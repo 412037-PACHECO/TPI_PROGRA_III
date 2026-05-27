@@ -1,0 +1,25 @@
+# IDE
+.idea/
+*.iml
+
+# Java / Maven
+target/
+*.class
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Frontend future
+node_modules/
+dist/
+.angular/
+.vscode/
