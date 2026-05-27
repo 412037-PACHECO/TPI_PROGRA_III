@@ -10,11 +10,20 @@
 
 ## Fase 2 - Catálogo y caché de cartas XY1
 
+- Estado: implementada y validada con tests automatizados.
 - Objetivo: importar/cachear cartas `xy1` desde pokemontcg.io v2.
-- Entregables: modelo catálogo, importador, búsqueda local.
-- Dependencias: Fase 1, DB elegida.
-- Riesgos: datos API no calzan directo con engine.
-- Criterio: cartas XY1 disponibles localmente sin consultar API durante partida.
+- Entregables: modelo catálogo JPA, H2 local/dev, cliente pokemontcg.io, importador idempotente, búsqueda local paginada por `setId` y/o nombre.
+- Dependencias: Fase 1, H2 local/dev elegido para fase académica y preparado para migrar.
+- Riesgos: datos API no calzan directo con engine; campos complejos se conservan como JSON texto y no deben tratarse como lógica ejecutable.
+- Criterio: cartas XY1 disponibles localmente sin consultar API durante partida; importación no duplica por `cardId` oficial.
+
+Endpoints fase 2:
+
+- `POST /api/cards/import/xy1`: importa/cachea `xy1` y devuelve resumen `received/created/updated/skipped/errors`.
+- `GET /api/cards?setId=xy1&name=...&page=0&size=20`: lista cartas cacheadas con filtros opcionales.
+- `GET /api/cards/{cardId}`: obtiene una carta cacheada por ID oficial.
+
+Fuera de alcance explícito de fase 2: Game Engine, Deck Builder, WebSockets, frontend, efectos ejecutables, validaciones de mazo y ACE SPEC obligatorio para `xy1`.
 
 ## Fase 3 - Deck Builder backend
 

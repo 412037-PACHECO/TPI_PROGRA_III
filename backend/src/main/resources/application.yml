@@ -1,6 +1,13 @@
 spring:
   application:
     name: pokemon-tcg-backend
+  profiles:
+    default: local
 
 server:
   port: 8080
+
+pokemon-tcg:
+  api:
+    base-url: https://api.pokemontcg.io/v2
+    api-key: ${POKEMON_TCG_API_KEY:}

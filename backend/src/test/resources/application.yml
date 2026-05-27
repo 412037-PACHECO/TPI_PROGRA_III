@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:pokemon-tcg-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+  h2:
+    console:
+      enabled: false
+
+pokemon-tcg:
+  api:
+    base-url: https://api.pokemontcg.io/v2
+    api-key:
