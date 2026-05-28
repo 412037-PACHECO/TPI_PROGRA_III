@@ -4,7 +4,7 @@
 
 El Game Engine es una máquina de estados determinística de dominio. Recibe un estado y un comando, valida reglas, muta el estado, emite eventos y no conoce infraestructura.
 
-Estado actual: la Fase 6 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno y acciones MAIN. Ataques, daño, knockout, premios durante partida, condiciones especiales, efectos complejos, WebSocket y endpoints de partida quedan para fases posteriores.
+Estado actual: la Fase 7 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno, acciones MAIN y ataques base. Knockout, premios durante partida, victoria/derrota, condiciones especiales, efectos complejos, WebSocket y endpoints de partida quedan para fases posteriores.
 
 ```text
 GameCommand
@@ -98,21 +98,28 @@ Limitaciones Fase 6:
 
 ## Flujo de ataque
 
-1. Validar jugador, fase y Pokémon activo.
-2. Validar que puede atacar: no Dormido/Paralizado, restricciones de primer turno, efectos activos.
-3. Validar coste de energía.
-4. Si está Confundido, lanzar moneda: cruz cancela ataque, aplica 3 contadores al atacante y termina turno.
-5. Resolver selecciones/targets.
-6. Ejecutar requisitos previos del ataque.
-7. Aplicar efectos que modifican o cancelan el ataque.
+Implementado en Fase 7:
+
+1. Validar `GameStatus.ACTIVE`.
+2. Validar que ataca el jugador actual.
+3. Validar que el ataque se declara desde `MAIN`; el engine pasa internamente a `ATTACK`.
+4. Validar que el jugador inicial no ataque en su primer turno.
+5. Validar Pokémon Activo atacante y Pokémon Activo defensor.
+6. Validar que el ataque seleccionado exista en el Pokémon Activo atacante.
+7. Validar coste de energía sin consumir energías: primero símbolos específicos, después `COLORLESS`.
 8. Calcular daño base.
-9. Aplicar modificadores del atacante.
-10. Aplicar Debilidad x2.
-11. Aplicar Resistencia -20, mínimo 0.
-12. Aplicar modificadores del defensor.
-13. Colocar contadores de daño.
-14. Aplicar efectos posteriores.
-15. Resolver knockouts y victoria.
+9. Aplicar Debilidad si el tipo del atacante coincide con la debilidad del defensor.
+10. Aplicar Resistencia si corresponde, con mínimo 0.
+11. Colocar contadores de daño sobre el Activo rival.
+12. Emitir eventos de ataque/daño.
+13. Finalizar el turno automáticamente usando `TurnManager`.
+
+Pendiente para fases posteriores:
+
+- Efectos textuales de ataques.
+- Condiciones especiales como Confundido/Dormido/Paralizado.
+- Modificadores de daño por habilidades, herramientas, estadios o efectos persistentes.
+- Knockout, premios y victoria.
 
 ## Flujo de knockout
 
@@ -148,7 +155,7 @@ Orden entre turnos: Envenenado → Quemado → Dormido → Paralizado → efecto
 - `SpecialConditionApplied`, `PokemonKnockedOut`, `PrizeTaken`.
 - `TurnEnded`, `VictoryDeclared`, `GameFinished`.
 
-Implementados como estructura base hasta Fase 6:
+Implementados como estructura base hasta Fase 7:
 
 - `GameCreatedEvent`.
 - `GameStateInitializedEvent`.
@@ -176,6 +183,11 @@ Implementados como estructura base hasta Fase 6:
 - `StadiumReplacedEvent`.
 - `TurnEndedEvent`.
 - `DeckOutLossDetectedEvent`.
+- `AttackDeclaredEvent`.
+- `EnergyCostValidatedEvent`.
+- `DamageCalculatedEvent`.
+- `DamageAppliedEvent`.
+- `AttackResolvedEvent`.
 
 ## Comandos de juego sugeridos
 
@@ -183,7 +195,7 @@ Implementados como estructura base hasta Fase 6:
 - `DrawForTurn`, `PlayBasicPokemon`, `EvolvePokemon`, `AttachEnergy`.
 - `PlayTrainer`, `UseAbility`, `Retreat`, `DeclareAttack`, `EndTurn`.
 
-En Fase 6 existen comandos/modelos específicos de setup y turno/acciones MAIN. Los comandos de ataque, daño, efectos y acciones completas de combate siguen pendientes.
+En Fase 7 existen comandos/modelos específicos de setup, turno/acciones MAIN y declaración de ataque base. Los comandos de efectos, KO, premios y victoria siguen pendientes.
 
 ## Reglas de acoplamiento del modelo actual
 
@@ -193,5 +205,5 @@ En Fase 6 existen comandos/modelos específicos de setup y turno/acciones MAIN. 
 
 ## Validadores y resolutores
 
-- Implementados: validaciones/resolución de setup, mulligan inicial, turno básico y acciones MAIN estructurales.
-- Futuros: validadores de ataque, daño, condiciones, efectos activos, knockout, premios durante partida y victoria.
+- Implementados: validaciones/resolución de setup, mulligan inicial, turno básico, acciones MAIN estructurales, ataque base, coste de energía y daño base con debilidad/resistencia.
+- Futuros: condiciones, efectos activos, knockout, premios durante partida y victoria.

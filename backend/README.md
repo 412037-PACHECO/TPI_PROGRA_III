@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 6 - Motor de turnos y acciones MAIN
+## Alcance actual: Fase 7 - Ataques base
 
-El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno base de estado de partida y setup/mulligan inicial. La Fase 6 agrega el motor de turnos y acciones principales de fase MAIN del Game Engine: puro Java, en memoria, testeable y desacoplado de Spring/JPA/controllers/WebSocket/API externa.
+El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial y motor de turnos/acciones MAIN. La Fase 7 agrega resolución base de ataques del Pokémon Activo: validación de energía, daño base, debilidad, resistencia, contadores de daño y finalización automática de turno.
 
 Incluye:
 
@@ -23,6 +23,7 @@ Incluye:
 - Módulo `game` con modelo interno de Game State, value objects, enums, eventos y comandos base.
 - Componentes de setup/mulligan para barajar, robar mano inicial, resolver mulligans, seleccionar Activo/Banca inicial, colocar Premios y definir jugador inicial.
 - Motor de turnos para inicio de turno, DRAW/MAIN, finalización de turno y acciones MAIN estructurales.
+- Motor de ataques base para validar ataque, validar coste de energía, calcular daño y aplicar contadores al Activo rival.
 
 ## Modelo Game State
 
@@ -47,6 +48,8 @@ Decisiones de dominio:
 - `CardDefinitionRef` también conserva metadata estructural opcional (`evolvesFrom`, `retreatCost`) para evolución/retiro sin interpretar texto natural.
 - `PokemonInPlay` mantiene pila de evolución, cartas unidas y turnos de entrada/evolución.
 - `GameState` puede mantener Estadio activo global como estructura, sin aplicar efectos continuos todavía.
+- `CardDefinitionRef` puede conservar ataques, HP, tipos, debilidades, resistencias y perfil de energía estructural para el motor de ataque.
+- `PokemonInPlay` conserva contadores de daño acumulados; Fase 7 no resuelve KO aunque el daño alcance el HP.
 
 Invariantes protegidas en el modelo:
 
@@ -110,6 +113,39 @@ Limitaciones honestas de Fase 6:
 - Las cartas Trainer, Stadium, Tool y Energías Especiales no aplican efectos textuales todavía.
 - El retiro no contempla modificadores de coste, condiciones especiales ni energías que cuenten doble.
 - Deck-out se marca sin modelo completo de ganador/victoria; eso queda para fases de victoria/derrota.
+
+## Ataques base
+
+La Fase 7 implementa ataques del Pokémon Activo como resolución estructural del engine.
+
+Componentes principales:
+
+- `AttackService`: valida y resuelve declaración de ataque desde `MAIN` con transición interna a `ATTACK`.
+- `EnergyCostValidator`: valida coste específico e incoloro sin consumir energías.
+- `DamageCalculator`: aplica daño base, debilidad y resistencia.
+- Modelo mínimo: `AttackDefinition`, `EnergyType`, `PokemonType`, `Weakness`, `Resistance`, `EnergyProfile`.
+
+Reglas implementadas:
+
+- Solo ataca el jugador actual.
+- El ataque se declara desde `TurnPhase.MAIN`; el engine transiciona internamente a `ATTACK` y luego finaliza turno.
+- El jugador inicial no puede atacar en su primer turno.
+- Solo ataca el Pokémon Activo.
+- El ataque debe existir en la definición del Pokémon Activo.
+- Debe haber un Pokémon Activo rival.
+- Energía específica requiere símbolo del tipo correspondiente.
+- Coste `COLORLESS` se paga con cualquier símbolo de energía.
+- Los costes específicos se cubren antes que los incoloros.
+- Se aplica daño base, luego debilidad, luego resistencia, con mínimo 0.
+- El daño se convierte a contadores de 10 y se acumula en el Activo rival.
+- Atacar finaliza automáticamente el turno usando `TurnManager`.
+
+Limitaciones honestas de Fase 7:
+
+- No hay knockout, descarte por KO, toma de premios ni victoria/derrota.
+- No se resuelven efectos textuales de ataques.
+- No se resuelven condiciones especiales como Confundido, Dormido o Paralizado.
+- Energías especiales solo cuentan si tienen `EnergyProfile` explícito; no hay efectos dinámicos.
 
 ## Endpoints de catálogo
 
@@ -295,8 +331,6 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 ## Qué NO incluye todavía
 
 - Partida jugable.
-- Ataques.
-- Cálculo de daño.
 - Knockout y premios durante partida.
 - Condiciones especiales.
 - WebSocket/realtime.

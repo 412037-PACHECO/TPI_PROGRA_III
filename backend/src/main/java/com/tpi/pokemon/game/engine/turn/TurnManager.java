@@ -73,8 +73,8 @@ public final class TurnManager {
         Objects.requireNonNull(command, "command must not be null");
         requireActive(state);
         TurnState turn = state.getTurnState();
-        if (turn.phase() != TurnPhase.MAIN) {
-            throw new TurnException("Turn can only end from MAIN phase");
+        if (turn.phase() != TurnPhase.MAIN && turn.phase() != TurnPhase.ATTACK) {
+            throw new TurnException("Turn can only end from MAIN or ATTACK phase");
         }
         if (!command.playerId().equals(turn.currentPlayer())) {
             throw new TurnException("Only the current player can end their turn");

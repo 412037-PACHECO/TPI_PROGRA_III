@@ -105,11 +105,20 @@ Decisiones fase 6:
 
 ## Fase 7 - Ataques base
 
-- Objetivo: declarar ataque, validar energía y daño simple.
-- Entregables: AttackResolver, DamageCalculator inicial.
+- Estado: implementada como motor puro Java, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Objetivo: declarar ataque, validar energía y resolver daño base contra el Activo rival.
+- Entregables: `AttackService`, `EnergyCostValidator`, `DamageCalculator`, modelo mínimo de ataque/energía/tipos/debilidad/resistencia y eventos de ataque/daño.
 - Dependencias: turnos.
-- Riesgos: mezclar efectos complejos demasiado pronto.
-- Criterio: ataque simple con daño/debilidad/resistencia testeado.
+- Riesgos: no interpretar efectos textuales; energías especiales solo cuentan si tienen `EnergyProfile` explícito; KO/victoria quedan pendientes.
+- Criterio: ataque simple con energía suficiente, daño base, debilidad, resistencia, contadores y fin automático de turno testeado.
+
+Decisiones fase 7:
+
+- El ataque se declara desde `MAIN` y el engine transiciona internamente a `ATTACK` antes de finalizar turno.
+- La energía no se consume al atacar.
+- El validador cubre primero costes específicos y después `COLORLESS`.
+- Debilidad se aplica antes que resistencia.
+- Daño se acumula como contadores en `PokemonInPlay`; no se resuelve KO todavía.
 
 ## Fase 8 - Knockout, premios y victoria
 

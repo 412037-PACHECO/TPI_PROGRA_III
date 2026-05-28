@@ -2,7 +2,10 @@ package com.tpi.pokemon.game.domain.model;
 
 import com.tpi.pokemon.game.domain.enums.CardSubtype;
 import com.tpi.pokemon.game.domain.enums.CardSupertype;
+import com.tpi.pokemon.game.domain.enums.PokemonType;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 public record CardDefinitionRef(
@@ -11,7 +14,13 @@ public record CardDefinitionRef(
         CardSupertype supertype,
         Set<CardSubtype> subtypes,
         String evolvesFrom,
-        Integer retreatCost
+        Integer retreatCost,
+        Integer hp,
+        List<PokemonType> pokemonTypes,
+        List<AttackDefinition> attacks,
+        List<Weakness> weaknesses,
+        List<Resistance> resistances,
+        EnergyProfile energyProfile
 ) {
     public CardDefinitionRef {
         if (cardId == null || cardId.isBlank()) {
@@ -28,7 +37,31 @@ public record CardDefinitionRef(
         if (retreatCost != null && retreatCost < 0) {
             throw new IllegalArgumentException("retreatCost must not be negative");
         }
+        if (hp != null && (hp <= 0 || hp % 10 != 0)) {
+            throw new IllegalArgumentException("hp must be positive and a multiple of 10 when provided");
+        }
+        Objects.requireNonNull(pokemonTypes, "pokemonTypes must not be null");
+        Objects.requireNonNull(attacks, "attacks must not be null");
+        Objects.requireNonNull(weaknesses, "weaknesses must not be null");
+        Objects.requireNonNull(resistances, "resistances must not be null");
+        Objects.requireNonNull(energyProfile, "energyProfile must not be null");
+        if (pokemonTypes.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("pokemonTypes must not contain null values");
+        }
+        if (attacks.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("attacks must not contain null values");
+        }
+        if (weaknesses.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("weaknesses must not contain null values");
+        }
+        if (resistances.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("resistances must not contain null values");
+        }
         subtypes = Set.copyOf(subtypes);
+        pokemonTypes = List.copyOf(pokemonTypes);
+        attacks = List.copyOf(attacks);
+        weaknesses = List.copyOf(weaknesses);
+        resistances = List.copyOf(resistances);
         if (evolvesFrom != null && evolvesFrom.isBlank()) {
             evolvesFrom = null;
         }
@@ -40,6 +73,10 @@ public record CardDefinitionRef(
 
     public CardDefinitionRef(String cardId, String name, CardSupertype supertype, Set<CardSubtype> subtypes) {
         this(cardId, name, supertype, subtypes, null, null);
+    }
+
+    public CardDefinitionRef(String cardId, String name, CardSupertype supertype, Set<CardSubtype> subtypes, String evolvesFrom, Integer retreatCost) {
+        this(cardId, name, supertype, subtypes, evolvesFrom, retreatCost, null, List.of(), List.of(), List.of(), List.of(), EnergyProfile.none());
     }
 
     public boolean isPokemon() {
@@ -80,5 +117,16 @@ public record CardDefinitionRef(
 
     public boolean hasKnownRetreatCost() {
         return retreatCost != null;
+    }
+
+    public Optional<AttackDefinition> attackById(String attackId) {
+        if (attackId == null || attackId.isBlank()) {
+            return Optional.empty();
+        }
+        return attacks.stream().filter(attack -> attack.attackId().equals(attackId)).findFirst();
+    }
+
+    public boolean providesEnergy() {
+        return isEnergy() && !energyProfile.provides().isEmpty();
     }
 }

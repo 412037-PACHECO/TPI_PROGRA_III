@@ -77,6 +77,10 @@ public record TurnState(
         return new TurnState(currentPlayer, startingPlayer, turnNumber, phase, cardDrawnThisTurn, energyAttachedThisTurn, supporterPlayedThisTurn, stadiumPlayedThisTurn, true);
     }
 
+    public TurnState enterAttack() {
+        return new TurnState(currentPlayer, startingPlayer, turnNumber, TurnPhase.ATTACK, cardDrawnThisTurn, energyAttachedThisTurn, supporterPlayedThisTurn, stadiumPlayedThisTurn, retreatedThisTurn);
+    }
+
     public TurnState preparedForNextPlayer(PlayerId nextPlayer) {
         Objects.requireNonNull(nextPlayer, "nextPlayer must not be null");
         return new TurnState(nextPlayer, startingPlayer, turnNumber, TurnPhase.NOT_STARTED, false, false, false, false, false);

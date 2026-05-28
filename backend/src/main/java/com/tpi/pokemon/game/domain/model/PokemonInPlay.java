@@ -11,12 +11,17 @@ public final class PokemonInPlay {
     private final AttachedCards attachedCards;
     private final int enteredTurnNumber;
     private final Integer lastEvolvedTurnNumber;
+    private final int damageCounters;
 
     public PokemonInPlay(CardInstance baseCard, AttachedCards attachedCards) {
-        this(List.of(baseCard), attachedCards, 0, null);
+        this(List.of(baseCard), attachedCards, 0, null, 0);
     }
 
     public PokemonInPlay(List<CardInstance> evolutionStack, AttachedCards attachedCards, int enteredTurnNumber, Integer lastEvolvedTurnNumber) {
+        this(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, 0);
+    }
+
+    public PokemonInPlay(List<CardInstance> evolutionStack, AttachedCards attachedCards, int enteredTurnNumber, Integer lastEvolvedTurnNumber, int damageCounters) {
         Objects.requireNonNull(evolutionStack, "evolutionStack must not be null");
         if (evolutionStack.isEmpty()) {
             throw new IllegalArgumentException("evolutionStack must not be empty");
@@ -30,6 +35,9 @@ public final class PokemonInPlay {
         if (lastEvolvedTurnNumber != null && lastEvolvedTurnNumber < 0) {
             throw new IllegalArgumentException("lastEvolvedTurnNumber must not be negative");
         }
+        if (damageCounters < 0) {
+            throw new IllegalArgumentException("damageCounters must not be negative");
+        }
         GameStateValidation.requireUniqueCards(evolutionStack, "evolution stack");
         this.evolutionStack = List.copyOf(evolutionStack);
         this.attachedCards = Objects.requireNonNull(attachedCards, "attachedCards must not be null");
@@ -39,6 +47,7 @@ public final class PokemonInPlay {
         }
         this.enteredTurnNumber = enteredTurnNumber;
         this.lastEvolvedTurnNumber = lastEvolvedTurnNumber;
+        this.damageCounters = damageCounters;
     }
 
     public static PokemonInPlay withoutAttachments(CardInstance baseCard) {
@@ -76,6 +85,10 @@ public final class PokemonInPlay {
         return lastEvolvedTurnNumber == null ? OptionalInt.empty() : OptionalInt.of(lastEvolvedTurnNumber);
     }
 
+    public int getDamageCounters() {
+        return damageCounters;
+    }
+
     public boolean wasPlayedThisTurn(int turnNumber) {
         return enteredTurnNumber == turnNumber;
     }
@@ -85,20 +98,31 @@ public final class PokemonInPlay {
     }
 
     public PokemonInPlay withAttachedEnergy(CardInstance energy) {
-        return new PokemonInPlay(evolutionStack, attachedCards.withEnergy(energy), enteredTurnNumber, lastEvolvedTurnNumber);
+        return new PokemonInPlay(evolutionStack, attachedCards.withEnergy(energy), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
     }
 
     public PokemonInPlay withAttachedTool(CardInstance tool) {
-        return new PokemonInPlay(evolutionStack, attachedCards.withTool(tool), enteredTurnNumber, lastEvolvedTurnNumber);
+        return new PokemonInPlay(evolutionStack, attachedCards.withTool(tool), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
     }
 
     public PokemonInPlay withoutAttachedEnergies(Set<CardInstanceId> energyIds) {
-        return new PokemonInPlay(evolutionStack, attachedCards.withoutEnergies(energyIds), enteredTurnNumber, lastEvolvedTurnNumber);
+        return new PokemonInPlay(evolutionStack, attachedCards.withoutEnergies(energyIds), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
     }
 
     public PokemonInPlay evolve(CardInstance evolutionCard, int turnNumber) {
         List<CardInstance> updatedStack = new java.util.ArrayList<>(evolutionStack);
         updatedStack.add(Objects.requireNonNull(evolutionCard, "evolutionCard must not be null"));
-        return new PokemonInPlay(updatedStack, attachedCards, enteredTurnNumber, turnNumber);
+        return new PokemonInPlay(updatedStack, attachedCards, enteredTurnNumber, turnNumber, damageCounters);
+    }
+
+    public PokemonInPlay withDamageCounters(int damageCounters) {
+        return new PokemonInPlay(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
+    }
+
+    public PokemonInPlay applyDamage(int damageAmount) {
+        if (damageAmount < 0 || damageAmount % 10 != 0) {
+            throw new IllegalArgumentException("damageAmount must be non-negative and a multiple of 10");
+        }
+        return withDamageCounters(damageCounters + (damageAmount / 10));
     }
 }
