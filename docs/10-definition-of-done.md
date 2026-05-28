@@ -9,6 +9,7 @@
 - Tests mínimos del caso de uso.
 - Documentación actualizada si cambia arquitectura o contrato.
 - No implementa validaciones de expansiones opcionales como obligatorias del alcance base; por ejemplo, AS TÁCTICO / ACE SPEC no se valida para mazos solo `xy1`.
+- Deck Builder puede persistir mazos incompletos; las reglas de mazo completo deben estar en endpoint/servicio explícito de validación, no como bloqueo del CRUD.
 
 ## Game Engine
 

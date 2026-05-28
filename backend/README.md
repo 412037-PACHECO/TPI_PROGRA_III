@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 2 - Catálogo/cache local XY1
+## Alcance actual: Fase 3 - Deck Builder backend
 
-Esta fase agrega un catálogo local de cartas `xy1` importado desde `pokemontcg.io` v2. El backend guarda una copia fiel de los datos relevantes para consultas locales, sin interpretar texto natural como lógica ejecutable.
+El backend ya cuenta con catálogo local de cartas `xy1` importado desde `pokemontcg.io` v2. Esta fase agrega Deck Builder sobre ese catálogo local: CRUD de mazos, edición de cantidades y validación explícita de reglas XY1, sin interpretar texto natural como lógica ejecutable.
 
 Incluye:
 
@@ -16,6 +16,10 @@ Incluye:
 - Módulo `cards` separado en `api`, `application`, `domain` e `infrastructure`.
 - Importador de cartas `xy1` desde `pokemontcg.io`.
 - Búsqueda local paginada por `setId` y/o nombre parcial.
+- Módulo `decks` separado en `api`, `application` y `domain`.
+- CRUD de mazos por `ownerName` simple, sin relación compleja con `Player`.
+- Edición de cartas del mazo usando exclusivamente el catálogo local.
+- Validación explícita de mazos XY1.
 
 ## Endpoints de catálogo
 
@@ -64,6 +68,117 @@ Ejemplo:
 GET /api/cards/xy1-1
 ```
 
+## Endpoints Deck Builder
+
+El Deck Builder depende del catálogo local. Antes de agregar cartas, importá/cacheá `xy1` con `POST /api/cards/import/xy1`. No consume `pokemontcg.io` directamente desde decks.
+
+### Crear mazo vacío
+
+```http
+POST /api/decks
+Content-Type: application/json
+
+{
+  "name": "Mi mazo XY1",
+  "ownerName": "Ash"
+}
+```
+
+### Listar mazos por owner
+
+```http
+GET /api/decks?owner=Ash
+```
+
+### Obtener detalle
+
+```http
+GET /api/decks/{deckId}
+```
+
+El detalle incluye `cardId`, `name`, `supertype`, `subtypes`, `imageSmall` y `quantity` de cada carta, enriquecidos desde el catálogo local.
+
+### Editar datos básicos
+
+```http
+PUT /api/decks/{deckId}
+Content-Type: application/json
+
+{
+  "name": "Mi mazo editado",
+  "ownerName": "Ash"
+}
+```
+
+No se fuerza unicidad de nombre por owner en esta fase.
+
+### Eliminar mazo
+
+```http
+DELETE /api/decks/{deckId}
+```
+
+Status esperado: `204 No Content`.
+
+### Agregar o actualizar carta
+
+```http
+PUT /api/decks/{deckId}/cards/xy1-1
+Content-Type: application/json
+
+{
+  "quantity": 4
+}
+```
+
+- `quantity < 0`: error `400`.
+- `quantity = 0`: remueve la carta del mazo.
+- Carta inexistente en catálogo local: error `404`.
+- Carta de set distinto de `xy1`: error `400`.
+
+### Quitar carta
+
+```http
+DELETE /api/decks/{deckId}/cards/xy1-1
+```
+
+### Validar mazo
+
+```http
+GET /api/decks/{deckId}/validation
+```
+
+Respuesta mínima:
+
+```json
+{
+  "valid": false,
+  "totalCards": 12,
+  "errors": [
+    {
+      "code": "DECK_SIZE_NOT_60",
+      "cardId": null,
+      "cardName": null,
+      "message": "El mazo debe tener exactamente 60 cartas"
+    }
+  ],
+  "warnings": [
+    "AS TÁCTICO / ACE SPEC no se valida como regla obligatoria para mazos xy1."
+  ]
+}
+```
+
+Reglas XY1 implementadas solo en el endpoint explícito de validación:
+
+- Exactamente 60 cartas para `valid=true`.
+- Máximo 4 copias por nombre de carta.
+- Energía Básica sin límite. Se detecta por `supertype` Energy/Energía y subtype Basic/Básica; adicionalmente se contemplan nombres simples de energías básicas.
+- Al menos 1 Pokémon Básico.
+- Errores posibles: `DECK_SIZE_NOT_60`, `TOO_MANY_COPIES`, `NO_BASIC_POKEMON`, `CARD_NOT_FOUND`, `NON_XY1_CARD`.
+- AS TÁCTICO / ACE SPEC NO es validación obligatoria para `xy1`.
+
+Los mazos incompletos pueden guardarse y editarse. Las reglas de mazo completo no bloquean el CRUD.
+
 ## Base de datos local/dev
 
 Se usa H2 bajo el perfil `local` como base de desarrollo inicial para mantener la fase académica liviana y migrable a PostgreSQL/MySQL más adelante.
@@ -93,9 +208,7 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Motor de juego.
 - WebSocket/realtime.
 - Frontend.
-- Deck Builder.
 - Efectos ejecutables.
-- Validaciones de mazo.
 - Regla ACE SPEC obligatoria para `xy1`.
 
 Los campos complejos de cartas (`attacks`, `abilities`, `rules`, `weaknesses`, etc.) se guardan como JSON texto para conservar fidelidad de catálogo sin sobre-modelar ni parsear reglas.
@@ -107,7 +220,7 @@ Los campos complejos de cartas (`attacks`, `abilities`, `rules`, `weaknesses`, e
 - `h2`: base local/dev y tests.
 - `spring-boot-starter-test`: permite validar el contexto de Spring desde el inicio.
 
-No se incluye `spring-boot-starter-validation` porque los endpoints actuales usan parámetros simples y no hay DTOs de entrada complejos.
+No se incluye `spring-boot-starter-validation`; los DTOs de Deck Builder se validan manualmente con mensajes simples para evitar agregar dependencias en esta fase.
 
 ## Comandos
 

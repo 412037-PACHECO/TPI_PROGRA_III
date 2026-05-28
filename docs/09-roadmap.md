@@ -27,13 +27,32 @@ Fuera de alcance explícito de fase 2: Game Engine, Deck Builder, WebSockets, fr
 
 ## Fase 3 - Deck Builder backend
 
+- Estado: implementada en backend.
 - Objetivo: CRUD y validación de mazos.
-- Entregables: decks, deck cards y validaciones obligatorias para alcance base `xy1`: exactamente 60 cartas, máximo 4 copias por nombre salvo excepciones oficiales aplicables, y al menos 1 Pokémon Básico.
+- Entregables: decks, deck cards, endpoints REST y validaciones obligatorias para alcance base `xy1`: exactamente 60 cartas, máximo 4 copias por nombre salvo Energía Básica, y al menos 1 Pokémon Básico.
 - Dependencias: catálogo.
-- Riesgos: reglas de nombre Pokémon mal interpretadas; implementar por error AS TÁCTICO / ACE SPEC como validación obligatoria aunque `xy1` no contiene esa mecánica.
+- Riesgos: detección de Energía Básica basada en campos de catálogo JSON texto y nombres simples; reglas de nombre Pokémon mal interpretadas; implementar por error AS TÁCTICO / ACE SPEC como validación obligatoria aunque `xy1` no contiene esa mecánica.
 - Criterio: mazo válido/inválido detectado con mensajes claros.
 
 Nota: la validación "máximo 1 AS TÁCTICO / ACE SPEC por mazo" no aplica a mazos solo `xy1`. Queda como validación condicional/futura si se incorporan sets opcionales que incluyan cartas ACE SPEC.
+
+Endpoints fase 3:
+
+- `POST /api/decks`: crea mazo vacío.
+- `GET /api/decks?owner=...`: lista mazos por `ownerName` case-insensitive.
+- `GET /api/decks/{deckId}`: obtiene detalle enriquecido con datos del catálogo local.
+- `PUT /api/decks/{deckId}`: edita nombre y `ownerName`.
+- `DELETE /api/decks/{deckId}`: elimina mazo.
+- `PUT /api/decks/{deckId}/cards/{cardId}`: agrega/actualiza cantidad; `quantity=0` remueve.
+- `DELETE /api/decks/{deckId}/cards/{cardId}`: quita carta.
+- `GET /api/decks/{deckId}/validation`: valida reglas XY1 sin bloquear guardado de mazos incompletos.
+
+Decisiones fase 3:
+
+- `ownerName` queda como string simple; no hay relación con `Player` todavía.
+- No se define unicidad de nombre de mazo por owner.
+- Deck Builder solo usa `CardRepository` local; no llama a pokemontcg.io.
+- El CRUD permite mazos incompletos; la completitud se evalúa solo en `/validation`.
 
 ## Fase 4 - Modelo de Game State
 
