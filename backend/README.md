@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 5 - Setup y Mulligan
+## Alcance actual: Fase 6 - Motor de turnos y acciones MAIN
 
-El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder y modelo interno base de estado de partida. La Fase 5 agrega el flujo inicial de setup/mulligan del Game Engine: puro Java, en memoria, testeable y desacoplado de Spring/JPA/controllers/WebSocket/API externa.
+El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno base de estado de partida y setup/mulligan inicial. La Fase 6 agrega el motor de turnos y acciones principales de fase MAIN del Game Engine: puro Java, en memoria, testeable y desacoplado de Spring/JPA/controllers/WebSocket/API externa.
 
 Incluye:
 
@@ -22,6 +22,7 @@ Incluye:
 - Validación explícita de mazos XY1.
 - Módulo `game` con modelo interno de Game State, value objects, enums, eventos y comandos base.
 - Componentes de setup/mulligan para barajar, robar mano inicial, resolver mulligans, seleccionar Activo/Banca inicial, colocar Premios y definir jugador inicial.
+- Motor de turnos para inicio de turno, DRAW/MAIN, finalización de turno y acciones MAIN estructurales.
 
 ## Modelo Game State
 
@@ -43,6 +44,9 @@ Decisiones de dominio:
 - El estado interno no es una vista segura para frontend; podrá contener mano, premios y mazo de ambos jugadores.
 - `PrizeCards` permite `0` para estado no inicializado, `6` para setup normal y `1` para futura Muerte Súbita.
 - `CardDefinitionRef` conserva clasificación mínima (`CardSupertype` y `CardSubtype`) para validar Pokémon Básico durante setup sin consultar infraestructura externa.
+- `CardDefinitionRef` también conserva metadata estructural opcional (`evolvesFrom`, `retreatCost`) para evolución/retiro sin interpretar texto natural.
+- `PokemonInPlay` mantiene pila de evolución, cartas unidas y turnos de entrada/evolución.
+- `GameState` puede mantener Estadio activo global como estructura, sin aplicar efectos continuos todavía.
 
 Invariantes protegidas en el modelo:
 
@@ -77,6 +81,35 @@ Flujo implementado:
 9. Determinar jugador inicial y dejar el juego en `ACTIVE` con `TurnState.preparedForFirstTurn(...)`.
 
 Decisión de fase: al completar setup la partida queda preparada para Fase 6, pero no se ejecuta robo obligatorio de turno, acciones de turno, ataques ni efectos.
+
+## Turnos y acciones MAIN
+
+La Fase 6 implementa estructura de turno y acciones principales, pero todavía no resuelve ataques ni consecuencias de combate.
+
+Componentes principales:
+
+- `TurnManager`: inicia turnos, resuelve DRAW obligatorio o salto de robo del primer jugador, entra a MAIN y finaliza turno.
+- `TurnActionService`: ejecuta acciones MAIN estructurales.
+- Commands: `StartTurnCommand`, `EndTurnCommand`, `PutBasicPokemonOnBenchCommand`, `AttachEnergyCommand`, `EvolvePokemonCommand`, `RetreatActivePokemonCommand`, `PlayTrainerCommand`.
+
+Reglas implementadas:
+
+- El primer jugador no roba en su primer turno.
+- Los demás inicios de turno roban 1 carta; si el mazo está vacío se emite `DeckOutLossDetectedEvent` y el estado pasa a `FINISHED` como marcador provisional.
+- Solo el jugador actual puede actuar.
+- Las acciones MAIN solo se permiten en `TurnPhase.MAIN`.
+- Bajar Pokémon Básico a Banca desde la mano, respetando máximo 5.
+- Unir 1 Energía por turno a un Pokémon propio en juego.
+- Evolucionar estructuralmente con `evolvesFrom`, bloqueando primer turno del jugador, Pokémon recién jugados y doble evolución en el mismo turno.
+- Retirar estructuralmente una vez por turno si el coste de retirada es conocido y se descartan energías suficientes.
+- Jugar Entrenadores estructurales: Item sin límite, Supporter máximo 1, Stadium máximo 1 y Tool única por Pokémon.
+- Finalizar turno cambia al oponente, deja fase `NOT_STARTED` y resetea flags para el siguiente inicio de turno.
+
+Limitaciones honestas de Fase 6:
+
+- Las cartas Trainer, Stadium, Tool y Energías Especiales no aplican efectos textuales todavía.
+- El retiro no contempla modificadores de coste, condiciones especiales ni energías que cuenten doble.
+- Deck-out se marca sin modelo completo de ganador/victoria; eso queda para fases de victoria/derrota.
 
 ## Endpoints de catálogo
 
@@ -262,8 +295,10 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 ## Qué NO incluye todavía
 
 - Partida jugable.
-- Turnos reales.
 - Ataques.
+- Cálculo de daño.
+- Knockout y premios durante partida.
+- Condiciones especiales.
 - WebSocket/realtime.
 - Frontend.
 - Efectos ejecutables.

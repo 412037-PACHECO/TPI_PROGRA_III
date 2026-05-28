@@ -14,14 +14,20 @@ public final class GameState {
     private final PlayerGameState playerOneState;
     private final PlayerGameState playerTwoState;
     private final TurnState turnState;
+    private final StadiumInPlay activeStadium;
     private final List<GameEvent> events;
 
     public GameState(GameId gameId, GameStatus status, PlayerGameState playerOneState, PlayerGameState playerTwoState, TurnState turnState, List<GameEvent> events) {
+        this(gameId, status, playerOneState, playerTwoState, turnState, null, events);
+    }
+
+    public GameState(GameId gameId, GameStatus status, PlayerGameState playerOneState, PlayerGameState playerTwoState, TurnState turnState, StadiumInPlay activeStadium, List<GameEvent> events) {
         this.gameId = Objects.requireNonNull(gameId, "gameId must not be null");
         this.status = Objects.requireNonNull(status, "status must not be null");
         this.playerOneState = Objects.requireNonNull(playerOneState, "playerOneState must not be null");
         this.playerTwoState = Objects.requireNonNull(playerTwoState, "playerTwoState must not be null");
         this.turnState = Objects.requireNonNull(turnState, "turnState must not be null");
+        this.activeStadium = activeStadium;
         Objects.requireNonNull(events, "events must not be null");
         if (events.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("events must not contain null values");
@@ -66,6 +72,10 @@ public final class GameState {
 
     public TurnState getTurnState() {
         return turnState;
+    }
+
+    public java.util.Optional<StadiumInPlay> getActiveStadium() {
+        return java.util.Optional.ofNullable(activeStadium);
     }
 
     public List<GameEvent> getEvents() {

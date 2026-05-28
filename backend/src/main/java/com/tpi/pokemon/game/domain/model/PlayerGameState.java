@@ -13,14 +13,23 @@ public final class PlayerGameState {
     private final PrizeCards prizeCards;
     private final DiscardPile discardPile;
     private final BoardState board;
+    private final int turnsTaken;
 
     public PlayerGameState(PlayerId playerId, DeckZone deck, HandZone hand, PrizeCards prizeCards, DiscardPile discardPile, BoardState board) {
+        this(playerId, deck, hand, prizeCards, discardPile, board, 0);
+    }
+
+    public PlayerGameState(PlayerId playerId, DeckZone deck, HandZone hand, PrizeCards prizeCards, DiscardPile discardPile, BoardState board, int turnsTaken) {
         this.playerId = Objects.requireNonNull(playerId, "playerId must not be null");
         this.deck = Objects.requireNonNull(deck, "deck must not be null");
         this.hand = Objects.requireNonNull(hand, "hand must not be null");
         this.prizeCards = Objects.requireNonNull(prizeCards, "prizeCards must not be null");
         this.discardPile = Objects.requireNonNull(discardPile, "discardPile must not be null");
         this.board = Objects.requireNonNull(board, "board must not be null");
+        if (turnsTaken < 0) {
+            throw new IllegalArgumentException("turnsTaken must not be negative");
+        }
+        this.turnsTaken = turnsTaken;
         validateOwnershipAndUniqueness();
     }
 
@@ -52,6 +61,14 @@ public final class PlayerGameState {
         return board;
     }
 
+    public int getTurnsTaken() {
+        return turnsTaken;
+    }
+
+    public PlayerGameState withTurnsTaken(int turnsTaken) {
+        return new PlayerGameState(playerId, deck, hand, prizeCards, discardPile, board, turnsTaken);
+    }
+
     private void validateOwnershipAndUniqueness() {
         Set<CardInstanceId> seen = new HashSet<>();
         deck.getCards().forEach(card -> validateCard(card, seen, "deck"));
@@ -63,7 +80,7 @@ public final class PlayerGameState {
     }
 
     private void validatePokemon(PokemonInPlay pokemon, Set<CardInstanceId> seen, String zoneName) {
-        validateCard(pokemon.getBaseCard(), seen, zoneName);
+        pokemon.getEvolutionStack().forEach(card -> validateCard(card, seen, zoneName));
         pokemon.getAttachedCards().getCards().forEach(card -> validateCard(card, seen, zoneName + " attached cards"));
     }
 

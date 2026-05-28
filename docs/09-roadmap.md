@@ -88,11 +88,20 @@ Decisiones fase 5:
 
 ## Fase 6 - Turnos y acciones básicas
 
-- Objetivo: DRAW/MAIN/ATTACK/BETWEEN_TURNS y comandos básicos.
-- Entregables: TurnManager, flags, acciones de banca/energía/retiro básico.
+- Estado: implementada como motor puro Java, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Objetivo: estructura de turno DRAW/MAIN y acciones principales previas a ataque.
+- Entregables: `TurnManager`, `TurnActionService`, flags de turno, robo obligatorio, deck-out provisional, banca, energía, evolución, retiro y Trainers estructurales.
 - Dependencias: setup.
-- Riesgos: flags mal reseteados.
-- Criterio: tests de fase/turno/jugador.
+- Riesgos: metadata incompleta para `evolvesFrom`/`retreatCost`; retiro no contempla modificadores ni condiciones; Trainers no aplican efectos.
+- Criterio: tests unitarios de fase/turno/jugador, robo, deck-out, flags y acciones MAIN.
+
+Decisiones fase 6:
+
+- `TurnManager.startTurn` resuelve DRAW y pasa a MAIN porque todavía no hay decisiones durante DRAW.
+- El primer jugador saltea su primer robo; el segundo jugador roba normalmente.
+- Deck-out emite evento y marca `GameStatus.FINISHED` sin modelo completo de ganador todavía.
+- `PokemonInPlay` usa pila de evolución y conserva attachments al evolucionar.
+- `GameState` mantiene estadio activo global; efectos de estadio quedan pendientes.
 
 ## Fase 7 - Ataques base
 

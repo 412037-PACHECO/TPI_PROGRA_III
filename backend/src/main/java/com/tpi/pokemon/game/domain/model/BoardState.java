@@ -9,10 +9,16 @@ import java.util.Set;
 public final class BoardState {
     private final ActivePokemon activePokemon;
     private final Bench bench;
+    private final StadiumInPlay activeStadium;
 
     public BoardState(ActivePokemon activePokemon, Bench bench) {
+        this(activePokemon, bench, null);
+    }
+
+    public BoardState(ActivePokemon activePokemon, Bench bench, StadiumInPlay activeStadium) {
         this.activePokemon = activePokemon;
         this.bench = Objects.requireNonNull(bench, "bench must not be null");
+        this.activeStadium = activeStadium;
         validateNoDuplicateCardsBetweenActiveAndBench();
     }
 
@@ -28,19 +34,26 @@ public final class BoardState {
         return bench;
     }
 
+    public Optional<StadiumInPlay> getActiveStadium() {
+        return Optional.ofNullable(activeStadium);
+    }
+
     private void validateNoDuplicateCardsBetweenActiveAndBench() {
         Set<CardInstanceId> seen = new HashSet<>();
         if (activePokemon != null) {
-            addUnique(seen, activePokemon.getPokemon().getBaseCard());
+            activePokemon.getPokemon().getEvolutionStack().forEach(card -> addUnique(seen, card));
             for (CardInstance attached : activePokemon.getPokemon().getAttachedCards().getCards()) {
                 addUnique(seen, attached);
             }
         }
         for (PokemonInPlay pokemonInPlay : bench.getPokemon()) {
-            addUnique(seen, pokemonInPlay.getBaseCard());
+            pokemonInPlay.getEvolutionStack().forEach(card -> addUnique(seen, card));
             for (CardInstance attached : pokemonInPlay.getAttachedCards().getCards()) {
                 addUnique(seen, attached);
             }
+        }
+        if (activeStadium != null) {
+            addUnique(seen, activeStadium.card());
         }
     }
 

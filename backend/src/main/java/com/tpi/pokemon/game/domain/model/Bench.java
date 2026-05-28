@@ -21,7 +21,7 @@ public final class Bench {
         }
         Set<CardInstanceId> seen = new HashSet<>();
         for (PokemonInPlay pokemonInPlay : pokemon) {
-            addUnique(seen, pokemonInPlay.getBaseCard());
+            pokemonInPlay.getEvolutionStack().forEach(card -> addUnique(seen, card));
             for (CardInstance attached : pokemonInPlay.getAttachedCards().getCards()) {
                 addUnique(seen, attached);
             }

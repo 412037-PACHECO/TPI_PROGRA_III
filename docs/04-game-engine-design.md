@@ -4,7 +4,7 @@
 
 El Game Engine es una máquina de estados determinística de dominio. Recibe un estado y un comando, valida reglas, muta el estado, emite eventos y no conoce infraestructura.
 
-Estado actual: la Fase 5 implementa el modelo interno base de `GameState` y el flujo inicial de setup/mulligan. Turnos completos, robo obligatorio de turno, ataques, efectos, WebSocket y endpoints de partida quedan para fases posteriores.
+Estado actual: la Fase 6 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno y acciones MAIN. Ataques, daño, knockout, premios durante partida, condiciones especiales, efectos complejos, WebSocket y endpoints de partida quedan para fases posteriores.
 
 ```text
 GameCommand
@@ -21,8 +21,8 @@ Estados implementados en el modelo actual:
 
 - `CREATED`: estado base creado con dos jugadores, sin setup resuelto.
 - `SETUP`: setup iniciado, manos/mulligans resueltos, esperando selección inicial o cierre.
-- `ACTIVE`: setup completado y partida preparada para el primer turno futuro.
-- `FINISHED`: partida finalizada con ganador o resultado definido.
+- `ACTIVE`: setup completado o turno en curso.
+- `FINISHED`: estado terminal del modelo. En Fase 6 puede usarse como marcador provisional de deck-out sin ganador persistido; el resultado completo queda para victoria/derrota.
 
 Estados requeridos por diseño funcional/futuro:
 
@@ -63,12 +63,38 @@ Implementación Fase 5:
 
 ## Flujo de turno
 
-1. `DRAW`: robar carta o perder si el mazo está vacío al inicio del turno.
-2. `MAIN`: ejecutar comandos opcionales válidos.
-3. `ATTACK`: declarar ataque si permitido.
-4. Resolver ataque y finalizar turno.
-5. `BETWEEN_TURNS`: procesar condiciones/efectos.
-6. Cambiar jugador activo y resetear flags.
+Implementado en Fase 6:
+
+1. `NOT_STARTED`: turno preparado para el jugador actual.
+2. `DRAW`: `TurnManager.startTurn` incrementa turno y resuelve robo obligatorio.
+3. Excepción: el jugador inicial no roba en su primer turno.
+4. Si debe robar y el mazo está vacío, se emite `DeckOutLossDetectedEvent` y el estado pasa a `FINISHED` como marcador provisional de deck-out.
+5. `MAIN`: ejecutar acciones principales estructurales válidas.
+6. `TurnManager.endTurn`: cambia al oponente, resetea flags y deja `NOT_STARTED`.
+
+Pendiente para fases posteriores:
+
+1. `ATTACK`: declarar/resolver ataque.
+2. Resolver daño, KO, premios y victoria.
+3. `BETWEEN_TURNS`: procesar condiciones/efectos.
+
+## Acciones MAIN implementadas en Fase 6
+
+- Bajar Pokémon Básico desde la mano a la Banca, máximo 5.
+- Unir una Energía por turno a un Pokémon propio.
+- Evolucionar respetando `evolvesFrom`, primer turno del jugador, Pokémon recién jugado y una evolución por Pokémon por turno.
+- Retirar Activo una vez por turno si el coste de retirada es conocido y se pagan energías adjuntas suficientes.
+- Jugar Trainer estructuralmente:
+  - Item: sin límite, mano → descarte.
+  - Supporter: máximo 1 por turno, mano → descarte.
+  - Stadium: máximo 1 por turno, queda como estadio activo global y reemplaza el anterior.
+  - Tool: se une a un Pokémon propio, máximo 1 herramienta por Pokémon.
+
+Limitaciones Fase 6:
+
+- No se aplican efectos textuales de Trainer, Stadium, Tool, habilidades ni Energías Especiales.
+- No se modelan condiciones especiales ni restricciones que impidan retiro.
+- No se aplican modificadores de coste de retirada.
 
 ## Flujo de ataque
 
@@ -122,7 +148,7 @@ Orden entre turnos: Envenenado → Quemado → Dormido → Paralizado → efecto
 - `SpecialConditionApplied`, `PokemonKnockedOut`, `PrizeTaken`.
 - `TurnEnded`, `VictoryDeclared`, `GameFinished`.
 
-Implementados como estructura base hasta Fase 5:
+Implementados como estructura base hasta Fase 6:
 
 - `GameCreatedEvent`.
 - `GameStateInitializedEvent`.
@@ -138,6 +164,18 @@ Implementados como estructura base hasta Fase 5:
 - `PrizeCardsSetEvent`.
 - `StartingPlayerSelectedEvent`.
 - `SetupCompletedEvent`.
+- `TurnStartedEvent`.
+- `CardDrawnEvent`.
+- `CardDrawSkippedEvent`.
+- `MainPhaseStartedEvent`.
+- `BasicPokemonBenchedEvent`.
+- `EnergyAttachedEvent`.
+- `PokemonEvolvedEvent`.
+- `ActivePokemonRetreatedEvent`.
+- `TrainerPlayedEvent`.
+- `StadiumReplacedEvent`.
+- `TurnEndedEvent`.
+- `DeckOutLossDetectedEvent`.
 
 ## Comandos de juego sugeridos
 
@@ -145,7 +183,7 @@ Implementados como estructura base hasta Fase 5:
 - `DrawForTurn`, `PlayBasicPokemon`, `EvolvePokemon`, `AttachEnergy`.
 - `PlayTrainer`, `UseAbility`, `Retreat`, `DeclareAttack`, `EndTurn`.
 
-En Fase 5 existen comandos/modelos específicos de setup (`StartSetupCommand`, `ChooseInitialPokemonCommand`, `CompleteSetupCommand`) procesados por `SetupService`. Los comandos de turno, ataque, efectos y acciones completas siguen pendientes.
+En Fase 6 existen comandos/modelos específicos de setup y turno/acciones MAIN. Los comandos de ataque, daño, efectos y acciones completas de combate siguen pendientes.
 
 ## Reglas de acoplamiento del modelo actual
 
@@ -155,6 +193,5 @@ En Fase 5 existen comandos/modelos específicos de setup (`StartSetupCommand`, `
 
 ## Validadores y resolutores
 
-- Implementados: validaciones/resolución de setup y mulligan inicial.
-- Futuros: validadores de turno, fase, zona, target, coste, restricciones, efectos activos.
-- Futuros: resolutores de turnos, ataque, daño, condiciones, knockout, premios durante partida y victoria.
+- Implementados: validaciones/resolución de setup, mulligan inicial, turno básico y acciones MAIN estructurales.
+- Futuros: validadores de ataque, daño, condiciones, efectos activos, knockout, premios durante partida y victoria.

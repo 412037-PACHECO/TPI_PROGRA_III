@@ -2,6 +2,8 @@
 
 ## Entidades principales
 
+La tabla describe el modelo objetivo del TPI. La sección siguiente indica qué partes existen actualmente en código.
+
 | Entidad | Responsabilidad |
 |---|---|
 | Game | Estado completo de una partida y raíz del agregado del motor. |
@@ -24,18 +26,19 @@
 
 ## Estado de implementación actual
 
-La Fase 5 implementa el modelo interno base y el flujo inicial de setup/mulligan bajo `backend/src/main/java/com/tpi/pokemon/game/`.
+La Fase 6 implementa el modelo interno base, setup/mulligan y motor de turnos con acciones MAIN bajo `backend/src/main/java/com/tpi/pokemon/game/`.
 
 Incluye:
 
 - Value objects: `GameId`, `PlayerId`, `CardInstanceId`.
 - Enums: `GameStatus`, `TurnPhase`, `ZoneType`, `CardSupertype`, `CardSubtype`.
-- Modelo: `GameState`, `PlayerGameState`, `BoardState`, `TurnState`, `CardDefinitionRef`, `CardInstance`, `PokemonInPlay`, `ActivePokemon`, `Bench`, `AttachedCards`, `DeckZone`, `HandZone`, `PrizeCards`, `DiscardPile`.
-- Eventos base: `GameCreatedEvent`, `GameStateInitializedEvent`, `CardMovedEvent`, `TurnPhaseChangedEvent` y eventos de setup/mulligan.
+- Modelo: `GameState`, `PlayerGameState`, `BoardState`, `TurnState`, `CardDefinitionRef`, `CardInstance`, `PokemonInPlay`, `ActivePokemon`, `Bench`, `AttachedCards`, `DeckZone`, `HandZone`, `PrizeCards`, `DiscardPile`, `StadiumInPlay`.
+- Eventos base: `GameCreatedEvent`, `GameStateInitializedEvent`, `CardMovedEvent`, `TurnPhaseChangedEvent`, eventos de setup/mulligan y eventos de turno/acciones MAIN.
 - Comandos base: `GameCommand`, `PlayerCommand`, `CommandResult`.
 - Setup: `SetupService`, `DeckShuffler`, `StartingPlayerSelector`, `MulliganBonusDrawPolicy`, `StartSetupCommand`, `ChooseInitialPokemonCommand`, `CompleteSetupCommand`.
+- Turnos: `TurnManager`, `TurnActionService` y comandos de inicio/fin de turno, banca, energía, evolución, retiro y Trainer.
 
-No implementa todavía turnos reales, robo obligatorio de turno, ataques, efectos, endpoints de partida, WebSocket ni frontend.
+No implementa todavía ataques, daño, knockout, condiciones especiales, efectos complejos, endpoints de partida, WebSocket ni frontend.
 
 ## Relaciones
 
@@ -46,7 +49,7 @@ No implementa todavía turnos reales, robo obligatorio de turno, ataques, efecto
 - `Turn` pertenece al `Game` y define fase/flags.
 - `GameLog` pertenece a `Game/Match` y registra eventos derivados del motor.
 
-## Invariantes implementadas hasta Fase 5
+## Invariantes implementadas hasta Fase 6
 
 - Una `CardInstance` está en una sola zona lógica: deck, mano, premios, descarte, activo, banca, unida o removida.
 - Cada jugador tiene como máximo 1 Pokémon activo.
@@ -55,15 +58,16 @@ No implementa todavía turnos reales, robo obligatorio de turno, ataques, efecto
 - El mazo mantiene orden oculto.
 - La selección inicial de Activo/Banca solo acepta cartas que estén en mano y sean Pokémon Básicos.
 - El setup completo coloca exactamente 6 Premios desde el tope del mazo de cada jugador.
+- Solo el jugador actual puede ejecutar acciones MAIN.
+- Las acciones MAIN requieren `TurnPhase.MAIN`.
+- Una energía manual, un Partidario, un Estadio y un retiro como máximo por turno.
+- La evolución estructural conserva cartas unidas y respeta primer turno del jugador, Pokémon recién jugado y evolución previa en el mismo turno.
 
 ## Reglas de dominio futuras / requeridas por reglamento
 
 - Mano rival, premios ocultos y orden de mazo no se exponen al oponente.
-- Solo el jugador activo ejecuta acciones de turno, salvo reglas futuras explícitas.
-- Una energía manual por turno, salvo efecto que lo permita.
-- Un retiro por turno.
-- Un Partidario por turno.
-- Un Estadio por turno.
+- Ataques, cálculo de daño, knockout, premios durante partida y victoria quedan pendientes.
+- Efectos de cartas pueden modificar límites de energía/retiro/Trainer en fases futuras.
 - Dormido, Confundido y Paralizado son mutuamente excluyentes.
 - Quemado y Envenenado pueden coexistir con otras condiciones.
 - Al evolucionar o ir a banca se limpian condiciones especiales según reglamento XY1.
