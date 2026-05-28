@@ -56,11 +56,19 @@ Decisiones fase 3:
 
 ## Fase 4 - Modelo de Game State
 
-- Objetivo: estado completo en memoria y serializable.
-- Entregables: Game, PlayerState, zonas, cartas instancia, turn state.
+- Estado: implementada como modelo interno puro Java y validada con tests automatizados.
+- Objetivo: estado completo en memoria y preparable para serialización futura de snapshots.
+- Entregables: `GameState`, `PlayerGameState`, zonas, `CardInstance`, `PokemonInPlay`, `TurnState`, eventos y comandos mínimos.
 - Dependencias: catálogo/decks.
-- Riesgos: zonas duplicadas o estado incompleto.
-- Criterio: snapshot reconstruible en tests.
+- Riesgos: zonas duplicadas o estado incompleto; semántica futura de premios intermedios durante partida deberá definirse cuando existan setup/turnos/KO.
+- Criterio: modelo en memoria con invariantes testeadas, sin setup/mulligan, ataques, efectos, WebSocket ni endpoints de juego.
+
+Decisiones fase 4:
+
+- `CardDefinitionRef` separa la definición del catálogo de `CardInstance`, que representa una copia concreta en partida.
+- `GameState` queda desacoplado de JPA, Spring, controllers y API externa.
+- `PrizeCards` permite `0`, `1` y `6` para cubrir estado no inicializado, setup normal y futura Muerte Súbita.
+- `TurnState` incluye flags futuros de una vez por turno: energía, Partidario, Estadio y retiro.
 
 ## Fase 5 - Setup y mulligan
 

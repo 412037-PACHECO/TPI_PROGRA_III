@@ -4,7 +4,7 @@
 
 Este proyecto corresponde al TPI de Programación III: una aplicación cliente-servidor para jugar Pokémon TCG basada en el reglamento oficial XY1. El sistema debe permitir que dos jugadores construyan mazos, inicien una partida, ejecuten acciones válidas, sincronicen el estado en tiempo real y finalicen la partida bajo condiciones oficiales de victoria/derrota.
 
-Estado actual del repositorio: documentación base creada y backend Spring Boot implementado incrementalmente hasta Fase 3: catálogo/cache local XY1 y Deck Builder backend. No existe todavía frontend Angular implementado. Game Engine, partidas, WebSocket y efectos ejecutables siguen pendientes.
+Estado actual del repositorio: documentación base creada y backend Spring Boot implementado incrementalmente hasta Fase 4: catálogo/cache local XY1, Deck Builder backend y modelo interno base de Game State. No existe todavía frontend Angular implementado. Partidas jugables, setup/mulligan, turnos reales, ataques, WebSocket y efectos ejecutables siguen pendientes.
 
 ## Objetivo del sistema
 

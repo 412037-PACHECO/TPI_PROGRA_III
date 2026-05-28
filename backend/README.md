@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 3 - Deck Builder backend
+## Alcance actual: Fase 4 - Modelo de Game State
 
-El backend ya cuenta con catálogo local de cartas `xy1` importado desde `pokemontcg.io` v2. Esta fase agrega Deck Builder sobre ese catálogo local: CRUD de mazos, edición de cantidades y validación explícita de reglas XY1, sin interpretar texto natural como lógica ejecutable.
+El backend ya cuenta con catálogo local de cartas `xy1` importado desde `pokemontcg.io` v2 y Deck Builder sobre ese catálogo local. La Fase 4 agrega el modelo interno base de estado de partida para el futuro Game Engine: puro Java, en memoria, testeable y desacoplado de Spring/JPA/controllers/WebSocket/API externa.
 
 Incluye:
 
@@ -20,6 +20,36 @@ Incluye:
 - CRUD de mazos por `ownerName` simple, sin relación compleja con `Player`.
 - Edición de cartas del mazo usando exclusivamente el catálogo local.
 - Validación explícita de mazos XY1.
+- Módulo `game` con modelo interno de Game State, value objects, enums, eventos y comandos base.
+
+## Modelo Game State
+
+La Fase 4 prepara el dominio del Game Engine sin implementar todavía una partida jugable.
+
+Paquetes principales:
+
+- `com.tpi.pokemon.game.domain.value`: IDs de dominio (`GameId`, `PlayerId`, `CardInstanceId`).
+- `com.tpi.pokemon.game.domain.enums`: estado de partida, fases y zonas.
+- `com.tpi.pokemon.game.domain.model`: `GameState`, estado por jugador, tablero, zonas, cartas instancia y turno.
+- `com.tpi.pokemon.game.engine.event`: eventos de dominio base.
+- `com.tpi.pokemon.game.engine.command`: contratos mínimos de comandos/resultados.
+
+Decisiones de dominio:
+
+- `CardDefinitionRef` representa una referencia estable a la carta de catálogo.
+- `CardInstance` representa una copia concreta dentro de una partida, con identidad propia.
+- `GameState` no usa entidades JPA ni DTOs REST.
+- El estado interno no es una vista segura para frontend; podrá contener mano, premios y mazo de ambos jugadores.
+- `PrizeCards` permite `0` para estado no inicializado, `6` para setup normal y `1` para futura Muerte Súbita.
+
+Invariantes protegidas en el modelo:
+
+- Una partida base requiere dos jugadores distintos.
+- Cada jugador tiene zonas propias.
+- Una misma `CardInstanceId` no puede repetirse dentro de una zona ni entre zonas de un mismo jugador.
+- La banca tiene máximo 5 Pokémon.
+- Solo hay un wrapper de Pokémon Activo por jugador; puede estar vacío antes del setup.
+- `TurnState.notStarted()` inicializa número de turno `0`, fase `NOT_STARTED` y flags de turno en `false`.
 
 ## Endpoints de catálogo
 
@@ -204,8 +234,10 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 
 ## Qué NO incluye todavía
 
-- Reglas oficiales del juego.
-- Motor de juego.
+- Partida jugable.
+- Setup y mulligan.
+- Turnos reales.
+- Ataques.
 - WebSocket/realtime.
 - Frontend.
 - Efectos ejecutables.
@@ -234,4 +266,4 @@ mvn test
 
 La estructura parte de paquetes por módulo de negocio. En `cards` se usan subpaquetes `api`, `application`, `domain` e `infrastructure` porque ya hay controller, servicio, entidad/repository y cliente externo reales.
 
-La lógica oficial del juego no debe vivir en controllers, handlers WebSocket ni servicios de aplicación. Cuando se implemente, debe quedar concentrada en el módulo/motor de juego.
+La lógica oficial del juego no debe vivir en controllers, handlers WebSocket ni servicios de aplicación. Cuando se implemente, debe quedar concentrada en el módulo/motor de juego. El módulo `game` actual es intencionalmente puro Java y no depende de Spring ni JPA.

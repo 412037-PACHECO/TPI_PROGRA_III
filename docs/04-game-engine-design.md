@@ -4,6 +4,8 @@
 
 El Game Engine es una máquina de estados determinística de dominio. Recibe un estado y un comando, valida reglas, muta el estado, emite eventos y no conoce infraestructura.
 
+Estado actual: la Fase 4 implementa solamente el modelo interno base de `GameState`, zonas, cartas instancia, turno, eventos y comandos mínimos. La ejecución real de comandos, setup/mulligan, turnos, ataques, efectos, WebSocket y endpoints quedan para fases posteriores.
+
 ```text
 GameCommand
 → CommandValidator
@@ -15,10 +17,21 @@ GameCommand
 
 ## Estados de partida
 
+Estados implementados en Fase 4:
+
+- `CREATED`: estado base creado con dos jugadores, sin setup resuelto.
+- `SETUP`: reservado para Fase 5.
+- `ACTIVE`: reservado para partida en curso cuando existan setup/turnos.
+- `FINISHED`: partida finalizada con ganador o resultado definido.
+
+Estados requeridos por diseño funcional/futuro:
+
 - `WAITING`: partida creada, esperando segundo jugador.
 - `SETUP`: mulligan, selección de activo/banca inicial, premios y primer jugador.
 - `ACTIVE`: partida en curso.
 - `FINISHED`: partida finalizada con ganador o resultado definido.
+
+Nota: `WAITING` pertenece más al ciclo externo de match/lobby. El `GameState` interno de Fase 4 se crea con dos jugadores y por eso arranca en `CREATED`.
 
 ## Fases de turno
 
@@ -100,11 +113,26 @@ Orden entre turnos: Envenenado → Quemado → Dormido → Paralizado → efecto
 - `SpecialConditionApplied`, `PokemonKnockedOut`, `PrizeTaken`.
 - `TurnEnded`, `VictoryDeclared`, `GameFinished`.
 
+Implementados como estructura base en Fase 4:
+
+- `GameCreatedEvent`.
+- `GameStateInitializedEvent`.
+- `CardMovedEvent`.
+- `TurnPhaseChangedEvent`.
+
 ## Comandos de juego sugeridos
 
 - `JoinGame`, `ChooseStartingActive`, `ChooseStartingBench`, `ResolveMulligan`.
 - `DrawForTurn`, `PlayBasicPokemon`, `EvolvePokemon`, `AttachEnergy`.
 - `PlayTrainer`, `UseAbility`, `Retreat`, `DeclareAttack`, `EndTurn`.
+
+En Fase 4 solo existen contratos base `GameCommand`, `PlayerCommand` y `CommandResult`; no hay handlers ni procesamiento real de comandos.
+
+## Reglas de acoplamiento del modelo actual
+
+- `game` no depende de Spring, JPA, controllers, WebSocket ni cliente externo.
+- El catálogo se referencia mediante `CardDefinitionRef`; el estado mutable de partida usa `CardInstance`.
+- `GameState` es estado interno del motor, no DTO público ni vista segura por jugador.
 
 ## Validadores y resolutores
 
