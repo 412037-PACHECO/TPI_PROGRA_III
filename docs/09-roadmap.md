@@ -72,11 +72,19 @@ Decisiones fase 4:
 
 ## Fase 5 - Setup y mulligan
 
+- Estado: implementada como flujo de engine puro Java, pendiente de ejecución local final de `mvn test` por restricción de entorno.
 - Objetivo: preparación oficial.
-- Entregables: barajar, robar 7, mulligan, activo/banca, premios.
+- Entregables: barajar, robar 7, resolver mulligans, contar bonus por mulligan rival, seleccionar Activo/Banca inicial, colocar premios y determinar jugador inicial.
 - Dependencias: Game State.
-- Riesgos: timing de mulligan.
-- Criterio: tests de ambos/single mulligan y setup válido.
+- Riesgos: timing de mulligan y decisión de UI futura para aceptar/omitir robo bonus opcional.
+- Criterio: tests unitarios de mano inicial, mulligan simple/repetido, bonus, selección inicial, premios y estado final consistente.
+
+Decisiones fase 5:
+
+- `DeckShuffler`, `StartingPlayerSelector` y `MulliganBonusDrawPolicy` son abstracciones inyectables para mantener determinismo en tests.
+- `CardDefinitionRef` incorpora `CardSupertype`/`CardSubtype` para identificar Pokémon Básico sin consultar JPA ni API externa.
+- `MulliganPerformedEvent` registra IDs de la mano revelada conceptualmente.
+- Setup completo deja `GameStatus.ACTIVE` y `TurnState.preparedForFirstTurn(jugadorInicial)`, sin iniciar turno ni robar carta de turno.
 
 ## Fase 6 - Turnos y acciones básicas
 

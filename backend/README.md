@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 4 - Modelo de Game State
+## Alcance actual: Fase 5 - Setup y Mulligan
 
-El backend ya cuenta con catálogo local de cartas `xy1` importado desde `pokemontcg.io` v2 y Deck Builder sobre ese catálogo local. La Fase 4 agrega el modelo interno base de estado de partida para el futuro Game Engine: puro Java, en memoria, testeable y desacoplado de Spring/JPA/controllers/WebSocket/API externa.
+El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder y modelo interno base de estado de partida. La Fase 5 agrega el flujo inicial de setup/mulligan del Game Engine: puro Java, en memoria, testeable y desacoplado de Spring/JPA/controllers/WebSocket/API externa.
 
 Incluye:
 
@@ -21,6 +21,7 @@ Incluye:
 - Edición de cartas del mazo usando exclusivamente el catálogo local.
 - Validación explícita de mazos XY1.
 - Módulo `game` con modelo interno de Game State, value objects, enums, eventos y comandos base.
+- Componentes de setup/mulligan para barajar, robar mano inicial, resolver mulligans, seleccionar Activo/Banca inicial, colocar Premios y definir jugador inicial.
 
 ## Modelo Game State
 
@@ -41,6 +42,7 @@ Decisiones de dominio:
 - `GameState` no usa entidades JPA ni DTOs REST.
 - El estado interno no es una vista segura para frontend; podrá contener mano, premios y mazo de ambos jugadores.
 - `PrizeCards` permite `0` para estado no inicializado, `6` para setup normal y `1` para futura Muerte Súbita.
+- `CardDefinitionRef` conserva clasificación mínima (`CardSupertype` y `CardSubtype`) para validar Pokémon Básico durante setup sin consultar infraestructura externa.
 
 Invariantes protegidas en el modelo:
 
@@ -50,6 +52,31 @@ Invariantes protegidas en el modelo:
 - La banca tiene máximo 5 Pokémon.
 - Solo hay un wrapper de Pokémon Activo por jugador; puede estar vacío antes del setup.
 - `TurnState.notStarted()` inicializa número de turno `0`, fase `NOT_STARTED` y flags de turno en `false`.
+
+## Setup y Mulligan
+
+La Fase 5 implementa el flujo inicial oficial como lógica de engine, no como endpoint REST.
+
+Componentes principales:
+
+- `SetupService`: orquesta inicio de setup, elección inicial y cierre de setup.
+- `DeckShuffler`: abstracción inyectable para barajar mazos de forma testeable.
+- `StartingPlayerSelector`: abstracción inyectable para determinar quién comienza.
+- `MulliganBonusDrawPolicy`: policy inyectable para decidir cuántas cartas extra roba un jugador por mulligans del rival, entre `0` y el total permitido.
+
+Flujo implementado:
+
+1. Validar que cada jugador reciba un mazo de 60 `CardInstance` propias y con al menos 1 Pokémon Básico.
+2. Barajar cada mazo mediante `DeckShuffler`.
+3. Robar 7 cartas iniciales.
+4. Si una mano no tiene Pokémon Básico, registrar mulligan con cartas reveladas conceptualmente, volver a barajar y robar 7 hasta encontrar Básico.
+5. Aplicar robo bonus por mulligans del rival según `MulliganBonusDrawPolicy`.
+6. Elegir 1 Pokémon Básico desde la mano como Activo inicial.
+7. Elegir hasta 5 Pokémon Básicos desde la mano para la Banca inicial.
+8. Colocar 6 cartas de Premio desde el tope del mazo.
+9. Determinar jugador inicial y dejar el juego en `ACTIVE` con `TurnState.preparedForFirstTurn(...)`.
+
+Decisión de fase: al completar setup la partida queda preparada para Fase 6, pero no se ejecuta robo obligatorio de turno, acciones de turno, ataques ni efectos.
 
 ## Endpoints de catálogo
 
@@ -235,7 +262,6 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 ## Qué NO incluye todavía
 
 - Partida jugable.
-- Setup y mulligan.
 - Turnos reales.
 - Ataques.
 - WebSocket/realtime.

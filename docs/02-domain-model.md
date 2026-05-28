@@ -24,17 +24,18 @@
 
 ## Estado de implementación actual
 
-La Fase 4 implementa el modelo interno base bajo `backend/src/main/java/com/tpi/pokemon/game/`.
+La Fase 5 implementa el modelo interno base y el flujo inicial de setup/mulligan bajo `backend/src/main/java/com/tpi/pokemon/game/`.
 
 Incluye:
 
 - Value objects: `GameId`, `PlayerId`, `CardInstanceId`.
-- Enums: `GameStatus`, `TurnPhase`, `ZoneType`.
+- Enums: `GameStatus`, `TurnPhase`, `ZoneType`, `CardSupertype`, `CardSubtype`.
 - Modelo: `GameState`, `PlayerGameState`, `BoardState`, `TurnState`, `CardDefinitionRef`, `CardInstance`, `PokemonInPlay`, `ActivePokemon`, `Bench`, `AttachedCards`, `DeckZone`, `HandZone`, `PrizeCards`, `DiscardPile`.
-- Eventos base: `GameCreatedEvent`, `GameStateInitializedEvent`, `CardMovedEvent`, `TurnPhaseChangedEvent`.
+- Eventos base: `GameCreatedEvent`, `GameStateInitializedEvent`, `CardMovedEvent`, `TurnPhaseChangedEvent` y eventos de setup/mulligan.
 - Comandos base: `GameCommand`, `PlayerCommand`, `CommandResult`.
+- Setup: `SetupService`, `DeckShuffler`, `StartingPlayerSelector`, `MulliganBonusDrawPolicy`, `StartSetupCommand`, `ChooseInitialPokemonCommand`, `CompleteSetupCommand`.
 
-No implementa todavía setup, mulligan, turnos reales, ataques, efectos, endpoints de partida, WebSocket ni frontend.
+No implementa todavía turnos reales, robo obligatorio de turno, ataques, efectos, endpoints de partida, WebSocket ni frontend.
 
 ## Relaciones
 
@@ -45,13 +46,15 @@ No implementa todavía setup, mulligan, turnos reales, ataques, efectos, endpoin
 - `Turn` pertenece al `Game` y define fase/flags.
 - `GameLog` pertenece a `Game/Match` y registra eventos derivados del motor.
 
-## Invariantes implementadas en Fase 4
+## Invariantes implementadas hasta Fase 5
 
 - Una `CardInstance` está en una sola zona lógica: deck, mano, premios, descarte, activo, banca, unida o removida.
 - Cada jugador tiene como máximo 1 Pokémon activo.
 - La banca tiene máximo 5 Pokémon.
 - Las cartas de Premio permiten `0` en estado no inicializado, `6` en setup normal y `1` para futura Muerte Súbita.
 - El mazo mantiene orden oculto.
+- La selección inicial de Activo/Banca solo acepta cartas que estén en mano y sean Pokémon Básicos.
+- El setup completo coloca exactamente 6 Premios desde el tope del mazo de cada jugador.
 
 ## Reglas de dominio futuras / requeridas por reglamento
 

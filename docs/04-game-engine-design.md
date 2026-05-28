@@ -4,7 +4,7 @@
 
 El Game Engine es una máquina de estados determinística de dominio. Recibe un estado y un comando, valida reglas, muta el estado, emite eventos y no conoce infraestructura.
 
-Estado actual: la Fase 4 implementa solamente el modelo interno base de `GameState`, zonas, cartas instancia, turno, eventos y comandos mínimos. La ejecución real de comandos, setup/mulligan, turnos, ataques, efectos, WebSocket y endpoints quedan para fases posteriores.
+Estado actual: la Fase 5 implementa el modelo interno base de `GameState` y el flujo inicial de setup/mulligan. Turnos completos, robo obligatorio de turno, ataques, efectos, WebSocket y endpoints de partida quedan para fases posteriores.
 
 ```text
 GameCommand
@@ -17,11 +17,11 @@ GameCommand
 
 ## Estados de partida
 
-Estados implementados en Fase 4:
+Estados implementados en el modelo actual:
 
 - `CREATED`: estado base creado con dos jugadores, sin setup resuelto.
-- `SETUP`: reservado para Fase 5.
-- `ACTIVE`: reservado para partida en curso cuando existan setup/turnos.
+- `SETUP`: setup iniciado, manos/mulligans resueltos, esperando selección inicial o cierre.
+- `ACTIVE`: setup completado y partida preparada para el primer turno futuro.
 - `FINISHED`: partida finalizada con ganador o resultado definido.
 
 Estados requeridos por diseño funcional/futuro:
@@ -51,6 +51,15 @@ Nota: `WAITING` pertenece más al ciclo externo de match/lobby. El `GameState` i
 7. Tomar 6 premios boca abajo.
 8. Determinar primer jugador por moneda.
 9. Revelar Pokémon y pasar a `ACTIVE`.
+
+Implementación Fase 5:
+
+- El barajado se realiza mediante `DeckShuffler`, no con randomness directa dentro del motor.
+- El jugador inicial se determina con `StartingPlayerSelector`, inyectable y determinista en tests.
+- El bonus por mulligan rival se modela con `MulliganBonusDrawPolicy`; puede decidir de `0` hasta la cantidad de mulligans del oponente.
+- El mulligan registra evento con la mano revelada conceptualmente (`CardInstanceId`), pero no existe todavía vista pública/privada.
+- La implementación no modela todavía visibilidad boca abajo/revelada; queda para futuras vistas seguras por jugador.
+- Al completar setup se usa `GameStatus.ACTIVE` y `TurnState.preparedForFirstTurn(startingPlayer)`: se conoce quién empieza, pero no se ejecuta inicio real de turno ni robo obligatorio.
 
 ## Flujo de turno
 
@@ -113,12 +122,22 @@ Orden entre turnos: Envenenado → Quemado → Dormido → Paralizado → efecto
 - `SpecialConditionApplied`, `PokemonKnockedOut`, `PrizeTaken`.
 - `TurnEnded`, `VictoryDeclared`, `GameFinished`.
 
-Implementados como estructura base en Fase 4:
+Implementados como estructura base hasta Fase 5:
 
 - `GameCreatedEvent`.
 - `GameStateInitializedEvent`.
 - `CardMovedEvent`.
 - `TurnPhaseChangedEvent`.
+- `SetupStartedEvent`.
+- `DeckShuffledEvent`.
+- `InitialHandDrawnEvent`.
+- `MulliganPerformedEvent`.
+- `MulliganBonusCardsDrawnEvent`.
+- `InitialActivePokemonSelectedEvent`.
+- `InitialBenchSelectedEvent`.
+- `PrizeCardsSetEvent`.
+- `StartingPlayerSelectedEvent`.
+- `SetupCompletedEvent`.
 
 ## Comandos de juego sugeridos
 
@@ -126,7 +145,7 @@ Implementados como estructura base en Fase 4:
 - `DrawForTurn`, `PlayBasicPokemon`, `EvolvePokemon`, `AttachEnergy`.
 - `PlayTrainer`, `UseAbility`, `Retreat`, `DeclareAttack`, `EndTurn`.
 
-En Fase 4 solo existen contratos base `GameCommand`, `PlayerCommand` y `CommandResult`; no hay handlers ni procesamiento real de comandos.
+En Fase 5 existen comandos/modelos específicos de setup (`StartSetupCommand`, `ChooseInitialPokemonCommand`, `CompleteSetupCommand`) procesados por `SetupService`. Los comandos de turno, ataque, efectos y acciones completas siguen pendientes.
 
 ## Reglas de acoplamiento del modelo actual
 
@@ -136,5 +155,6 @@ En Fase 4 solo existen contratos base `GameCommand`, `PlayerCommand` y `CommandR
 
 ## Validadores y resolutores
 
-- Validadores: estado, turno, fase, zona, target, coste, restricciones, efectos activos.
-- Resolutores: setup, mulligan, turnos, ataque, daño, condiciones, knockout, premios y victoria.
+- Implementados: validaciones/resolución de setup y mulligan inicial.
+- Futuros: validadores de turno, fase, zona, target, coste, restricciones, efectos activos.
+- Futuros: resolutores de turnos, ataque, daño, condiciones, knockout, premios durante partida y victoria.
