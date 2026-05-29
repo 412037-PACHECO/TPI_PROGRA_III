@@ -128,7 +128,7 @@ class AttackServiceTest {
                 activeDefender()
         );
 
-        assertThatThrownBy(() -> attackService.declareAttack(state, new DeclareAttackCommand(PLAYER_TWO, "scratch")))
+        assertThatThrownBy(() -> attackService.declareAttack(state, new DeclareAttackCommand(GAME_ID, PLAYER_TWO, "scratch")))
                 .isInstanceOf(AttackException.class)
                 .hasMessage("Only the current player can attack");
     }
@@ -270,7 +270,7 @@ class AttackServiceTest {
     }
 
     private DeclareAttackCommand command(String attackId) {
-        return new DeclareAttackCommand(PLAYER_ONE, attackId);
+        return new DeclareAttackCommand(GAME_ID, PLAYER_ONE, attackId);
     }
 
     private PokemonInPlay activePokemon(PlayerGameState player) {
