@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.tpi.pokemon.game.domain.enums.CardSubtype;
 import com.tpi.pokemon.game.domain.enums.CardSupertype;
 import com.tpi.pokemon.game.domain.enums.GameStatus;
+import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.enums.TurnPhase;
 import com.tpi.pokemon.game.domain.model.ActivePokemon;
 import com.tpi.pokemon.game.domain.model.AttachedCards;
@@ -119,6 +120,7 @@ class TurnActionServiceTest {
         assertThat(evolved.getEvolutionStack()).extracting(CardInstance::id).containsExactly(active.getTopCard().id(), evolution.id());
         assertThat(evolved.getAttachedCards().getEnergies()).containsExactly(attachedEnergy);
         assertThat(evolved.getLastEvolvedTurnNumber()).hasValue(3);
+        assertThat(evolved.getSpecialConditions().hasAny()).isFalse();
         assertThat(eventsOfType(updated, PokemonEvolvedEvent.class)).hasSize(1);
 
         CardInstance firstTurnEvolution = card("ivysaur-first-turn", STAGE_1, PLAYER_ONE);
@@ -143,7 +145,10 @@ class TurnActionServiceTest {
     @Test
     void retreatActivePokemonPaysKnownCostSwapsWithBenchAndRejectsSecondRetreat() {
         CardInstance energy = card("retreat-energy", ENERGY, PLAYER_ONE);
-        PokemonInPlay active = new PokemonInPlay(List.of(card("retreat-active", BASIC, PLAYER_ONE)), new AttachedCards(List.of(energy)), 1, null);
+        PokemonInPlay active = new PokemonInPlay(List.of(card("retreat-active", BASIC, PLAYER_ONE)), new AttachedCards(List.of(energy)), 1, null)
+                .applySpecialCondition(SpecialCondition.CONFUSED)
+                .applySpecialCondition(SpecialCondition.BURNED)
+                .applySpecialCondition(SpecialCondition.POISONED);
         PokemonInPlay benched = PokemonInPlay.withoutAttachments(card("retreat-bench", OTHER_BASIC, PLAYER_ONE));
         GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), active, List.of(benched), 1), emptyPlayer(PLAYER_TWO), mainTurn());
 
@@ -152,6 +157,7 @@ class TurnActionServiceTest {
         assertThat(activePokemon(updated, PLAYER_ONE).getTopCard()).isEqualTo(benched.getTopCard());
         assertThat(updated.getPlayerOneState().getBoard().getBench().getPokemon().get(0).getTopCard()).isEqualTo(active.getTopCard());
         assertThat(updated.getPlayerOneState().getBoard().getBench().getPokemon().get(0).getAttachedCards().getEnergies()).isEmpty();
+        assertThat(updated.getPlayerOneState().getBoard().getBench().getPokemon().get(0).getSpecialConditions().hasAny()).isFalse();
         assertThat(updated.getPlayerOneState().getDiscardPile().getCards()).containsExactly(energy);
         assertThat(updated.getTurnState().retreatedThisTurn()).isTrue();
         assertThat(eventsOfType(updated, ActivePokemonRetreatedEvent.class)).hasSize(1);
@@ -159,6 +165,24 @@ class TurnActionServiceTest {
         assertThatThrownBy(() -> service.retreatActivePokemon(updated, new RetreatActivePokemonCommand(PLAYER_ONE, 0, List.of())))
                 .isInstanceOf(ActionException.class)
                 .hasMessageContaining("already retreated");
+    }
+
+    @Test
+    void retreatRejectsAsleepAndParalyzedActivePokemon() {
+        CardInstance energy = card("status-retreat-energy", ENERGY, PLAYER_ONE);
+        PokemonInPlay benched = PokemonInPlay.withoutAttachments(card("status-retreat-bench", OTHER_BASIC, PLAYER_ONE));
+        GameState asleep = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), new PokemonInPlay(List.of(card("asleep-active", BASIC, PLAYER_ONE)), new AttachedCards(List.of(energy)), 1, null).applySpecialCondition(SpecialCondition.ASLEEP), List.of(benched), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        assertThatThrownBy(() -> service.retreatActivePokemon(asleep, new RetreatActivePokemonCommand(PLAYER_ONE, 0, List.of(energy.id()))))
+                .isInstanceOf(ActionException.class)
+                .hasMessage("Asleep Pokemon cannot retreat");
+
+        CardInstance paralyzedEnergy = card("paralyzed-retreat-energy", ENERGY, PLAYER_ONE);
+        GameState paralyzed = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), new PokemonInPlay(List.of(card("paralyzed-active", BASIC, PLAYER_ONE)), new AttachedCards(List.of(paralyzedEnergy)), 1, null).applySpecialCondition(SpecialCondition.PARALYZED), List.of(benched), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        assertThatThrownBy(() -> service.retreatActivePokemon(paralyzed, new RetreatActivePokemonCommand(PLAYER_ONE, 0, List.of(paralyzedEnergy.id()))))
+                .isInstanceOf(ActionException.class)
+                .hasMessage("Paralyzed Pokemon cannot retreat");
     }
 
     @Test

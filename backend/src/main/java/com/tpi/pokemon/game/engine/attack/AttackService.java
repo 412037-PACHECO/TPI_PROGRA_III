@@ -1,6 +1,7 @@
 package com.tpi.pokemon.game.engine.attack;
 
 import com.tpi.pokemon.game.domain.enums.GameStatus;
+import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.enums.TurnPhase;
 import com.tpi.pokemon.game.domain.model.ActivePokemon;
 import com.tpi.pokemon.game.domain.model.AttackDefinition;
@@ -14,11 +15,17 @@ import com.tpi.pokemon.game.engine.damage.DamageCalculation;
 import com.tpi.pokemon.game.engine.damage.DamageCalculator;
 import com.tpi.pokemon.game.engine.event.AttackDeclaredEvent;
 import com.tpi.pokemon.game.engine.event.AttackResolvedEvent;
+import com.tpi.pokemon.game.engine.event.ConfusionCheckResolvedEvent;
 import com.tpi.pokemon.game.engine.event.DamageAppliedEvent;
 import com.tpi.pokemon.game.engine.event.DamageCalculatedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyCostValidatedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.knockout.PostAttackResolutionService;
+import com.tpi.pokemon.game.engine.random.CoinFlipProvider;
+import com.tpi.pokemon.game.engine.random.CoinFlipResult;
+import com.tpi.pokemon.game.engine.random.RandomCoinFlipProvider;
+import com.tpi.pokemon.game.engine.special.StatusEffectManager;
+import com.tpi.pokemon.game.engine.event.SpecialConditionDamageAppliedEvent;
 import com.tpi.pokemon.game.engine.turn.EndTurnCommand;
 import com.tpi.pokemon.game.engine.turn.TurnManager;
 import java.util.ArrayList;
@@ -30,20 +37,28 @@ public final class AttackService {
     private final EnergyCostValidator energyCostValidator;
     private final DamageCalculator damageCalculator;
     private final PostAttackResolutionService postAttackResolutionService;
+    private final StatusEffectManager statusEffectManager;
+    private final CoinFlipProvider coinFlipProvider;
 
     public AttackService() {
         this(new TurnManager());
     }
 
     public AttackService(TurnManager turnManager) {
-        this(turnManager, new EnergyCostValidator(), new DamageCalculator(), new PostAttackResolutionService());
+        this(turnManager, new EnergyCostValidator(), new DamageCalculator(), new PostAttackResolutionService(), new StatusEffectManager(), new RandomCoinFlipProvider());
     }
 
     public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService) {
+        this(turnManager, energyCostValidator, damageCalculator, postAttackResolutionService, new StatusEffectManager(), new RandomCoinFlipProvider());
+    }
+
+    public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService, StatusEffectManager statusEffectManager, CoinFlipProvider coinFlipProvider) {
         this.turnManager = Objects.requireNonNull(turnManager, "turnManager must not be null");
         this.energyCostValidator = Objects.requireNonNull(energyCostValidator, "energyCostValidator must not be null");
         this.damageCalculator = Objects.requireNonNull(damageCalculator, "damageCalculator must not be null");
         this.postAttackResolutionService = Objects.requireNonNull(postAttackResolutionService, "postAttackResolutionService must not be null");
+        this.statusEffectManager = Objects.requireNonNull(statusEffectManager, "statusEffectManager must not be null");
+        this.coinFlipProvider = Objects.requireNonNull(coinFlipProvider, "coinFlipProvider must not be null");
     }
 
     public GameState declareAttack(GameState state, DeclareAttackCommand command) {
@@ -65,6 +80,24 @@ public final class AttackService {
         AttackDefinition attack = attacker.getTopCard().definition().attackById(command.attackId())
                 .orElseThrow(() -> new AttackException("Attack does not exist on active Pokemon"));
 
+        if (statusEffectManager.hasCondition(attacker, SpecialCondition.ASLEEP)) {
+            throw new AttackException("Asleep Pokemon cannot attack");
+        }
+        if (statusEffectManager.hasCondition(attacker, SpecialCondition.PARALYZED)) {
+            throw new AttackException("Paralyzed Pokemon cannot attack");
+        }
+
+        List<GameEvent> events = new ArrayList<>(state.getEvents());
+        events.add(new AttackDeclaredEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId(), attack.name()));
+
+        if (statusEffectManager.hasCondition(attacker, SpecialCondition.CONFUSED)) {
+            CoinFlipResult confusionResult = coinFlipProvider.flip();
+            events.add(new ConfusionCheckResolvedEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId(), confusionResult));
+            if (confusionResult == CoinFlipResult.TAILS) {
+                return resolveFailedConfusedAttack(state, command.playerId(), defenderPlayer.getPlayerId(), attacker, attack, events);
+            }
+        }
+
         if (!energyCostValidator.hasEnoughEnergy(attacker, attack)) {
             throw new AttackException("Not enough energy to declare attack");
         }
@@ -73,8 +106,6 @@ public final class AttackService {
         PokemonInPlay damagedDefender = defender.applyDamage(damage.finalDamage());
         PlayerGameState updatedDefenderPlayer = withActivePokemon(defenderPlayer, damagedDefender);
 
-        List<GameEvent> events = new ArrayList<>(state.getEvents());
-        events.add(new AttackDeclaredEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId(), attack.name()));
         events.add(new EnergyCostValidatedEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId()));
         events.add(new DamageCalculatedEvent(state.getGameId(), attacker.getTopCard().id(), defender.getTopCard().id(), damage.baseDamage(), damage.weaknessApplied(), damage.resistanceApplied(), damage.finalDamage()));
         events.add(new DamageAppliedEvent(state.getGameId(), defender.getTopCard().id(), damage.finalDamage(), damage.countersAdded(), damagedDefender.getDamageCounters()));
@@ -90,6 +121,28 @@ public final class AttackService {
                 events
         );
         return postAttackResolutionService.resolveAfterAttack(attackState, command.playerId(), defenderPlayer.getPlayerId(), events);
+    }
+
+    private GameState resolveFailedConfusedAttack(GameState state, PlayerId attackerId, PlayerId defenderId, PokemonInPlay attacker, AttackDefinition attack, List<GameEvent> events) {
+        PokemonInPlay damagedAttacker = attacker.applyDamage(30);
+        PlayerGameState updatedAttackerPlayer = withActivePokemon(getPlayerState(state, attackerId), damagedAttacker);
+        events.add(new SpecialConditionDamageAppliedEvent(state.getGameId(), attackerId, attacker.getTopCard().id(), SpecialCondition.CONFUSED, 30, damagedAttacker.getDamageCounters()));
+        events.add(new DamageAppliedEvent(state.getGameId(), attacker.getTopCard().id(), 30, 3, damagedAttacker.getDamageCounters()));
+        events.add(new AttackResolvedEvent(state.getGameId(), attackerId, attacker.getTopCard().id(), attack.attackId()));
+        GameState confusedState = new GameState(
+                state.getGameId(),
+                GameStatus.ACTIVE,
+                playerOneOf(state, updatedAttackerPlayer),
+                playerTwoOf(state, updatedAttackerPlayer),
+                state.getTurnState().enterAttack(),
+                state.getActiveStadium().orElse(null),
+                events
+        );
+        GameState afterKnockout = postAttackResolutionService.resolveActiveKnockout(confusedState, attackerId, defenderId, events);
+        if (afterKnockout.getStatus() != GameStatus.ACTIVE || afterKnockout.getPendingActiveReplacement().isPresent()) {
+            return afterKnockout;
+        }
+        return turnManager.endTurn(afterKnockout, new EndTurnCommand(attackerId));
     }
 
     private void validateTurn(GameState state, PlayerId playerId) {

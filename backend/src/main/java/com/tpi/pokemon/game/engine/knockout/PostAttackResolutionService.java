@@ -35,31 +35,44 @@ public final class PostAttackResolutionService {
 
     public GameState resolveAfterAttack(GameState state, PlayerId attackerId, PlayerId defenderId, List<GameEvent> events) {
         return knockoutResolver.resolveActiveKnockout(state, defenderId, events)
-                .map(resolution -> resolveKnockoutConsequences(resolution.state(), resolution.knockout(), attackerId, defenderId, events))
+                .map(resolution -> finishTurnIfReady(resolveKnockoutConsequences(resolution.state(), resolution.knockout(), attackerId, defenderId, events), attackerId))
                 .orElseGet(() -> turnManager.endTurn(state, new EndTurnCommand(attackerId)));
     }
 
-    private GameState resolveKnockoutConsequences(GameState state, KnockoutResult knockout, PlayerId attackerId, PlayerId defenderId, List<GameEvent> events) {
-        PrizeResolver.PrizeResolution prizeResolution = prizeResolver.takePrizes(state, attackerId, knockout.prizeValue(), events);
+    public GameState resolveActiveKnockout(GameState state, PlayerId knockedOutOwnerId, PlayerId prizeTakerId, List<GameEvent> events) {
+        return knockoutResolver.resolveActiveKnockout(state, knockedOutOwnerId, events)
+                .map(resolution -> resolveKnockoutConsequences(resolution.state(), resolution.knockout(), prizeTakerId, knockedOutOwnerId, events))
+                .orElse(state);
+    }
+
+    private GameState resolveKnockoutConsequences(GameState state, KnockoutResult knockout, PlayerId prizeTakerId, PlayerId knockedOutOwnerId, List<GameEvent> events) {
+        PrizeResolver.PrizeResolution prizeResolution = prizeResolver.takePrizes(state, prizeTakerId, knockout.prizeValue(), events);
         GameState afterPrizes = prizeResolution.state();
 
-        java.util.Optional<GameFinishResult> finishResult = victoryConditionChecker.checkAfterKnockout(afterPrizes, attackerId, defenderId);
+        java.util.Optional<GameFinishResult> finishResult = victoryConditionChecker.checkAfterKnockout(afterPrizes, prizeTakerId, knockedOutOwnerId);
         if (finishResult.isPresent()) {
             GameFinishResult result = finishResult.get();
             FinishReason primaryReason = result.reasons().get(0);
-            events.add(new VictoryDetectedEvent(afterPrizes.getGameId(), attackerId, defenderId, primaryReason));
-            events.add(new GameFinishedEvent(afterPrizes.getGameId(), attackerId, defenderId, primaryReason));
+            events.add(new VictoryDetectedEvent(afterPrizes.getGameId(), prizeTakerId, knockedOutOwnerId, primaryReason));
+            events.add(new GameFinishedEvent(afterPrizes.getGameId(), prizeTakerId, knockedOutOwnerId, primaryReason));
             return new GameState(afterPrizes.getGameId(), GameStatus.FINISHED, afterPrizes.getPlayerOneState(), afterPrizes.getPlayerTwoState(), afterPrizes.getTurnState(), afterPrizes.getActiveStadium().orElse(null), result, null, events);
         }
 
-        PlayerGameState defender = playerState(afterPrizes, defenderId);
-        if (!defender.getBoard().getBench().isEmpty()) {
-            PendingActiveReplacement pending = new PendingActiveReplacement(defenderId, ActiveReplacementReason.ACTIVE_KNOCKED_OUT);
-            events.add(new ActivePokemonReplacementRequiredEvent(afterPrizes.getGameId(), defenderId, pending.reason().name()));
+        PlayerGameState knockedOutOwner = playerState(afterPrizes, knockedOutOwnerId);
+        if (!knockedOutOwner.getBoard().getBench().isEmpty()) {
+            PendingActiveReplacement pending = new PendingActiveReplacement(knockedOutOwnerId, ActiveReplacementReason.ACTIVE_KNOCKED_OUT);
+            events.add(new ActivePokemonReplacementRequiredEvent(afterPrizes.getGameId(), knockedOutOwnerId, pending.reason().name()));
             return new GameState(afterPrizes.getGameId(), GameStatus.ACTIVE, afterPrizes.getPlayerOneState(), afterPrizes.getPlayerTwoState(), afterPrizes.getTurnState(), afterPrizes.getActiveStadium().orElse(null), null, pending, events);
         }
 
-        return turnManager.endTurn(afterPrizes, new EndTurnCommand(attackerId));
+        return afterPrizes;
+    }
+
+    private GameState finishTurnIfReady(GameState state, PlayerId currentPlayerId) {
+        if (state.getStatus() != GameStatus.ACTIVE || state.getPendingActiveReplacement().isPresent()) {
+            return state;
+        }
+        return turnManager.endTurn(state, new EndTurnCommand(currentPlayerId));
     }
 
     private PlayerGameState playerState(GameState state, PlayerId playerId) {

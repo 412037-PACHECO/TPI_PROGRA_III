@@ -1,6 +1,7 @@
 package com.tpi.pokemon.game.engine.action;
 
 import com.tpi.pokemon.game.domain.enums.GameStatus;
+import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.enums.TurnPhase;
 import com.tpi.pokemon.game.domain.model.ActivePokemon;
 import com.tpi.pokemon.game.domain.model.Bench;
@@ -20,8 +21,11 @@ import com.tpi.pokemon.game.engine.event.BasicPokemonBenchedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.event.PokemonEvolvedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionAppliedEvent;
 import com.tpi.pokemon.game.engine.event.StadiumReplacedEvent;
 import com.tpi.pokemon.game.engine.event.TrainerPlayedEvent;
+import com.tpi.pokemon.game.engine.special.ApplySpecialConditionCommand;
+import com.tpi.pokemon.game.engine.special.StatusEffectManager;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +33,8 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class TurnActionService {
+    private final StatusEffectManager statusEffectManager = new StatusEffectManager();
+
     public GameState putBasicPokemonOnBench(GameState state, PutBasicPokemonOnBenchCommand command) {
         Context context = requireMainTurn(state, command.playerId());
         CardInstance card = requireCardInHand(context.playerState(), command.cardId());
@@ -90,6 +96,12 @@ public final class TurnActionService {
             throw new ActionException("Player has already retreated this turn");
         }
         PokemonInPlay active = context.playerState().getBoard().getActivePokemon().orElseThrow(() -> new ActionException("Active Pokemon is required")).getPokemon();
+        if (active.hasSpecialCondition(SpecialCondition.ASLEEP)) {
+            throw new ActionException("Asleep Pokemon cannot retreat");
+        }
+        if (active.hasSpecialCondition(SpecialCondition.PARALYZED)) {
+            throw new ActionException("Paralyzed Pokemon cannot retreat");
+        }
         List<PokemonInPlay> bench = context.playerState().getBoard().getBench().getPokemon();
         if (command.benchIndex() < 0 || command.benchIndex() >= bench.size()) {
             throw new ActionException("Bench index is invalid");
@@ -113,7 +125,7 @@ public final class TurnActionService {
                 throw new ActionException("Selected card must be an Energy");
             }
         }
-        PokemonInPlay paidActive = active.withoutAttachedEnergies(discardSet);
+        PokemonInPlay paidActive = active.withoutAttachedEnergies(discardSet).clearSpecialConditions();
         PokemonInPlay newActive = bench.get(command.benchIndex());
         List<PokemonInPlay> updatedBench = new ArrayList<>(bench);
         updatedBench.set(command.benchIndex(), paidActive);
@@ -122,6 +134,13 @@ public final class TurnActionService {
         BoardState board = new BoardState(new ActivePokemon(newActive), new Bench(updatedBench));
         PlayerGameState updatedPlayer = rebuildPlayer(context.playerState(), context.playerState().getHand(), new DiscardPile(discard), board, context.playerState().getTurnsTaken());
         return withEvent(context.state(), updatedPlayer, context.turnState().withRetreated(), context.state().getActiveStadium().orElse(null), new ActivePokemonRetreatedEvent(context.state().getGameId(), command.playerId(), newActive.getTopCard().id(), discardIds));
+    }
+
+    public GameState applySpecialCondition(GameState state, ApplySpecialConditionCommand command) {
+        Context context = requireMainTurn(state, command.playerId());
+        TargetUpdate update = updateTarget(context.playerState().getBoard(), command.target(), pokemon -> statusEffectManager.applyCondition(pokemon, command.condition()));
+        PlayerGameState updatedPlayer = rebuildPlayer(context.playerState(), context.playerState().getHand(), context.playerState().getDiscardPile(), update.board(), context.playerState().getTurnsTaken());
+        return withEvent(context.state(), updatedPlayer, context.turnState(), context.state().getActiveStadium().orElse(null), new SpecialConditionAppliedEvent(context.state().getGameId(), command.playerId(), update.updatedPokemon().getTopCard().id(), command.condition()));
     }
 
     public GameState playTrainer(GameState state, PlayTrainerCommand command) {

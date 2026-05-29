@@ -141,19 +141,29 @@ Decisiones fase 8:
 - Muerte Súbita queda representada como `GameFinishResult` de tipo `SUDDEN_DEATH_REQUIRED`; no se juega todavía el flujo completo.
 - No se implementan condiciones especiales ni efectos complejos en esta fase.
 
-## Fase 9 - Condiciones especiales
+## Fase 9 - Condiciones especiales y daño entre turnos
 
-- Objetivo: implementar estados XY1.
-- Entregables: StatusEffectManager y between turns.
-- Dependencias: turnos/KO.
-- Riesgos: timing y limpieza.
-- Criterio: tests para las 5 condiciones.
+- Estado: implementada como motor puro Java, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Objetivo: soportar condiciones especiales oficiales e integrarlas con ataque, retiro, evolución, KO, premios y victoria.
+- Entregables: `SpecialCondition`, `SpecialConditionSet`, `StatusEffectManager`, `BetweenTurnsService`, `CoinFlipProvider`, eventos de condiciones y tests unitarios/integración.
+- Dependencias: Fase 6 turnos, Fase 7 ataques y Fase 8 KO/premios/victoria.
+- Riesgos: timing entre turnos, KO por condición, Confusión auto-KO y no duplicar reglas de KO/victoria.
+- Criterio: Dormido, Quemado, Confundido, Paralizado y Envenenado testeados; restricciones de ataque/retiro; limpieza por evolución/retiro; daño entre turnos integrado con KO/victoria.
+
+Decisiones fase 9:
+
+- Las condiciones especiales viven en `PokemonInPlay` mediante `SpecialConditionSet`.
+- Dormido, Confundido y Paralizado son mutuamente excluyentes.
+- Quemado y Envenenado coexisten con cualquier otra condición.
+- Los chequeos de moneda usan `CoinFlipProvider` inyectable para tests deterministas.
+- `TurnManager.endTurn` resuelve `BetweenTurnsService` antes de preparar el turno del oponente.
+- El motor no interpreta texto libre de cartas XY1 ni habilidades en esta fase.
 
 ## Fase 10 - Motor de efectos
 
-- Objetivo: soportar efectos reales XY1 incrementalmente.
-- Entregables: EffectRegistry, handlers genéricos/custom.
-- Dependencias: auditoría XY1.
+- Objetivo: soportar efectos reales XY1 incrementalmente, incluyendo aplicación automática de condiciones desde ataques y habilidades.
+- Entregables: EffectRegistry, handlers genéricos/custom y auditoría XY1.
+- Dependencias: condiciones especiales, KO/premios/victoria y auditoría XY1.
 - Riesgos: hardcode desordenado.
 - Criterio: cada efecto implementado está auditado y testeado.
 

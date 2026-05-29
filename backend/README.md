@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 8 - Knockout, premios y condiciones de victoria
+## Alcance actual: Fase 9 - Condiciones especiales y daño entre turnos
 
-El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN y ataques base. La Fase 8 agrega resolución de knockout, descarte, toma de premios y condiciones básicas de victoria/derrota.
+El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios y condiciones básicas de victoria/derrota. La Fase 9 agrega condiciones especiales oficiales y daño entre turnos, integrados con ataque, retiro, evolución, KO, premios y victoria.
 
 Incluye:
 
@@ -30,6 +30,10 @@ Incluye:
 - Victoria por último Premio, por rival sin Pokémon en juego y por deck-out.
 - Reemplazo obligatorio de Activo desde Banca cuando la partida continúa tras un KO.
 - Representación explícita de simultaneidad/Muerte Súbita pendiente, sin jugar todavía Muerte Súbita completa.
+- Modelo de condiciones especiales: Dormido, Quemado, Confundido, Paralizado y Envenenado.
+- Restricciones de ataque/retiro por condición y chequeos con moneda inyectable.
+- Daño entre turnos por Envenenado/Quemado e integración con KO/premios/victoria.
+- Limpieza de condiciones al evolucionar y al retirar a Banca.
 
 ## Modelo Game State
 
@@ -56,6 +60,7 @@ Decisiones de dominio:
 - `GameState` puede mantener Estadio activo global como estructura, sin aplicar efectos continuos todavía.
 - `CardDefinitionRef` puede conservar ataques, HP, tipos, debilidades, resistencias y perfil de energía estructural para el motor de ataque.
 - `PokemonInPlay` conserva contadores de daño acumulados; Fase 8 resuelve KO cuando el daño alcanza o supera el HP.
+- `PokemonInPlay` conserva condiciones especiales como parte del estado en juego.
 
 Invariantes protegidas en el modelo:
 
@@ -180,9 +185,41 @@ Reglas implementadas:
 Limitaciones honestas de Fase 8:
 
 - Solo se resuelve KO del Activo defensor causado por ataque base; no hay daño a Banca todavía.
-- No se implementan condiciones especiales ni daño entre turnos.
+- En Fase 8 no se implementaban condiciones especiales ni daño entre turnos; Fase 9 lo incorpora en una sección separada.
 - No se implementan efectos complejos que modifiquen premios, daño, descarte o victoria.
 - No se juega Muerte Súbita completa; solo queda representada como resultado pendiente.
+- No hay endpoints REST de juego, WebSocket, frontend ni persistencia de partida.
+
+## Condiciones especiales y daño entre turnos
+
+La Fase 9 incorpora condiciones especiales al estado de `PokemonInPlay` y las procesa dentro del Game Engine puro Java, sin interpretar texto libre de cartas.
+
+Componentes principales:
+
+- `SpecialCondition` y `SpecialConditionSet`: modelo de condiciones especiales.
+- `StatusEffectManager`: aplica, remueve, limpia y consulta condiciones.
+- `BetweenTurnsService`: procesa daño/chequeos entre turnos y coordina KO/premios/victoria.
+- `CoinFlipProvider`: abstracción inyectable para chequeos de moneda testeables.
+
+Reglas implementadas:
+
+- Dormido impide atacar y retirarse; entre turnos lanza moneda y se cura con cara.
+- Paralizado impide atacar y retirarse; se limpia entre turnos.
+- Confundido permite intentar atacar; con cruz el ataque falla y el atacante recibe 3 contadores de daño.
+- Envenenado aplica 1 contador de daño entre turnos.
+- Quemado lanza moneda entre turnos; con cruz aplica 2 contadores de daño.
+- Dormido, Confundido y Paralizado son mutuamente excluyentes; la condición más reciente reemplaza a la anterior.
+- Quemado y Envenenado coexisten con cualquier otra condición y entre sí.
+- Evolucionar limpia todas las condiciones especiales del Pokémon evolucionado.
+- Retirar limpia todas las condiciones del Pokémon que se mueve a Banca.
+- El daño por condición puede provocar KO, premios, reemplazo de Activo y victoria.
+
+Limitaciones honestas de Fase 9:
+
+- No se implementan efectos complejos de cartas XY1 que apliquen/modifiquen condiciones automáticamente.
+- No se implementan habilidades.
+- No se implementa daño a Banca.
+- No se implementan modificadores por Herramientas, Estadios, Energías Especiales o texto complejo.
 - No hay endpoints REST de juego, WebSocket, frontend ni persistencia de partida.
 
 ## Endpoints de catálogo
@@ -369,7 +406,6 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 ## Qué NO incluye todavía
 
 - Partida completa jugable de punta a punta vía API pública.
-- Condiciones especiales y daño entre turnos.
 - Daño a Banca.
 - Flujo completo de Muerte Súbita.
 - Efectos complejos de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.

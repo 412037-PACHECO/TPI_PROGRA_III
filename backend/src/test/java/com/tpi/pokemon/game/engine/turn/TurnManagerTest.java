@@ -5,7 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tpi.pokemon.game.domain.enums.CardSubtype;
 import com.tpi.pokemon.game.domain.enums.CardSupertype;
 import com.tpi.pokemon.game.domain.enums.GameStatus;
+import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.enums.TurnPhase;
+import com.tpi.pokemon.game.domain.model.ActivePokemon;
+import com.tpi.pokemon.game.domain.model.AttachedCards;
+import com.tpi.pokemon.game.domain.model.Bench;
 import com.tpi.pokemon.game.domain.model.BoardState;
 import com.tpi.pokemon.game.domain.model.CardDefinitionRef;
 import com.tpi.pokemon.game.domain.model.CardInstance;
@@ -14,6 +18,7 @@ import com.tpi.pokemon.game.domain.model.DiscardPile;
 import com.tpi.pokemon.game.domain.model.GameState;
 import com.tpi.pokemon.game.domain.model.HandZone;
 import com.tpi.pokemon.game.domain.model.PlayerGameState;
+import com.tpi.pokemon.game.domain.model.PokemonInPlay;
 import com.tpi.pokemon.game.domain.model.PrizeCards;
 import com.tpi.pokemon.game.domain.model.TurnState;
 import com.tpi.pokemon.game.domain.value.CardInstanceId;
@@ -25,7 +30,12 @@ import com.tpi.pokemon.game.engine.event.DeckOutLossDetectedEvent;
 import com.tpi.pokemon.game.engine.event.GameFinishedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.event.MainPhaseStartedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionDamageAppliedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionRemovedEvent;
+import com.tpi.pokemon.game.engine.event.ParalysisClearedEvent;
 import com.tpi.pokemon.game.engine.event.VictoryDetectedEvent;
+import com.tpi.pokemon.game.engine.random.CoinFlipResult;
+import com.tpi.pokemon.game.engine.special.BetweenTurnsService;
 import com.tpi.pokemon.game.engine.victory.FinishReason;
 import java.util.List;
 import java.util.Set;
@@ -122,6 +132,87 @@ class TurnManagerTest {
         assertThat(next.getTurnState().phase()).isEqualTo(TurnPhase.MAIN);
     }
 
+    @Test
+    void endTurnAppliesPoisonBurnAndSleepBetweenTurns() {
+        TurnManager manager = new TurnManager(new BetweenTurnsService(sequence(CoinFlipResult.TAILS, CoinFlipResult.HEADS)));
+        PokemonInPlay active = PokemonInPlay.withoutAttachments(card("p1-active", PLAYER_ONE))
+                .applySpecialCondition(SpecialCondition.POISONED)
+                .applySpecialCondition(SpecialCondition.BURNED)
+                .applySpecialCondition(SpecialCondition.ASLEEP);
+        GameState state = activeGame(
+                playerWithActive(PLAYER_ONE, active, List.of(), 1),
+                playerWithActive(PLAYER_TWO, PokemonInPlay.withoutAttachments(card("p2-active", PLAYER_TWO)), List.of(), 1),
+                new TurnState(PLAYER_ONE, PLAYER_ONE, 3, TurnPhase.MAIN, false, false, false, false, false)
+        );
+
+        GameState ended = manager.endTurn(state, new EndTurnCommand(PLAYER_ONE));
+
+        PokemonInPlay updated = activePokemon(ended, PLAYER_ONE);
+        assertThat(updated.getDamageCounters()).isEqualTo(3);
+        assertThat(updated.hasSpecialCondition(SpecialCondition.POISONED)).isTrue();
+        assertThat(updated.hasSpecialCondition(SpecialCondition.BURNED)).isTrue();
+        assertThat(updated.hasSpecialCondition(SpecialCondition.ASLEEP)).isFalse();
+        assertThat(eventsOfType(ended, SpecialConditionDamageAppliedEvent.class)).hasSize(2);
+        assertThat(eventsOfType(ended, SpecialConditionRemovedEvent.class)).hasSize(1);
+        assertThat(ended.getTurnState().currentPlayer()).isEqualTo(PLAYER_TWO);
+    }
+
+    @Test
+    void burnHeadsAddsNoDamageAndSleepTailsRemainsAsleepBetweenTurns() {
+        TurnManager manager = new TurnManager(new BetweenTurnsService(sequence(CoinFlipResult.HEADS, CoinFlipResult.TAILS)));
+        PokemonInPlay active = PokemonInPlay.withoutAttachments(card("p1-active", PLAYER_ONE))
+                .applySpecialCondition(SpecialCondition.BURNED)
+                .applySpecialCondition(SpecialCondition.ASLEEP);
+        GameState state = activeGame(
+                playerWithActive(PLAYER_ONE, active, List.of(), 1),
+                playerWithActive(PLAYER_TWO, PokemonInPlay.withoutAttachments(card("p2-active", PLAYER_TWO)), List.of(), 1),
+                new TurnState(PLAYER_ONE, PLAYER_ONE, 3, TurnPhase.MAIN, false, false, false, false, false)
+        );
+
+        GameState ended = manager.endTurn(state, new EndTurnCommand(PLAYER_ONE));
+
+        PokemonInPlay updated = activePokemon(ended, PLAYER_ONE);
+        assertThat(updated.getDamageCounters()).isZero();
+        assertThat(updated.hasSpecialCondition(SpecialCondition.BURNED)).isTrue();
+        assertThat(updated.hasSpecialCondition(SpecialCondition.ASLEEP)).isTrue();
+        assertThat(eventsOfType(ended, SpecialConditionDamageAppliedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void endTurnClearsParalysisBetweenTurns() {
+        PokemonInPlay active = PokemonInPlay.withoutAttachments(card("p1-active", PLAYER_ONE)).applySpecialCondition(SpecialCondition.PARALYZED);
+        GameState state = activeGame(
+                playerWithActive(PLAYER_ONE, active, List.of(), 1),
+                playerWithActive(PLAYER_TWO, PokemonInPlay.withoutAttachments(card("p2-active", PLAYER_TWO)), List.of(), 1),
+                new TurnState(PLAYER_ONE, PLAYER_ONE, 3, TurnPhase.MAIN, false, false, false, false, false)
+        );
+
+        GameState ended = turnManager.endTurn(state, new EndTurnCommand(PLAYER_ONE));
+
+        assertThat(activePokemon(ended, PLAYER_ONE).hasSpecialCondition(SpecialCondition.PARALYZED)).isFalse();
+        assertThat(eventsOfType(ended, ParalysisClearedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void poisonDamageCanKnockOutActivePokemonAndAwardPrize() {
+        PokemonInPlay poisoned = PokemonInPlay.withoutAttachments(card("p1-active", PLAYER_ONE, pokemonDefinition("p1-active-def", 60)))
+                .withDamageCounters(5)
+                .applySpecialCondition(SpecialCondition.POISONED);
+        GameState state = activeGame(
+                playerWithActive(PLAYER_ONE, poisoned, List.of(), 1),
+                playerWithActive(PLAYER_TWO, PokemonInPlay.withoutAttachments(card("p2-active", PLAYER_TWO)), prizes(PLAYER_TWO, 6), 1),
+                new TurnState(PLAYER_ONE, PLAYER_ONE, 3, TurnPhase.MAIN, false, false, false, false, false)
+        );
+
+        GameState ended = turnManager.endTurn(state, new EndTurnCommand(PLAYER_ONE));
+
+        assertThat(ended.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(ended.getPlayerOneState().getBoard().getActivePokemon()).isEmpty();
+        assertThat(ended.getPlayerOneState().getDiscardPile().getCards()).extracting(CardInstance::id).contains(new CardInstanceId("p1-active"));
+        assertThat(ended.getPlayerTwoState().getPrizeCards().remainingCount()).isEqualTo(5);
+        assertThat(ended.getFinishResult()).hasValueSatisfying(result -> assertThat(result.winnerId()).isEqualTo(PLAYER_TWO));
+    }
+
     private GameState activeGame(PlayerGameState playerOne, PlayerGameState playerTwo, TurnState turnState) {
         return new GameState(GAME_ID, GameStatus.ACTIVE, playerOne, playerTwo, turnState, List.of());
     }
@@ -130,8 +221,36 @@ class TurnManagerTest {
         return new PlayerGameState(playerId, new DeckZone(deck), new HandZone(hand), PrizeCards.empty(), DiscardPile.empty(), BoardState.empty(), turnsTaken);
     }
 
+    private PlayerGameState playerWithActive(PlayerId playerId, PokemonInPlay active, List<CardInstance> prizes, int turnsTaken) {
+        return new PlayerGameState(playerId, DeckZone.empty(), HandZone.empty(), new PrizeCards(prizes), DiscardPile.empty(), new BoardState(new ActivePokemon(active), Bench.empty()), turnsTaken);
+    }
+
     private CardInstance card(String id, PlayerId owner) {
         return new CardInstance(new CardInstanceId(id), BASIC, owner);
+    }
+
+    private CardInstance card(String id, PlayerId owner, CardDefinitionRef definition) {
+        return new CardInstance(new CardInstanceId(id), definition, owner);
+    }
+
+    private CardDefinitionRef pokemonDefinition(String id, int hp) {
+        return new CardDefinitionRef(id, "Pokemon " + id, CardSupertype.POKEMON, Set.of(CardSubtype.BASIC), null, 1, hp, List.of(), List.of(), List.of(), List.of(), com.tpi.pokemon.game.domain.model.EnergyProfile.none());
+    }
+
+    private List<CardInstance> prizes(PlayerId owner, int count) {
+        return java.util.stream.IntStream.rangeClosed(1, count)
+                .mapToObj(index -> new CardInstance(new CardInstanceId(owner.value() + "-prize-" + index), BASIC, owner))
+                .toList();
+    }
+
+    private PokemonInPlay activePokemon(GameState state, PlayerId playerId) {
+        PlayerGameState player = playerId.equals(PLAYER_ONE) ? state.getPlayerOneState() : state.getPlayerTwoState();
+        return player.getBoard().getActivePokemon().orElseThrow().getPokemon();
+    }
+
+    private com.tpi.pokemon.game.engine.random.CoinFlipProvider sequence(CoinFlipResult... results) {
+        java.util.concurrent.atomic.AtomicInteger index = new java.util.concurrent.atomic.AtomicInteger();
+        return () -> results[Math.min(index.getAndIncrement(), results.length - 1)];
     }
 
     private <T extends GameEvent> List<T> eventsOfType(GameState state, Class<T> type) {

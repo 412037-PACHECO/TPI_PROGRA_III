@@ -1,6 +1,7 @@
 package com.tpi.pokemon.game.domain.model;
 
 import com.tpi.pokemon.game.domain.value.CardInstanceId;
+import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
@@ -12,16 +13,21 @@ public final class PokemonInPlay {
     private final int enteredTurnNumber;
     private final Integer lastEvolvedTurnNumber;
     private final int damageCounters;
+    private final SpecialConditionSet specialConditions;
 
     public PokemonInPlay(CardInstance baseCard, AttachedCards attachedCards) {
-        this(List.of(baseCard), attachedCards, 0, null, 0);
+        this(List.of(baseCard), attachedCards, 0, null, 0, SpecialConditionSet.none());
     }
 
     public PokemonInPlay(List<CardInstance> evolutionStack, AttachedCards attachedCards, int enteredTurnNumber, Integer lastEvolvedTurnNumber) {
-        this(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, 0);
+        this(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, 0, SpecialConditionSet.none());
     }
 
     public PokemonInPlay(List<CardInstance> evolutionStack, AttachedCards attachedCards, int enteredTurnNumber, Integer lastEvolvedTurnNumber, int damageCounters) {
+        this(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, damageCounters, SpecialConditionSet.none());
+    }
+
+    public PokemonInPlay(List<CardInstance> evolutionStack, AttachedCards attachedCards, int enteredTurnNumber, Integer lastEvolvedTurnNumber, int damageCounters, SpecialConditionSet specialConditions) {
         Objects.requireNonNull(evolutionStack, "evolutionStack must not be null");
         if (evolutionStack.isEmpty()) {
             throw new IllegalArgumentException("evolutionStack must not be empty");
@@ -48,6 +54,7 @@ public final class PokemonInPlay {
         this.enteredTurnNumber = enteredTurnNumber;
         this.lastEvolvedTurnNumber = lastEvolvedTurnNumber;
         this.damageCounters = damageCounters;
+        this.specialConditions = Objects.requireNonNull(specialConditions, "specialConditions must not be null");
     }
 
     public static PokemonInPlay withoutAttachments(CardInstance baseCard) {
@@ -89,6 +96,14 @@ public final class PokemonInPlay {
         return damageCounters;
     }
 
+    public SpecialConditionSet getSpecialConditions() {
+        return specialConditions;
+    }
+
+    public boolean hasSpecialCondition(SpecialCondition condition) {
+        return specialConditions.has(condition);
+    }
+
     public boolean wasPlayedThisTurn(int turnNumber) {
         return enteredTurnNumber == turnNumber;
     }
@@ -98,25 +113,41 @@ public final class PokemonInPlay {
     }
 
     public PokemonInPlay withAttachedEnergy(CardInstance energy) {
-        return new PokemonInPlay(evolutionStack, attachedCards.withEnergy(energy), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
+        return new PokemonInPlay(evolutionStack, attachedCards.withEnergy(energy), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters, specialConditions);
     }
 
     public PokemonInPlay withAttachedTool(CardInstance tool) {
-        return new PokemonInPlay(evolutionStack, attachedCards.withTool(tool), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
+        return new PokemonInPlay(evolutionStack, attachedCards.withTool(tool), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters, specialConditions);
     }
 
     public PokemonInPlay withoutAttachedEnergies(Set<CardInstanceId> energyIds) {
-        return new PokemonInPlay(evolutionStack, attachedCards.withoutEnergies(energyIds), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
+        return new PokemonInPlay(evolutionStack, attachedCards.withoutEnergies(energyIds), enteredTurnNumber, lastEvolvedTurnNumber, damageCounters, specialConditions);
     }
 
     public PokemonInPlay evolve(CardInstance evolutionCard, int turnNumber) {
         List<CardInstance> updatedStack = new java.util.ArrayList<>(evolutionStack);
         updatedStack.add(Objects.requireNonNull(evolutionCard, "evolutionCard must not be null"));
-        return new PokemonInPlay(updatedStack, attachedCards, enteredTurnNumber, turnNumber, damageCounters);
+        return new PokemonInPlay(updatedStack, attachedCards, enteredTurnNumber, turnNumber, damageCounters, SpecialConditionSet.none());
     }
 
     public PokemonInPlay withDamageCounters(int damageCounters) {
-        return new PokemonInPlay(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, damageCounters);
+        return new PokemonInPlay(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, damageCounters, specialConditions);
+    }
+
+    public PokemonInPlay withSpecialConditions(SpecialConditionSet specialConditions) {
+        return new PokemonInPlay(evolutionStack, attachedCards, enteredTurnNumber, lastEvolvedTurnNumber, damageCounters, specialConditions);
+    }
+
+    public PokemonInPlay applySpecialCondition(SpecialCondition condition) {
+        return withSpecialConditions(specialConditions.apply(condition));
+    }
+
+    public PokemonInPlay removeSpecialCondition(SpecialCondition condition) {
+        return withSpecialConditions(specialConditions.remove(condition));
+    }
+
+    public PokemonInPlay clearSpecialConditions() {
+        return withSpecialConditions(SpecialConditionSet.none());
     }
 
     public PokemonInPlay applyDamage(int damageAmount) {

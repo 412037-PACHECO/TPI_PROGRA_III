@@ -4,7 +4,7 @@
 
 El Game Engine es una máquina de estados determinística de dominio. Recibe un estado y un comando, valida reglas, muta el estado, emite eventos y no conoce infraestructura.
 
-Estado actual: la Fase 8 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno, acciones MAIN, ataques base, knockout, premios y condiciones básicas de victoria/derrota. Condiciones especiales, efectos complejos, WebSocket, endpoints de partida, persistencia y frontend quedan fuera del alcance actual.
+Estado actual: la Fase 9 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno, acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y daño entre turnos. Efectos complejos XY1, habilidades, daño a Banca, WebSocket, endpoints de partida, persistencia y frontend quedan fuera del alcance actual.
 
 ```text
 GameCommand
@@ -63,7 +63,7 @@ Implementación Fase 5:
 
 ## Flujo de turno
 
-Implementado hasta Fase 8:
+Implementado hasta Fase 9:
 
 1. `NOT_STARTED`: turno preparado para el jugador actual.
 2. `DRAW`: `TurnManager.startTurn` incrementa turno y resuelve robo obligatorio.
@@ -73,12 +73,14 @@ Implementado hasta Fase 8:
 6. `ATTACK`: declarar/resolver ataque.
 7. Aplicar daño.
 8. Evaluar knockout, premios y victoria.
-9. Si la partida continúa sin reemplazo pendiente, `TurnManager.endTurn` cambia al oponente, resetea flags y deja `NOT_STARTED`.
+9. Resolver condiciones especiales entre turnos.
+10. Resolver KO/premios/victoria causados por daño entre turnos.
+11. Si la partida continúa sin reemplazo pendiente, `TurnManager.endTurn` cambia al oponente, resetea flags y deja `NOT_STARTED`.
 
 Pendiente para fases posteriores:
 
-1. `BETWEEN_TURNS`: procesar condiciones/efectos.
-2. Efectos complejos de cartas.
+1. Efectos complejos de cartas.
+2. Daño a Banca y habilidades.
 
 ## Acciones MAIN implementadas en Fase 6
 
@@ -146,13 +148,28 @@ Implementado en Fase 8:
 
 ## Condiciones especiales
 
-- Dormido: no puede atacar ni retirarse; entre turnos moneda, cara despierta.
-- Quemado: entre turnos moneda; cruz aplica 2 contadores.
-- Confundido: al atacar moneda; cruz cancela ataque y aplica 3 contadores al atacante.
-- Paralizado: no puede atacar ni retirarse; se limpia al final del turno correspondiente.
-- Envenenado: entre turnos aplica 1 contador.
+Implementado en Fase 9:
 
-Orden entre turnos: Envenenado → Quemado → Dormido → Paralizado → efectos de habilidades/cartas → KO.
+- Dormido: no puede atacar ni retirarse; entre turnos lanza moneda, cara despierta y cruz permanece Dormido.
+- Quemado: puede coexistir con otras condiciones; entre turnos lanza moneda y cruz aplica 2 contadores.
+- Confundido: al atacar lanza moneda; cruz cancela el ataque y aplica 3 contadores al atacante, cara continúa normalmente.
+- Paralizado: no puede atacar ni retirarse; se limpia entre turnos.
+- Envenenado: puede coexistir con otras condiciones; entre turnos aplica 1 contador.
+
+Reglas de coexistencia:
+
+- Dormido, Confundido y Paralizado son mutuamente excluyentes.
+- Quemado y Envenenado pueden coexistir con cualquiera de las anteriores y entre sí.
+
+Integraciones:
+
+- Ataque: Dormido/Paralizado bloquean; Confundido resuelve chequeo de moneda antes del daño normal.
+- Retiro: Dormido/Paralizado bloquean; retiro exitoso limpia condiciones del Pokémon que pasa a Banca.
+- Evolución: evolucionar limpia condiciones especiales.
+- Entre turnos: Envenenado → Quemado → Dormido → Paralizado → KO/premios/victoria.
+- KO por condición reutiliza descarte, premios, reemplazo de Activo y victoria de Fase 8.
+
+Fuera de alcance: efectos complejos XY1, habilidades, daño a Banca y modificadores por cartas.
 
 ## Eventos de dominio sugeridos
 
@@ -162,7 +179,7 @@ Orden entre turnos: Envenenado → Quemado → Dormido → Paralizado → efecto
 - `SpecialConditionApplied`, `PokemonKnockedOut`, `PrizeTaken`.
 - `TurnEnded`, `VictoryDeclared`, `GameFinished`.
 
-Implementados como estructura base hasta Fase 8:
+Implementados como estructura base hasta Fase 9:
 
 - `GameCreatedEvent`.
 - `GameStateInitializedEvent`.
@@ -203,6 +220,14 @@ Implementados como estructura base hasta Fase 8:
 - `VictoryDetectedEvent`.
 - `GameFinishedEvent`.
 - `SuddenDeathRequiredEvent`.
+- `SpecialConditionAppliedEvent`.
+- `SpecialConditionRemovedEvent`.
+- `SpecialConditionDamageAppliedEvent`.
+- `SleepCheckResolvedEvent`.
+- `BurnCheckResolvedEvent`.
+- `ConfusionCheckResolvedEvent`.
+- `ParalysisClearedEvent`.
+- `BetweenTurnsResolvedEvent`.
 
 ## Comandos de juego sugeridos
 
@@ -210,7 +235,7 @@ Implementados como estructura base hasta Fase 8:
 - `DrawForTurn`, `PlayBasicPokemon`, `EvolvePokemon`, `AttachEnergy`.
 - `PlayTrainer`, `UseAbility`, `Retreat`, `DeclareAttack`, `EndTurn`.
 
-En Fase 8 existen comandos/modelos específicos de setup, turno/acciones MAIN, declaración de ataque base y reemplazo de Activo post-KO. Los comandos de condiciones especiales y efectos complejos siguen pendientes.
+En Fase 9 existen comandos/modelos específicos de setup, turno/acciones MAIN, declaración de ataque base, reemplazo de Activo post-KO y aplicación estructural de condiciones especiales. Los comandos de efectos complejos siguen pendientes.
 
 ## Reglas de acoplamiento del modelo actual
 
@@ -220,5 +245,5 @@ En Fase 8 existen comandos/modelos específicos de setup, turno/acciones MAIN, d
 
 ## Validadores y resolutores
 
-- Implementados: validaciones/resolución de setup, mulligan inicial, turno básico, acciones MAIN estructurales, ataque base, coste de energía, daño base con debilidad/resistencia, knockout, premios, reemplazo de Activo y condiciones básicas de victoria.
-- Futuros: condiciones especiales, efectos activos/complejos, daño a Banca, Muerte Súbita jugable, persistencia y vistas seguras.
+- Implementados: validaciones/resolución de setup, mulligan inicial, turno básico, acciones MAIN estructurales, ataque base, coste de energía, daño base con debilidad/resistencia, knockout, premios, reemplazo de Activo, condiciones básicas de victoria, condiciones especiales y daño entre turnos.
+- Futuros: efectos activos/complejos, habilidades, daño a Banca, Muerte Súbita jugable, persistencia y vistas seguras.

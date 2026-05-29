@@ -18,6 +18,7 @@ import com.tpi.pokemon.game.engine.event.MainPhaseStartedEvent;
 import com.tpi.pokemon.game.engine.event.TurnEndedEvent;
 import com.tpi.pokemon.game.engine.event.TurnStartedEvent;
 import com.tpi.pokemon.game.engine.event.VictoryDetectedEvent;
+import com.tpi.pokemon.game.engine.special.BetweenTurnsService;
 import com.tpi.pokemon.game.engine.victory.FinishReason;
 import com.tpi.pokemon.game.engine.victory.GameFinishResult;
 import com.tpi.pokemon.game.engine.victory.VictoryConditionChecker;
@@ -27,6 +28,15 @@ import java.util.Objects;
 
 public final class TurnManager {
     private final VictoryConditionChecker victoryConditionChecker = new VictoryConditionChecker();
+    private final BetweenTurnsService betweenTurnsService;
+
+    public TurnManager() {
+        this(new BetweenTurnsService());
+    }
+
+    public TurnManager(BetweenTurnsService betweenTurnsService) {
+        this.betweenTurnsService = Objects.requireNonNull(betweenTurnsService, "betweenTurnsService must not be null");
+    }
 
     public GameState startTurn(GameState state, StartTurnCommand command) {
         Objects.requireNonNull(state, "state must not be null");
@@ -95,7 +105,12 @@ public final class TurnManager {
         }
         List<GameEvent> events = new ArrayList<>(state.getEvents());
         events.add(new TurnEndedEvent(state.getGameId(), command.playerId(), turn.turnNumber()));
-        return new GameState(state.getGameId(), GameStatus.ACTIVE, state.getPlayerOneState(), state.getPlayerTwoState(), turn.preparedForNextPlayer(opponentOf(state, command.playerId())), state.getActiveStadium().orElse(null), events);
+        GameState ended = new GameState(state.getGameId(), GameStatus.ACTIVE, state.getPlayerOneState(), state.getPlayerTwoState(), turn, state.getActiveStadium().orElse(null), events);
+        GameState afterBetweenTurns = betweenTurnsService.resolveBetweenTurns(ended, events);
+        if (afterBetweenTurns.getStatus() != GameStatus.ACTIVE || afterBetweenTurns.getPendingActiveReplacement().isPresent()) {
+            return afterBetweenTurns;
+        }
+        return new GameState(afterBetweenTurns.getGameId(), GameStatus.ACTIVE, afterBetweenTurns.getPlayerOneState(), afterBetweenTurns.getPlayerTwoState(), turn.preparedForNextPlayer(opponentOf(afterBetweenTurns, command.playerId())), afterBetweenTurns.getActiveStadium().orElse(null), afterBetweenTurns.getFinishResult().orElse(null), null, events);
     }
 
     private void requireActive(GameState state) {

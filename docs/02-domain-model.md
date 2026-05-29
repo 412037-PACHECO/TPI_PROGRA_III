@@ -26,7 +26,7 @@ La tabla describe el modelo objetivo del TPI. La sección siguiente indica qué 
 
 ## Estado de implementación actual
 
-La Fase 8 implementa el modelo interno base, setup/mulligan, motor de turnos con acciones MAIN, ataques base, knockout, premios y condiciones básicas de victoria/derrota bajo `backend/src/main/java/com/tpi/pokemon/game/`.
+La Fase 9 implementa el modelo interno base, setup/mulligan, motor de turnos con acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y daño entre turnos bajo `backend/src/main/java/com/tpi/pokemon/game/`.
 
 Incluye:
 
@@ -39,8 +39,9 @@ Incluye:
 - Turnos: `TurnManager`, `TurnActionService` y comandos de inicio/fin de turno, banca, energía, evolución, retiro y Trainer.
 - Ataques: `AttackService`, `EnergyCostValidator`, `DamageCalculator`, `DeclareAttackCommand`.
 - Knockout/victoria: `KnockoutResolver`, `PrizeResolver`, `PostAttackResolutionService`, `ActivePokemonReplacementResolver`, `VictoryConditionChecker`, `GameFinishResult`.
+- Condiciones especiales: `SpecialCondition`, `SpecialConditionSet`, `StatusEffectManager`, `BetweenTurnsService`, `CoinFlipProvider`.
 
-No implementa todavía condiciones especiales, daño entre turnos, daño a Banca, efectos complejos, flujo jugable completo de Muerte Súbita, endpoints de partida, WebSocket, persistencia de partidas ni frontend.
+No implementa todavía efectos complejos XY1, habilidades, daño a Banca, flujo jugable completo de Muerte Súbita, endpoints de partida, WebSocket, persistencia de partidas ni frontend.
 
 ## Relaciones
 
@@ -51,7 +52,7 @@ No implementa todavía condiciones especiales, daño entre turnos, daño a Banca
 - `Turn` pertenece al `Game` y define fase/flags.
 - `GameLog` pertenece a `Game/Match` y registra eventos derivados del motor.
 
-## Invariantes implementadas hasta Fase 8
+## Invariantes implementadas hasta Fase 9
 
 - Una `CardInstance` está en una sola zona lógica: deck, mano, premios, descarte, activo, banca, unida o removida.
 - Cada jugador tiene como máximo 1 Pokémon activo.
@@ -75,12 +76,18 @@ No implementa todavía condiciones especiales, daño entre turnos, daño a Banca
 - Una partida puede finalizar por deck-out cuando un jugador debe robar y no tiene cartas en el mazo.
 - Si hay reemplazo de Activo pendiente, el turno no finaliza hasta que el jugador correspondiente promueva desde Banca.
 - La simultaneidad/Muerte Súbita se representa explícitamente para evitar declarar un ganador incorrecto.
+- Dormido, Confundido y Paralizado son mutuamente excluyentes.
+- Quemado y Envenenado pueden coexistir con otras condiciones.
+- Un Pokémon Dormido o Paralizado no puede atacar ni retirarse.
+- Evolucionar limpia las condiciones especiales del Pokémon evolucionado.
+- Retirar limpia condiciones especiales del Pokémon que pasa a Banca.
+- El daño entre turnos puede causar KO y debe integrarse con premios, reemplazo de Activo y victoria.
 
 ## Reglas de dominio futuras / requeridas por reglamento
 
 - Mano rival, premios ocultos y orden de mazo no se exponen al oponente.
 - El flujo completo de Muerte Súbita queda pendiente.
-- Condiciones especiales y daño entre turnos quedan pendientes para Fase 9.
+- Efectos complejos que aplican, modifican o previenen condiciones especiales quedan pendientes para fases posteriores.
 - Efectos de cartas pueden modificar límites de energía/retiro/Trainer en fases futuras.
 - Dormido, Confundido y Paralizado son mutuamente excluyentes.
 - Quemado y Envenenado pueden coexistir con otras condiciones.

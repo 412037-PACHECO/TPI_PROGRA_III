@@ -8,6 +8,7 @@ import com.tpi.pokemon.game.domain.enums.CardSupertype;
 import com.tpi.pokemon.game.domain.enums.EnergyType;
 import com.tpi.pokemon.game.domain.enums.GameStatus;
 import com.tpi.pokemon.game.domain.enums.PokemonType;
+import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.enums.TurnPhase;
 import com.tpi.pokemon.game.domain.model.ActivePokemon;
 import com.tpi.pokemon.game.domain.model.AttackDefinition;
@@ -41,7 +42,11 @@ import com.tpi.pokemon.game.engine.event.EnergyCostValidatedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.event.PokemonKnockedOutEvent;
 import com.tpi.pokemon.game.engine.event.PrizeCardsTakenEvent;
+import com.tpi.pokemon.game.engine.event.ConfusionCheckResolvedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionDamageAppliedEvent;
 import com.tpi.pokemon.game.engine.event.TurnEndedEvent;
+import com.tpi.pokemon.game.engine.random.CoinFlipResult;
+import com.tpi.pokemon.game.engine.special.StatusEffectManager;
 import com.tpi.pokemon.game.engine.knockout.ActivePokemonReplacementResolver;
 import com.tpi.pokemon.game.engine.knockout.ReplaceActivePokemonCommand;
 import com.tpi.pokemon.game.engine.victory.FinishReason;
@@ -200,6 +205,80 @@ class AttackServiceTest {
         assertThatThrownBy(() -> attackService.declareAttack(state, command("scratch")))
                 .isInstanceOf(AttackException.class)
                 .hasMessage("Starting player cannot attack on their first turn");
+    }
+
+    @Test
+    void rejectsAttackWhenActivePokemonIsAsleep() {
+        GameState state = activeGame(
+                activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))).applySpecialCondition(SpecialCondition.ASLEEP),
+                activeDefender()
+        );
+
+        assertThatThrownBy(() -> attackService.declareAttack(state, command("scratch")))
+                .isInstanceOf(AttackException.class)
+                .hasMessage("Asleep Pokemon cannot attack");
+    }
+
+    @Test
+    void rejectsAttackWhenActivePokemonIsParalyzed() {
+        GameState state = activeGame(
+                activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))).applySpecialCondition(SpecialCondition.PARALYZED),
+                activeDefender()
+        );
+
+        assertThatThrownBy(() -> attackService.declareAttack(state, command("scratch")))
+                .isInstanceOf(AttackException.class)
+                .hasMessage("Paralyzed Pokemon cannot attack");
+    }
+
+    @Test
+    void confusedAttackWithHeadsResolvesNormally() {
+        AttackService service = attackServiceWithCoin(CoinFlipResult.HEADS);
+        GameState result = service.declareAttack(
+                activeGame(activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))).applySpecialCondition(SpecialCondition.CONFUSED), activeDefender()),
+                command("scratch")
+        );
+
+        assertThat(activePokemon(result.getPlayerTwoState()).getDamageCounters()).isEqualTo(3);
+        assertThat(activePokemon(result.getPlayerOneState()).getDamageCounters()).isZero();
+        assertThat(eventsOfType(result, ConfusionCheckResolvedEvent.class)).singleElement()
+                .satisfies(event -> assertThat(event.result()).isEqualTo(CoinFlipResult.HEADS));
+    }
+
+    @Test
+    void confusedAttackWithTailsFailsAndDamagesAttacker() {
+        AttackService service = attackServiceWithCoin(CoinFlipResult.TAILS);
+        GameState result = service.declareAttack(
+                activeGame(activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))).applySpecialCondition(SpecialCondition.CONFUSED), activeDefender()),
+                command("scratch")
+        );
+
+        assertThat(activePokemon(result.getPlayerOneState()).getDamageCounters()).isEqualTo(3);
+        assertThat(activePokemon(result.getPlayerTwoState()).getDamageCounters()).isZero();
+        assertThat(eventsOfType(result, SpecialConditionDamageAppliedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, DamageCalculatedEvent.class)).isEmpty();
+        assertThat(eventsOfType(result, TurnEndedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void confusedSelfDamageCanKnockOutAttackerAndAwardPrizeToOpponent() {
+        AttackService service = attackServiceWithCoin(CoinFlipResult.TAILS);
+        PokemonInPlay confusedAttacker = activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)))
+                .withDamageCounters(3)
+                .applySpecialCondition(SpecialCondition.CONFUSED);
+        GameState state = activeGame(
+                playerWithActiveAndPrizes(PLAYER_ONE, confusedAttacker, prizes(PLAYER_ONE, 6)),
+                playerWithActiveAndPrizes(PLAYER_TWO, activeDefender(), prizes(PLAYER_TWO, 6)),
+                defaultTurn()
+        );
+
+        GameState result = service.declareAttack(state, command("scratch"));
+
+        assertThat(result.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(result.getPlayerOneState().getBoard().getActivePokemon()).isEmpty();
+        assertThat(result.getPlayerOneState().getDiscardPile().getCards()).extracting(CardInstance::id).contains(new CardInstanceId("p1-active"));
+        assertThat(result.getPlayerTwoState().getPrizeCards().remainingCount()).isEqualTo(5);
+        assertThat(result.getFinishResult()).hasValueSatisfying(finish -> assertThat(finish.winnerId()).isEqualTo(PLAYER_TWO));
     }
 
     @Test
@@ -412,6 +491,10 @@ class AttackServiceTest {
 
     private DeclareAttackCommand command(String attackId) {
         return new DeclareAttackCommand(GAME_ID, PLAYER_ONE, attackId);
+    }
+
+    private AttackService attackServiceWithCoin(CoinFlipResult result) {
+        return new AttackService(new com.tpi.pokemon.game.engine.turn.TurnManager(), new EnergyCostValidator(), new com.tpi.pokemon.game.engine.damage.DamageCalculator(), new com.tpi.pokemon.game.engine.knockout.PostAttackResolutionService(), new StatusEffectManager(), () -> result);
     }
 
     private PokemonInPlay activePokemon(PlayerGameState player) {
