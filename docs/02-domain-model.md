@@ -26,20 +26,21 @@ La tabla describe el modelo objetivo del TPI. La sección siguiente indica qué 
 
 ## Estado de implementación actual
 
-La Fase 7 implementa el modelo interno base, setup/mulligan, motor de turnos con acciones MAIN y ataques base bajo `backend/src/main/java/com/tpi/pokemon/game/`.
+La Fase 8 implementa el modelo interno base, setup/mulligan, motor de turnos con acciones MAIN, ataques base, knockout, premios y condiciones básicas de victoria/derrota bajo `backend/src/main/java/com/tpi/pokemon/game/`.
 
 Incluye:
 
 - Value objects: `GameId`, `PlayerId`, `CardInstanceId`.
 - Enums: `GameStatus`, `TurnPhase`, `ZoneType`, `CardSupertype`, `CardSubtype`, `EnergyType`, `PokemonType`.
 - Modelo: `GameState`, `PlayerGameState`, `BoardState`, `TurnState`, `CardDefinitionRef`, `CardInstance`, `PokemonInPlay`, `ActivePokemon`, `Bench`, `AttachedCards`, `DeckZone`, `HandZone`, `PrizeCards`, `DiscardPile`, `StadiumInPlay`, `AttackDefinition`, `EnergyProfile`, `Weakness`, `Resistance`.
-- Eventos base: `GameCreatedEvent`, `GameStateInitializedEvent`, `CardMovedEvent`, `TurnPhaseChangedEvent`, eventos de setup/mulligan, eventos de turno/acciones MAIN y eventos de ataque/daño.
+- Eventos base: `GameCreatedEvent`, `GameStateInitializedEvent`, `CardMovedEvent`, `TurnPhaseChangedEvent`, eventos de setup/mulligan, eventos de turno/acciones MAIN, eventos de ataque/daño y eventos de KO/premios/victoria.
 - Comandos base: `GameCommand`, `PlayerCommand`, `CommandResult`.
 - Setup: `SetupService`, `DeckShuffler`, `StartingPlayerSelector`, `MulliganBonusDrawPolicy`, `StartSetupCommand`, `ChooseInitialPokemonCommand`, `CompleteSetupCommand`.
 - Turnos: `TurnManager`, `TurnActionService` y comandos de inicio/fin de turno, banca, energía, evolución, retiro y Trainer.
 - Ataques: `AttackService`, `EnergyCostValidator`, `DamageCalculator`, `DeclareAttackCommand`.
+- Knockout/victoria: `KnockoutResolver`, `PrizeResolver`, `PostAttackResolutionService`, `ActivePokemonReplacementResolver`, `VictoryConditionChecker`, `GameFinishResult`.
 
-No implementa todavía knockout, premios durante partida, victoria, condiciones especiales, efectos complejos, endpoints de partida, WebSocket ni frontend.
+No implementa todavía condiciones especiales, daño entre turnos, daño a Banca, efectos complejos, flujo jugable completo de Muerte Súbita, endpoints de partida, WebSocket, persistencia de partidas ni frontend.
 
 ## Relaciones
 
@@ -50,12 +51,12 @@ No implementa todavía knockout, premios durante partida, victoria, condiciones 
 - `Turn` pertenece al `Game` y define fase/flags.
 - `GameLog` pertenece a `Game/Match` y registra eventos derivados del motor.
 
-## Invariantes implementadas hasta Fase 7
+## Invariantes implementadas hasta Fase 8
 
 - Una `CardInstance` está en una sola zona lógica: deck, mano, premios, descarte, activo, banca, unida o removida.
 - Cada jugador tiene como máximo 1 Pokémon activo.
 - La banca tiene máximo 5 Pokémon.
-- Las cartas de Premio permiten `0` en estado no inicializado, `6` en setup normal y `1` para futura Muerte Súbita.
+- Las cartas de Premio permiten conteos `0..6` para setup normal, premios restantes durante partida y futura Muerte Súbita.
 - El mazo mantiene orden oculto.
 - La selección inicial de Activo/Banca solo acepta cartas que estén en mano y sean Pokémon Básicos.
 - El setup completo coloca exactamente 6 Premios desde el tope del mazo de cada jugador.
@@ -66,11 +67,20 @@ No implementa todavía knockout, premios durante partida, victoria, condiciones 
 - Solo el jugador actual puede atacar desde `MAIN` y el engine controla la transición a `ATTACK`.
 - El coste de energía de un ataque debe estar cubierto antes de aplicar daño.
 - El daño aplicado nunca es negativo y se acumula como contadores de 10.
+- Un Pokémon queda noqueado cuando su daño acumulado alcanza o supera su HP.
+- Un Pokémon noqueado y sus cartas asociadas salen de mesa y pasan al descarte de su dueño.
+- Las cartas de Premio tomadas reducen la cantidad de premios pendientes del jugador y se agregan a su mano.
+- Una partida puede finalizar por último Premio tomado.
+- Una partida puede finalizar si un jugador queda sin Pokémon en juego.
+- Una partida puede finalizar por deck-out cuando un jugador debe robar y no tiene cartas en el mazo.
+- Si hay reemplazo de Activo pendiente, el turno no finaliza hasta que el jugador correspondiente promueva desde Banca.
+- La simultaneidad/Muerte Súbita se representa explícitamente para evitar declarar un ganador incorrecto.
 
 ## Reglas de dominio futuras / requeridas por reglamento
 
 - Mano rival, premios ocultos y orden de mazo no se exponen al oponente.
-- Knockout, premios durante partida y victoria quedan pendientes.
+- El flujo completo de Muerte Súbita queda pendiente.
+- Condiciones especiales y daño entre turnos quedan pendientes para Fase 9.
 - Efectos de cartas pueden modificar límites de energía/retiro/Trainer en fases futuras.
 - Dormido, Confundido y Paralizado son mutuamente excluyentes.
 - Quemado y Envenenado pueden coexistir con otras condiciones.

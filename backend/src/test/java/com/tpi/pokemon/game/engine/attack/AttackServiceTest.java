@@ -32,11 +32,19 @@ import com.tpi.pokemon.game.domain.value.GameId;
 import com.tpi.pokemon.game.domain.value.PlayerId;
 import com.tpi.pokemon.game.engine.event.AttackDeclaredEvent;
 import com.tpi.pokemon.game.engine.event.AttackResolvedEvent;
+import com.tpi.pokemon.game.engine.event.ActivePokemonReplacedEvent;
+import com.tpi.pokemon.game.engine.event.ActivePokemonReplacementRequiredEvent;
+import com.tpi.pokemon.game.engine.event.GameFinishedEvent;
 import com.tpi.pokemon.game.engine.event.DamageAppliedEvent;
 import com.tpi.pokemon.game.engine.event.DamageCalculatedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyCostValidatedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
+import com.tpi.pokemon.game.engine.event.PokemonKnockedOutEvent;
+import com.tpi.pokemon.game.engine.event.PrizeCardsTakenEvent;
 import com.tpi.pokemon.game.engine.event.TurnEndedEvent;
+import com.tpi.pokemon.game.engine.knockout.ActivePokemonReplacementResolver;
+import com.tpi.pokemon.game.engine.knockout.ReplaceActivePokemonCommand;
+import com.tpi.pokemon.game.engine.victory.FinishReason;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -47,6 +55,7 @@ class AttackServiceTest {
     private static final PlayerId PLAYER_TWO = new PlayerId("player-two");
     private static final AttackDefinition SCRATCH = new AttackDefinition("scratch", "Scratch", List.of(EnergyType.COLORLESS), 30);
     private static final AttackDefinition FIRE_BLAST = new AttackDefinition("fire-blast", "Fire Blast", List.of(EnergyType.FIRE), 40);
+    private static final AttackDefinition KNOCKOUT_HIT = new AttackDefinition("knockout-hit", "Knockout Hit", List.of(EnergyType.COLORLESS), 60);
 
     private final AttackService attackService = new AttackService();
 
@@ -193,6 +202,112 @@ class AttackServiceTest {
                 .hasMessage("Starting player cannot attack on their first turn");
     }
 
+    @Test
+    void attackThatKnocksOutDefenderDiscardsDefenderTakesPrizeAndRequiresReplacementWhenBenchExists() {
+        PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
+        PokemonInPlay defender = activeDefender();
+        PokemonInPlay benched = benchPokemon("p2-bench", PLAYER_TWO);
+        GameState state = activeGame(
+                playerWithActiveAndPrizes(PLAYER_ONE, attacker, prizes(PLAYER_ONE, 6)),
+                playerWithActiveBenchAndPrizes(PLAYER_TWO, defender, List.of(benched), prizes(PLAYER_TWO, 6)),
+                defaultTurn()
+        );
+
+        GameState result = attackService.declareAttack(state, command("knockout-hit"));
+
+        assertThat(result.getStatus()).isEqualTo(GameStatus.ACTIVE);
+        assertThat(result.getPlayerTwoState().getBoard().getActivePokemon()).isEmpty();
+        assertThat(result.getPendingActiveReplacement()).hasValueSatisfying(pending -> assertThat(pending.playerId()).isEqualTo(PLAYER_TWO));
+        assertThat(result.getPlayerTwoState().getDiscardPile().getCards()).extracting(CardInstance::id).contains(new CardInstanceId("p2-active"));
+        assertThat(result.getPlayerOneState().getPrizeCards().remainingCount()).isEqualTo(5);
+        assertThat(eventsOfType(result, PokemonKnockedOutEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, PrizeCardsTakenEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, ActivePokemonReplacementRequiredEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, TurnEndedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void attackThatKnocksOutPokemonExTakesTwoPrizes() {
+        PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
+        PokemonInPlay exDefender = activeDefender(Set.of(CardSubtype.BASIC, CardSubtype.EX));
+        GameState state = activeGame(
+                playerWithActiveAndPrizes(PLAYER_ONE, attacker, prizes(PLAYER_ONE, 6)),
+                playerWithActiveBenchAndPrizes(PLAYER_TWO, exDefender, List.of(benchPokemon("p2-bench", PLAYER_TWO)), prizes(PLAYER_TWO, 6)),
+                defaultTurn()
+        );
+
+        GameState result = attackService.declareAttack(state, command("knockout-hit"));
+
+        assertThat(result.getPlayerOneState().getPrizeCards().remainingCount()).isEqualTo(4);
+        assertThat(eventsOfType(result, PrizeCardsTakenEvent.class)).singleElement()
+                .satisfies(event -> assertThat(event.prizeCardIds()).hasSize(2));
+    }
+
+    @Test
+    void attackThatTakesLastPrizeWinsImmediately() {
+        PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
+        GameState state = activeGame(
+                playerWithActiveAndPrizes(PLAYER_ONE, attacker, prizes(PLAYER_ONE, 1)),
+                playerWithActiveBenchAndPrizes(PLAYER_TWO, activeDefender(), List.of(benchPokemon("p2-bench", PLAYER_TWO)), prizes(PLAYER_TWO, 6)),
+                defaultTurn()
+        );
+
+        GameState result = attackService.declareAttack(state, command("knockout-hit"));
+
+        assertThat(result.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(result.getFinishResult()).hasValueSatisfying(finish -> {
+            assertThat(finish.winnerId()).isEqualTo(PLAYER_ONE);
+            assertThat(finish.reasons()).contains(FinishReason.PRIZES_TAKEN);
+        });
+        assertThat(eventsOfType(result, GameFinishedEvent.class)).hasSize(1);
+        assertThat(result.getPendingActiveReplacement()).isEmpty();
+        assertThat(eventsOfType(result, TurnEndedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void attackThatKnocksOutLastPokemonWinsImmediately() {
+        PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
+        GameState state = activeGame(
+                playerWithActiveAndPrizes(PLAYER_ONE, attacker, prizes(PLAYER_ONE, 6)),
+                playerWithActiveAndPrizes(PLAYER_TWO, activeDefender(), prizes(PLAYER_TWO, 6)),
+                defaultTurn()
+        );
+
+        GameState result = attackService.declareAttack(state, command("knockout-hit"));
+
+        assertThat(result.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(result.getFinishResult()).hasValueSatisfying(finish -> {
+            assertThat(finish.winnerId()).isEqualTo(PLAYER_ONE);
+            assertThat(finish.loserId()).isEqualTo(PLAYER_TWO);
+            assertThat(finish.reasons()).contains(FinishReason.OPPONENT_HAS_NO_POKEMON_IN_PLAY);
+        });
+        assertThat(eventsOfType(result, GameFinishedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, TurnEndedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void replacingActiveFromBenchClearsPendingReplacementAndEndsTurn() {
+        PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
+        PokemonInPlay benched = benchPokemon("p2-bench", PLAYER_TWO);
+        GameState pending = attackService.declareAttack(
+                activeGame(
+                        playerWithActiveAndPrizes(PLAYER_ONE, attacker, prizes(PLAYER_ONE, 6)),
+                        playerWithActiveBenchAndPrizes(PLAYER_TWO, activeDefender(), List.of(benched), prizes(PLAYER_TWO, 6)),
+                        defaultTurn()
+                ),
+                command("knockout-hit")
+        );
+
+        GameState result = new ActivePokemonReplacementResolver().replaceActive(pending, new ReplaceActivePokemonCommand(PLAYER_TWO, 0));
+
+        assertThat(result.getPendingActiveReplacement()).isEmpty();
+        assertThat(activePokemon(result.getPlayerTwoState()).getTopCard().id()).isEqualTo(new CardInstanceId("p2-bench"));
+        assertThat(result.getTurnState().currentPlayer()).isEqualTo(PLAYER_TWO);
+        assertThat(result.getTurnState().phase()).isEqualTo(TurnPhase.NOT_STARTED);
+        assertThat(eventsOfType(result, ActivePokemonReplacedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, TurnEndedEvent.class)).hasSize(1);
+    }
+
     private GameState activeGame(PokemonInPlay attacker, PokemonInPlay defender) {
         return activeGame(attacker, defender, defaultTurn());
     }
@@ -213,6 +328,14 @@ class AttackServiceTest {
         return player(playerId, new BoardState(new ActivePokemon(active), Bench.empty()));
     }
 
+    private PlayerGameState playerWithActiveAndPrizes(PlayerId playerId, PokemonInPlay active, List<CardInstance> prizes) {
+        return new PlayerGameState(playerId, DeckZone.empty(), HandZone.empty(), new PrizeCards(prizes), DiscardPile.empty(), new BoardState(new ActivePokemon(active), Bench.empty()), 1);
+    }
+
+    private PlayerGameState playerWithActiveBenchAndPrizes(PlayerId playerId, PokemonInPlay active, List<PokemonInPlay> bench, List<CardInstance> prizes) {
+        return new PlayerGameState(playerId, DeckZone.empty(), HandZone.empty(), new PrizeCards(prizes), DiscardPile.empty(), new BoardState(new ActivePokemon(active), new Bench(bench)), 1);
+    }
+
     private PlayerGameState player(PlayerId playerId, BoardState board) {
         return new PlayerGameState(playerId, DeckZone.empty(), HandZone.empty(), PrizeCards.empty(), DiscardPile.empty(), board, 1);
     }
@@ -225,17 +348,29 @@ class AttackServiceTest {
     }
 
     private PokemonInPlay activeDefender() {
+        return activeDefender(Set.of(CardSubtype.BASIC));
+    }
+
+    private PokemonInPlay activeDefender(Set<CardSubtype> subtypes) {
         return PokemonInPlay.withoutAttachments(
-                card("p2-active", PLAYER_TWO, pokemonDefinition("p2-active-def", PokemonType.GRASS, List.of(), List.of(), List.of()))
+                card("p2-active", PLAYER_TWO, pokemonDefinition("p2-active-def", PokemonType.GRASS, List.of(), List.of(), List.of(), subtypes))
         );
     }
 
+    private PokemonInPlay benchPokemon(String id, PlayerId owner) {
+        return PokemonInPlay.withoutAttachments(card(id, owner, pokemonDefinition(id + "-def", PokemonType.GRASS, List.of(), List.of(), List.of())));
+    }
+
     private CardDefinitionRef pokemonDefinition(String id, PokemonType type, List<AttackDefinition> attacks, List<Weakness> weaknesses, List<Resistance> resistances) {
+        return pokemonDefinition(id, type, attacks, weaknesses, resistances, Set.of(CardSubtype.BASIC));
+    }
+
+    private CardDefinitionRef pokemonDefinition(String id, PokemonType type, List<AttackDefinition> attacks, List<Weakness> weaknesses, List<Resistance> resistances, Set<CardSubtype> subtypes) {
         return new CardDefinitionRef(
                 id,
                 "Pokemon " + id,
                 CardSupertype.POKEMON,
-                Set.of(CardSubtype.BASIC),
+                subtypes,
                 null,
                 1,
                 60,
@@ -267,6 +402,12 @@ class AttackServiceTest {
 
     private CardInstance card(String id, PlayerId owner, CardDefinitionRef definition) {
         return new CardInstance(new CardInstanceId(id), definition, owner);
+    }
+
+    private List<CardInstance> prizes(PlayerId owner, int count) {
+        return java.util.stream.IntStream.rangeClosed(1, count)
+                .mapToObj(index -> card(owner.value() + "-prize-" + index, owner, new CardDefinitionRef(owner.value() + "-prize-def-" + index, "Prize " + index)))
+                .toList();
     }
 
     private DeclareAttackCommand command(String attackId) {

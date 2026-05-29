@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 7 - Ataques base
+## Alcance actual: Fase 8 - Knockout, premios y condiciones de victoria
 
-El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial y motor de turnos/acciones MAIN. La Fase 7 agrega resolución base de ataques del Pokémon Activo: validación de energía, daño base, debilidad, resistencia, contadores de daño y finalización automática de turno.
+El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN y ataques base. La Fase 8 agrega resolución de knockout, descarte, toma de premios y condiciones básicas de victoria/derrota.
 
 Incluye:
 
@@ -24,6 +24,12 @@ Incluye:
 - Componentes de setup/mulligan para barajar, robar mano inicial, resolver mulligans, seleccionar Activo/Banca inicial, colocar Premios y definir jugador inicial.
 - Motor de turnos para inicio de turno, DRAW/MAIN, finalización de turno y acciones MAIN estructurales.
 - Motor de ataques base para validar ataque, validar coste de energía, calcular daño y aplicar contadores al Activo rival.
+- Resolución de knockout cuando el daño acumulado alcanza o supera el HP.
+- Descarte del Pokémon noqueado, pila de evolución y cartas unidas.
+- Toma de premios por KO: 1 premio normal, 2 premios para Pokémon-EX.
+- Victoria por último Premio, por rival sin Pokémon en juego y por deck-out.
+- Reemplazo obligatorio de Activo desde Banca cuando la partida continúa tras un KO.
+- Representación explícita de simultaneidad/Muerte Súbita pendiente, sin jugar todavía Muerte Súbita completa.
 
 ## Modelo Game State
 
@@ -43,13 +49,13 @@ Decisiones de dominio:
 - `CardInstance` representa una copia concreta dentro de una partida, con identidad propia.
 - `GameState` no usa entidades JPA ni DTOs REST.
 - El estado interno no es una vista segura para frontend; podrá contener mano, premios y mazo de ambos jugadores.
-- `PrizeCards` permite `0` para estado no inicializado, `6` para setup normal y `1` para futura Muerte Súbita.
+- `PrizeCards` permite conteos de `0` a `6` para soportar premios restantes durante partida.
 - `CardDefinitionRef` conserva clasificación mínima (`CardSupertype` y `CardSubtype`) para validar Pokémon Básico durante setup sin consultar infraestructura externa.
 - `CardDefinitionRef` también conserva metadata estructural opcional (`evolvesFrom`, `retreatCost`) para evolución/retiro sin interpretar texto natural.
 - `PokemonInPlay` mantiene pila de evolución, cartas unidas y turnos de entrada/evolución.
 - `GameState` puede mantener Estadio activo global como estructura, sin aplicar efectos continuos todavía.
 - `CardDefinitionRef` puede conservar ataques, HP, tipos, debilidades, resistencias y perfil de energía estructural para el motor de ataque.
-- `PokemonInPlay` conserva contadores de daño acumulados; Fase 7 no resuelve KO aunque el daño alcance el HP.
+- `PokemonInPlay` conserva contadores de daño acumulados; Fase 8 resuelve KO cuando el daño alcanza o supera el HP.
 
 Invariantes protegidas en el modelo:
 
@@ -98,7 +104,7 @@ Componentes principales:
 Reglas implementadas:
 
 - El primer jugador no roba en su primer turno.
-- Los demás inicios de turno roban 1 carta; si el mazo está vacío se emite `DeckOutLossDetectedEvent` y el estado pasa a `FINISHED` como marcador provisional.
+- Los demás inicios de turno roban 1 carta; si el mazo está vacío se emite `DeckOutLossDetectedEvent`, se registra victoria del oponente y el estado pasa a `FINISHED`.
 - Solo el jugador actual puede actuar.
 - Las acciones MAIN solo se permiten en `TurnPhase.MAIN`.
 - Bajar Pokémon Básico a Banca desde la mano, respetando máximo 5.
@@ -112,7 +118,7 @@ Limitaciones honestas de Fase 6:
 
 - Las cartas Trainer, Stadium, Tool y Energías Especiales no aplican efectos textuales todavía.
 - El retiro no contempla modificadores de coste, condiciones especiales ni energías que cuenten doble.
-- Deck-out se marca sin modelo completo de ganador/victoria; eso queda para fases de victoria/derrota.
+- Deck-out ya se integra como condición de derrota/victoria; no hay todavía persistencia ni vista pública del resultado.
 
 ## Ataques base
 
@@ -128,7 +134,7 @@ Componentes principales:
 Reglas implementadas:
 
 - Solo ataca el jugador actual.
-- El ataque se declara desde `TurnPhase.MAIN`; el engine transiciona internamente a `ATTACK` y luego finaliza turno.
+- El ataque se declara desde `TurnPhase.MAIN`; el engine transiciona internamente a `ATTACK` y luego resuelve daño, KO/premios/victoria y fin de turno o reemplazo pendiente.
 - El jugador inicial no puede atacar en su primer turno.
 - Solo ataca el Pokémon Activo.
 - El ataque debe existir en la definición del Pokémon Activo.
@@ -138,14 +144,46 @@ Reglas implementadas:
 - Los costes específicos se cubren antes que los incoloros.
 - Se aplica daño base, luego debilidad, luego resistencia, con mínimo 0.
 - El daño se convierte a contadores de 10 y se acumula en el Activo rival.
-- Atacar finaliza automáticamente el turno usando `TurnManager`.
+- Atacar finaliza automáticamente el turno usando `TurnManager` solo si no hay victoria ni reemplazo de Activo pendiente.
 
-Limitaciones honestas de Fase 7:
+Limitaciones honestas propias de Fase 7 antes de Fase 8:
 
-- No hay knockout, descarte por KO, toma de premios ni victoria/derrota.
+- En Fase 7 no había knockout, descarte por KO, toma de premios ni victoria/derrota; Fase 8 lo incorpora en una sección separada.
 - No se resuelven efectos textuales de ataques.
 - No se resuelven condiciones especiales como Confundido, Dormido o Paralizado.
 - Energías especiales solo cuentan si tienen `EnergyProfile` explícito; no hay efectos dinámicos.
+
+## Knockout, premios y victoria
+
+La Fase 8 integra las consecuencias principales del daño dentro del Game Engine puro Java.
+
+Componentes principales:
+
+- `KnockoutResolver`: detecta KO del Activo defensor y mueve Pokémon, evolución y cartas unidas al descarte del dueño.
+- `PrizeResolver`: toma premios del jugador que provoca el KO y los agrega a su mano.
+- `VictoryConditionChecker`: evalúa victoria por premios, rival sin Pokémon en juego, deck-out y estructura de simultaneidad.
+- `PostAttackResolutionService`: orquesta la resolución post-daño desde `AttackService`.
+- `ActivePokemonReplacementResolver`: promueve un Pokémon de Banca cuando el defensor debe reemplazar Activo.
+
+Reglas implementadas:
+
+- Un Pokémon queda Fuera de Combate cuando `damageCounters * 10 >= hp`.
+- El Pokémon noqueado, su pila de evolución y sus cartas unidas pasan al descarte del dueño.
+- El jugador que provoca el KO toma 1 Premio por Pokémon normal y 2 por Pokémon-EX.
+- Si quedan menos Premios que los requeridos, se toman los restantes.
+- Tomar el último Premio finaliza la partida con victoria.
+- Si el dueño del Pokémon noqueado queda sin Activo y sin Banca, pierde.
+- Si tiene Banca y la partida no terminó, queda `PendingActiveReplacement` hasta elegir nuevo Activo.
+- Deck-out en `TurnManager.startTurn` finaliza la partida con victoria del oponente.
+- La simultaneidad/Muerte Súbita queda representada mediante `GameFinishResult` sin jugar el flujo completo.
+
+Limitaciones honestas de Fase 8:
+
+- Solo se resuelve KO del Activo defensor causado por ataque base; no hay daño a Banca todavía.
+- No se implementan condiciones especiales ni daño entre turnos.
+- No se implementan efectos complejos que modifiquen premios, daño, descarte o victoria.
+- No se juega Muerte Súbita completa; solo queda representada como resultado pendiente.
+- No hay endpoints REST de juego, WebSocket, frontend ni persistencia de partida.
 
 ## Endpoints de catálogo
 
@@ -330,12 +368,15 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 
 ## Qué NO incluye todavía
 
-- Partida jugable.
-- Knockout y premios durante partida.
-- Condiciones especiales.
+- Partida completa jugable de punta a punta vía API pública.
+- Condiciones especiales y daño entre turnos.
+- Daño a Banca.
+- Flujo completo de Muerte Súbita.
+- Efectos complejos de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.
+- Endpoints REST de juego.
+- Persistencia de partidas.
 - WebSocket/realtime.
 - Frontend.
-- Efectos ejecutables.
 - Regla ACE SPEC obligatoria para `xy1`.
 
 Los campos complejos de cartas (`attacks`, `abilities`, `rules`, `weaknesses`, etc.) se guardan como JSON texto para conservar fidelidad de catálogo sin sobre-modelar ni parsear reglas.

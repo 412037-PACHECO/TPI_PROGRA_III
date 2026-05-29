@@ -4,7 +4,7 @@
 
 El Game Engine es una máquina de estados determinística de dominio. Recibe un estado y un comando, valida reglas, muta el estado, emite eventos y no conoce infraestructura.
 
-Estado actual: la Fase 7 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno, acciones MAIN y ataques base. Knockout, premios durante partida, victoria/derrota, condiciones especiales, efectos complejos, WebSocket y endpoints de partida quedan para fases posteriores.
+Estado actual: la Fase 8 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno, acciones MAIN, ataques base, knockout, premios y condiciones básicas de victoria/derrota. Condiciones especiales, efectos complejos, WebSocket, endpoints de partida, persistencia y frontend quedan fuera del alcance actual.
 
 ```text
 GameCommand
@@ -22,7 +22,7 @@ Estados implementados en el modelo actual:
 - `CREATED`: estado base creado con dos jugadores, sin setup resuelto.
 - `SETUP`: setup iniciado, manos/mulligans resueltos, esperando selección inicial o cierre.
 - `ACTIVE`: setup completado o turno en curso.
-- `FINISHED`: estado terminal del modelo. En Fase 6 puede usarse como marcador provisional de deck-out sin ganador persistido; el resultado completo queda para victoria/derrota.
+- `FINISHED`: estado terminal del modelo. En Fase 8 incluye `GameFinishResult` para victoria por premios, rival sin Pokémon en juego o deck-out.
 
 Estados requeridos por diseño funcional/futuro:
 
@@ -63,20 +63,22 @@ Implementación Fase 5:
 
 ## Flujo de turno
 
-Implementado en Fase 6:
+Implementado hasta Fase 8:
 
 1. `NOT_STARTED`: turno preparado para el jugador actual.
 2. `DRAW`: `TurnManager.startTurn` incrementa turno y resuelve robo obligatorio.
 3. Excepción: el jugador inicial no roba en su primer turno.
-4. Si debe robar y el mazo está vacío, se emite `DeckOutLossDetectedEvent` y el estado pasa a `FINISHED` como marcador provisional de deck-out.
+4. Si debe robar y el mazo está vacío, se emite `DeckOutLossDetectedEvent`, se registra victoria del oponente y el estado pasa a `FINISHED`.
 5. `MAIN`: ejecutar acciones principales estructurales válidas.
-6. `TurnManager.endTurn`: cambia al oponente, resetea flags y deja `NOT_STARTED`.
+6. `ATTACK`: declarar/resolver ataque.
+7. Aplicar daño.
+8. Evaluar knockout, premios y victoria.
+9. Si la partida continúa sin reemplazo pendiente, `TurnManager.endTurn` cambia al oponente, resetea flags y deja `NOT_STARTED`.
 
 Pendiente para fases posteriores:
 
-1. `ATTACK`: declarar/resolver ataque.
-2. Resolver daño, KO, premios y victoria.
-3. `BETWEEN_TURNS`: procesar condiciones/efectos.
+1. `BETWEEN_TURNS`: procesar condiciones/efectos.
+2. Efectos complejos de cartas.
 
 ## Acciones MAIN implementadas en Fase 6
 
@@ -112,23 +114,28 @@ Implementado en Fase 7:
 10. Aplicar Resistencia si corresponde, con mínimo 0.
 11. Colocar contadores de daño sobre el Activo rival.
 12. Emitir eventos de ataque/daño.
-13. Finalizar el turno automáticamente usando `TurnManager`.
+13. Resolver KO/premios/victoria si corresponde.
+14. Finalizar el turno, dejar reemplazo pendiente o finalizar partida según resultado.
 
 Pendiente para fases posteriores:
 
 - Efectos textuales de ataques.
 - Condiciones especiales como Confundido/Dormido/Paralizado.
 - Modificadores de daño por habilidades, herramientas, estadios o efectos persistentes.
-- Knockout, premios y victoria.
+- Daño a Banca, condiciones especiales, daño entre turnos y efectos complejos.
 
 ## Flujo de knockout
 
-1. Detectar Pokémon con daño acumulado >= HP.
-2. Descartar Pokémon y cartas unidas.
-3. Otorgar premios al rival: 1 normal, 2 si Pokémon-EX.
-4. Si el jugador toma el último premio, evaluar victoria.
-5. Si el dueño del Pokémon activo no puede promover desde banca, pierde.
-6. Resolver simultaneidades según reglamento: si ambos ganan simultáneamente, muerte súbita salvo que uno gane por más condiciones.
+Implementado en Fase 8:
+
+1. Detectar el Activo defensor con daño acumulado `>= HP`.
+2. Descartar pila de evolución y cartas unidas al descarte del dueño.
+3. Otorgar premios al jugador que causó el KO: 1 normal, 2 si Pokémon-EX.
+4. Si el jugador toma el último Premio, finalizar partida.
+5. Si el dueño del Pokémon activo queda sin Pokémon en juego, finalizar partida.
+6. Si el dueño tiene Banca y la partida continúa, dejar `PendingActiveReplacement`.
+7. Resolver el reemplazo con `ReplaceActivePokemonCommand` y luego finalizar el turno.
+8. Representar simultaneidad/Muerte Súbita con `GameFinishResult` sin jugar el flujo completo.
 
 ## Flujo de victoria/derrota
 
@@ -155,7 +162,7 @@ Orden entre turnos: Envenenado → Quemado → Dormido → Paralizado → efecto
 - `SpecialConditionApplied`, `PokemonKnockedOut`, `PrizeTaken`.
 - `TurnEnded`, `VictoryDeclared`, `GameFinished`.
 
-Implementados como estructura base hasta Fase 7:
+Implementados como estructura base hasta Fase 8:
 
 - `GameCreatedEvent`.
 - `GameStateInitializedEvent`.
@@ -188,6 +195,14 @@ Implementados como estructura base hasta Fase 7:
 - `DamageCalculatedEvent`.
 - `DamageAppliedEvent`.
 - `AttackResolvedEvent`.
+- `PokemonKnockedOutEvent`.
+- `CardsDiscardedEvent`.
+- `PrizeCardsTakenEvent`.
+- `ActivePokemonReplacementRequiredEvent`.
+- `ActivePokemonReplacedEvent`.
+- `VictoryDetectedEvent`.
+- `GameFinishedEvent`.
+- `SuddenDeathRequiredEvent`.
 
 ## Comandos de juego sugeridos
 
@@ -195,7 +210,7 @@ Implementados como estructura base hasta Fase 7:
 - `DrawForTurn`, `PlayBasicPokemon`, `EvolvePokemon`, `AttachEnergy`.
 - `PlayTrainer`, `UseAbility`, `Retreat`, `DeclareAttack`, `EndTurn`.
 
-En Fase 7 existen comandos/modelos específicos de setup, turno/acciones MAIN y declaración de ataque base. Los comandos de efectos, KO, premios y victoria siguen pendientes.
+En Fase 8 existen comandos/modelos específicos de setup, turno/acciones MAIN, declaración de ataque base y reemplazo de Activo post-KO. Los comandos de condiciones especiales y efectos complejos siguen pendientes.
 
 ## Reglas de acoplamiento del modelo actual
 
@@ -205,5 +220,5 @@ En Fase 7 existen comandos/modelos específicos de setup, turno/acciones MAIN y 
 
 ## Validadores y resolutores
 
-- Implementados: validaciones/resolución de setup, mulligan inicial, turno básico, acciones MAIN estructurales, ataque base, coste de energía y daño base con debilidad/resistencia.
-- Futuros: condiciones, efectos activos, knockout, premios durante partida y victoria.
+- Implementados: validaciones/resolución de setup, mulligan inicial, turno básico, acciones MAIN estructurales, ataque base, coste de energía, daño base con debilidad/resistencia, knockout, premios, reemplazo de Activo y condiciones básicas de victoria.
+- Futuros: condiciones especiales, efectos activos/complejos, daño a Banca, Muerte Súbita jugable, persistencia y vistas seguras.

@@ -3,10 +3,13 @@ package com.tpi.pokemon.game.domain.model;
 import com.tpi.pokemon.game.domain.enums.GameStatus;
 import com.tpi.pokemon.game.domain.value.GameId;
 import com.tpi.pokemon.game.domain.value.PlayerId;
+import com.tpi.pokemon.game.engine.knockout.PendingActiveReplacement;
 import com.tpi.pokemon.game.engine.event.GameCreatedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
+import com.tpi.pokemon.game.engine.victory.GameFinishResult;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class GameState {
     private final GameId gameId;
@@ -15,6 +18,8 @@ public final class GameState {
     private final PlayerGameState playerTwoState;
     private final TurnState turnState;
     private final StadiumInPlay activeStadium;
+    private final GameFinishResult finishResult;
+    private final PendingActiveReplacement pendingActiveReplacement;
     private final List<GameEvent> events;
 
     public GameState(GameId gameId, GameStatus status, PlayerGameState playerOneState, PlayerGameState playerTwoState, TurnState turnState, List<GameEvent> events) {
@@ -22,12 +27,18 @@ public final class GameState {
     }
 
     public GameState(GameId gameId, GameStatus status, PlayerGameState playerOneState, PlayerGameState playerTwoState, TurnState turnState, StadiumInPlay activeStadium, List<GameEvent> events) {
+        this(gameId, status, playerOneState, playerTwoState, turnState, activeStadium, null, null, events);
+    }
+
+    public GameState(GameId gameId, GameStatus status, PlayerGameState playerOneState, PlayerGameState playerTwoState, TurnState turnState, StadiumInPlay activeStadium, GameFinishResult finishResult, PendingActiveReplacement pendingActiveReplacement, List<GameEvent> events) {
         this.gameId = Objects.requireNonNull(gameId, "gameId must not be null");
         this.status = Objects.requireNonNull(status, "status must not be null");
         this.playerOneState = Objects.requireNonNull(playerOneState, "playerOneState must not be null");
         this.playerTwoState = Objects.requireNonNull(playerTwoState, "playerTwoState must not be null");
         this.turnState = Objects.requireNonNull(turnState, "turnState must not be null");
         this.activeStadium = activeStadium;
+        this.finishResult = finishResult;
+        this.pendingActiveReplacement = pendingActiveReplacement;
         Objects.requireNonNull(events, "events must not be null");
         if (events.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("events must not contain null values");
@@ -76,6 +87,14 @@ public final class GameState {
 
     public java.util.Optional<StadiumInPlay> getActiveStadium() {
         return java.util.Optional.ofNullable(activeStadium);
+    }
+
+    public Optional<GameFinishResult> getFinishResult() {
+        return Optional.ofNullable(finishResult);
+    }
+
+    public Optional<PendingActiveReplacement> getPendingActiveReplacement() {
+        return Optional.ofNullable(pendingActiveReplacement);
     }
 
     public List<GameEvent> getEvents() {

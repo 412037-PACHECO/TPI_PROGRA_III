@@ -19,10 +19,10 @@ class PrizeCardsTest {
     }
 
     @Test
-    void acceptsOnePrizeCardNearGameEnd() {
-        PrizeCards prizes = new PrizeCards(List.of(card("last-prize")));
+    void acceptsIntermediatePrizeCardCountsDuringGame() {
+        PrizeCards prizes = new PrizeCards(List.of(card("prize-1"), card("prize-2"), card("prize-3")));
 
-        assertThat(prizes.getCards()).hasSize(1);
+        assertThat(prizes.getCards()).hasSize(3);
     }
 
     @Test
@@ -33,9 +33,12 @@ class PrizeCardsTest {
     }
 
     @Test
-    void rejectsUnsupportedPrizeCardSizes() {
-        assertThatThrownBy(() -> new PrizeCards(List.of(card("prize-1"), card("prize-2"))))
+    void rejectsMoreThanSixPrizeCards() {
+        assertThatThrownBy(() -> new PrizeCards(List.of(
+                card("prize-1"), card("prize-2"), card("prize-3"), card("prize-4"),
+                card("prize-5"), card("prize-6"), card("prize-7")
+        )))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("0, 1, or 6");
+                .hasMessageContaining("between 0 and 6");
     }
 }

@@ -1,6 +1,7 @@
 package com.tpi.pokemon.game.domain.model;
 
 import com.tpi.pokemon.game.domain.value.CardInstanceId;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +36,19 @@ public final class Bench {
 
     public List<PokemonInPlay> getPokemon() {
         return pokemon;
+    }
+
+    public boolean isEmpty() {
+        return pokemon.isEmpty();
+    }
+
+    public Bench withoutPokemonAt(int benchIndex) {
+        if (benchIndex < 0 || benchIndex >= pokemon.size()) {
+            throw new IllegalArgumentException("benchIndex is out of range");
+        }
+        List<PokemonInPlay> updated = new ArrayList<>(pokemon);
+        updated.remove(benchIndex);
+        return new Bench(updated);
     }
 
     private void addUnique(Set<CardInstanceId> seen, CardInstance card) {

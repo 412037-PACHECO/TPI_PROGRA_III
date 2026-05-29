@@ -111,6 +111,14 @@ public record CardDefinitionRef(
         return isPokemon() && subtypes.contains(CardSubtype.BASIC);
     }
 
+    public boolean isPokemonEx() {
+        return isPokemon() && subtypes.contains(CardSubtype.EX);
+    }
+
+    public int prizeValue() {
+        return isPokemonEx() ? 2 : 1;
+    }
+
     public boolean canEvolve() {
         return isPokemon() && evolvesFrom != null;
     }

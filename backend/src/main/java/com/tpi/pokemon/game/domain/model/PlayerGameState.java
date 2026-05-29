@@ -69,6 +69,26 @@ public final class PlayerGameState {
         return new PlayerGameState(playerId, deck, hand, prizeCards, discardPile, board, turnsTaken);
     }
 
+    public PlayerGameState withHand(HandZone hand) {
+        return new PlayerGameState(playerId, deck, hand, prizeCards, discardPile, board, turnsTaken);
+    }
+
+    public PlayerGameState withPrizeCards(PrizeCards prizeCards) {
+        return new PlayerGameState(playerId, deck, hand, prizeCards, discardPile, board, turnsTaken);
+    }
+
+    public PlayerGameState withDiscardPile(DiscardPile discardPile) {
+        return new PlayerGameState(playerId, deck, hand, prizeCards, discardPile, board, turnsTaken);
+    }
+
+    public PlayerGameState withBoard(BoardState board) {
+        return new PlayerGameState(playerId, deck, hand, prizeCards, discardPile, board, turnsTaken);
+    }
+
+    public boolean hasPokemonInPlay() {
+        return board.getActivePokemon().isPresent() || !board.getBench().isEmpty();
+    }
+
     private void validateOwnershipAndUniqueness() {
         Set<CardInstanceId> seen = new HashSet<>();
         deck.getCards().forEach(card -> validateCard(card, seen, "deck"));

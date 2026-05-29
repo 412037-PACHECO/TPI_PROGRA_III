@@ -22,7 +22,11 @@ import com.tpi.pokemon.game.domain.value.PlayerId;
 import com.tpi.pokemon.game.engine.event.CardDrawSkippedEvent;
 import com.tpi.pokemon.game.engine.event.CardDrawnEvent;
 import com.tpi.pokemon.game.engine.event.DeckOutLossDetectedEvent;
+import com.tpi.pokemon.game.engine.event.GameFinishedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
+import com.tpi.pokemon.game.engine.event.MainPhaseStartedEvent;
+import com.tpi.pokemon.game.engine.event.VictoryDetectedEvent;
+import com.tpi.pokemon.game.engine.victory.FinishReason;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -86,7 +90,15 @@ class TurnManagerTest {
 
         assertThat(updated.getStatus()).isEqualTo(GameStatus.FINISHED);
         assertThat(updated.getTurnState().phase()).isEqualTo(TurnPhase.DRAW);
+        assertThat(updated.getFinishResult()).hasValueSatisfying(result -> {
+            assertThat(result.winnerId()).isEqualTo(PLAYER_TWO);
+            assertThat(result.loserId()).isEqualTo(PLAYER_ONE);
+            assertThat(result.reasons()).containsExactly(FinishReason.DECK_OUT);
+        });
         assertThat(eventsOfType(updated, DeckOutLossDetectedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, VictoryDetectedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, GameFinishedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, MainPhaseStartedEvent.class)).isEmpty();
     }
 
     @Test

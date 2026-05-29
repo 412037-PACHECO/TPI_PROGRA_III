@@ -18,6 +18,7 @@ import com.tpi.pokemon.game.engine.event.DamageAppliedEvent;
 import com.tpi.pokemon.game.engine.event.DamageCalculatedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyCostValidatedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
+import com.tpi.pokemon.game.engine.knockout.PostAttackResolutionService;
 import com.tpi.pokemon.game.engine.turn.EndTurnCommand;
 import com.tpi.pokemon.game.engine.turn.TurnManager;
 import java.util.ArrayList;
@@ -28,24 +29,29 @@ public final class AttackService {
     private final TurnManager turnManager;
     private final EnergyCostValidator energyCostValidator;
     private final DamageCalculator damageCalculator;
+    private final PostAttackResolutionService postAttackResolutionService;
 
     public AttackService() {
         this(new TurnManager());
     }
 
     public AttackService(TurnManager turnManager) {
-        this(turnManager, new EnergyCostValidator(), new DamageCalculator());
+        this(turnManager, new EnergyCostValidator(), new DamageCalculator(), new PostAttackResolutionService());
     }
 
-    public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator) {
+    public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService) {
         this.turnManager = Objects.requireNonNull(turnManager, "turnManager must not be null");
         this.energyCostValidator = Objects.requireNonNull(energyCostValidator, "energyCostValidator must not be null");
         this.damageCalculator = Objects.requireNonNull(damageCalculator, "damageCalculator must not be null");
+        this.postAttackResolutionService = Objects.requireNonNull(postAttackResolutionService, "postAttackResolutionService must not be null");
     }
 
     public GameState declareAttack(GameState state, DeclareAttackCommand command) {
         Objects.requireNonNull(state, "state must not be null");
         Objects.requireNonNull(command, "command must not be null");
+        if (!state.getGameId().equals(command.gameId())) {
+            throw new AttackException("Command gameId does not match state gameId");
+        }
 
         validateTurn(state, command.playerId());
         PlayerGameState attackerPlayer = getPlayerState(state, command.playerId());
@@ -83,7 +89,7 @@ public final class AttackService {
                 state.getActiveStadium().orElse(null),
                 events
         );
-        return turnManager.endTurn(attackState, new EndTurnCommand(command.playerId()));
+        return postAttackResolutionService.resolveAfterAttack(attackState, command.playerId(), defenderPlayer.getPlayerId(), events);
     }
 
     private void validateTurn(GameState state, PlayerId playerId) {

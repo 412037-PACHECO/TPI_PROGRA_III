@@ -38,6 +38,18 @@ public final class BoardState {
         return Optional.ofNullable(activeStadium);
     }
 
+    public BoardState withActivePokemon(PokemonInPlay pokemon) {
+        return new BoardState(new ActivePokemon(pokemon), bench, activeStadium);
+    }
+
+    public BoardState withoutActivePokemon() {
+        return new BoardState(null, bench, activeStadium);
+    }
+
+    public BoardState withBench(Bench bench) {
+        return new BoardState(activePokemon, bench, activeStadium);
+    }
+
     private void validateNoDuplicateCardsBetweenActiveAndBench() {
         Set<CardInstanceId> seen = new HashSet<>();
         if (activePokemon != null) {

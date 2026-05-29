@@ -1,5 +1,6 @@
 package com.tpi.pokemon.game.domain.model;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public final class HandZone {
@@ -16,5 +17,11 @@ public final class HandZone {
 
     public List<CardInstance> getCards() {
         return cards;
+    }
+
+    public HandZone withCardsAdded(List<CardInstance> cardsToAdd) {
+        List<CardInstance> updated = new ArrayList<>(cards);
+        updated.addAll(cardsToAdd);
+        return new HandZone(updated);
     }
 }

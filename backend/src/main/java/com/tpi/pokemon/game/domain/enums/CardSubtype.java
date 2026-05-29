@@ -8,6 +8,7 @@ public enum CardSubtype {
     SUPPORTER,
     STADIUM,
     TOOL,
+    EX,
     BASIC_ENERGY,
     SPECIAL_ENERGY
 }

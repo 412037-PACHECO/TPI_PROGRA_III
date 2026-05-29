@@ -67,7 +67,7 @@ Decisiones fase 4:
 
 - `CardDefinitionRef` separa la definición del catálogo de `CardInstance`, que representa una copia concreta en partida.
 - `GameState` queda desacoplado de JPA, Spring, controllers y API externa.
-- `PrizeCards` permite `0`, `1` y `6` para cubrir estado no inicializado, setup normal y futura Muerte Súbita.
+- `PrizeCards` ahora permite conteos `0..6` para cubrir setup normal, premios restantes durante partida y futura Muerte Súbita.
 - `TurnState` incluye flags futuros de una vez por turno: energía, Partidario, Estadio y retiro.
 
 ## Fase 5 - Setup y mulligan
@@ -99,17 +99,17 @@ Decisiones fase 6:
 
 - `TurnManager.startTurn` resuelve DRAW y pasa a MAIN porque todavía no hay decisiones durante DRAW.
 - El primer jugador saltea su primer robo; el segundo jugador roba normalmente.
-- Deck-out emite evento y marca `GameStatus.FINISHED` sin modelo completo de ganador todavía.
+- Deck-out fue integrado en Fase 8 como derrota/victoria con resultado de partida.
 - `PokemonInPlay` usa pila de evolución y conserva attachments al evolucionar.
 - `GameState` mantiene estadio activo global; efectos de estadio quedan pendientes.
 
 ## Fase 7 - Ataques base
 
-- Estado: implementada como motor puro Java, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Estado: implementada como motor puro Java y validada localmente con Maven antes de Fase 8.
 - Objetivo: declarar ataque, validar energía y resolver daño base contra el Activo rival.
 - Entregables: `AttackService`, `EnergyCostValidator`, `DamageCalculator`, modelo mínimo de ataque/energía/tipos/debilidad/resistencia y eventos de ataque/daño.
 - Dependencias: turnos.
-- Riesgos: no interpretar efectos textuales; energías especiales solo cuentan si tienen `EnergyProfile` explícito; KO/victoria quedan pendientes.
+- Riesgos: no interpretar efectos textuales; energías especiales solo cuentan si tienen `EnergyProfile` explícito.
 - Criterio: ataque simple con energía suficiente, daño base, debilidad, resistencia, contadores y fin automático de turno testeado.
 
 Decisiones fase 7:
@@ -118,15 +118,28 @@ Decisiones fase 7:
 - La energía no se consume al atacar.
 - El validador cubre primero costes específicos y después `COLORLESS`.
 - Debilidad se aplica antes que resistencia.
-- Daño se acumula como contadores en `PokemonInPlay`; no se resuelve KO todavía.
+- Daño se acumula como contadores en `PokemonInPlay`; Fase 8 resuelve KO después del daño.
 
 ## Fase 8 - Knockout, premios y victoria
 
-- Objetivo: resolver KO y condiciones de finalización.
-- Entregables: KnockoutResolver, PrizeResolver, VictoryConditionChecker.
-- Dependencias: ataques.
-- Riesgos: simultaneidades.
-- Criterio: premios, EX y victoria cubiertos por tests.
+- Estado: implementada como motor puro Java, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Objetivo: resolver consecuencias básicas del combate y condiciones de finalización de partida.
+- Entregables: `KnockoutResolver`, `PrizeResolver`, `PostAttackResolutionService`, `ActivePokemonReplacementResolver`, `VictoryConditionChecker`, eventos de KO/premios/victoria y resultado de partida.
+- Dependencias: Fase 7 - ataques base.
+- Riesgos: simultaneidades futuras, KO entre turnos por condiciones especiales, efectos que alteren premios y promoción obligatoria del Activo.
+- Criterio: KO simple, descarte de evolución/attachments, premios normal/EX, último Premio, rival sin Pokémon, reemplazo de Activo, deck-out y simultaneidad representada cubiertos por tests.
+
+Decisiones fase 8:
+
+- KO se evalúa después de aplicar daño de ataque.
+- Solo se resuelve KO del Activo defensor; daño a Banca queda fuera de alcance.
+- El Pokémon noqueado, su pila de evolución y cartas unidas pasan al descarte del dueño.
+- Pokémon normal otorga 1 Premio; Pokémon-EX otorga 2 mediante `CardSubtype.EX`.
+- Los premios tomados se mueven desde `PrizeCards` a la mano del jugador que causó el KO.
+- Si la partida continúa y el defensor tiene Banca, queda `PendingActiveReplacement` y no se finaliza turno hasta promover nuevo Activo.
+- Deck-out deja de ser marcador provisional y produce victoria del oponente.
+- Muerte Súbita queda representada como `GameFinishResult` de tipo `SUDDEN_DEATH_REQUIRED`; no se juega todavía el flujo completo.
+- No se implementan condiciones especiales ni efectos complejos en esta fase.
 
 ## Fase 9 - Condiciones especiales
 
