@@ -110,6 +110,92 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void phase11E1AddsVerifiedPokemonMappingsWithoutClaimingCompleteness() {
+        assertThat(catalog.mappingsForCard("xy1-2")).extracting(AttackEffectMapping::attackName).containsExactly("Crisis Vine");
+        assertThat(catalog.mappingsForCard("xy1-22")).extracting(AttackEffectMapping::attackName).containsExactlyInAnyOrder("Live Coal", "Fireworks");
+        assertThat(catalog.mappingsForCard("xy1-32")).extracting(AttackEffectMapping::attackName).containsExactly("Clamp Crush");
+        assertThat(catalog.auditedCardCount()).isLessThan(catalog.expectedCardCount());
+        assertThat(catalog.isCompleteAudit()).isFalse();
+    }
+
+    @Test
+    void multiStatusMappingKeepsBothConditionsExplicit() {
+        List<EffectDefinition> effects = catalog.effectsForAttack("xy1-2", "Crisis Vine");
+
+        assertThat(effects).hasSize(2);
+        assertThat(effects).extracting(EffectDefinition::type).containsOnly(EffectType.APPLY_SPECIAL_CONDITION);
+        assertThat(effects).extracting(EffectDefinition::condition)
+                .containsExactlyInAnyOrder(SpecialCondition.PARALYZED, SpecialCondition.POISONED);
+        assertThat(effects).extracting(EffectDefinition::target).containsOnly(EffectTarget.DEFENDER_ACTIVE);
+    }
+
+    @Test
+    void phase11E1StatusMappingsUseExistingSpecialConditionHandler() {
+        assertThat(catalog.effectsForAttack("xy1-5", "Poison Jab")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.APPLY_SPECIAL_CONDITION);
+            assertThat(effect.condition()).isEqualTo(SpecialCondition.POISONED);
+            assertThat(effect.target()).isEqualTo(EffectTarget.DEFENDER_ACTIVE);
+        });
+
+        assertThat(catalog.effectsForAttack("xy1-8", "Signal Beam")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.APPLY_SPECIAL_CONDITION);
+            assertThat(effect.condition()).isEqualTo(SpecialCondition.CONFUSED);
+            assertThat(effect.target()).isEqualTo(EffectTarget.DEFENDER_ACTIVE);
+        });
+    }
+
+    @Test
+    void phase11E1HealingMappingUsesExistingHealHandler() {
+        assertThat(catalog.effectsForAttack("xy1-14", "Touchdown")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.HEAL_DAMAGE);
+            assertThat(effect.target()).isEqualTo(EffectTarget.ATTACKER_ACTIVE);
+            assertThat(effect.amount()).isEqualTo(20);
+        });
+    }
+
+    @Test
+    void selfDiscardEnergyMappingsTargetAttackerActive() {
+        assertThat(catalog.effectsForAttack("xy1-20", "Flamethrower")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.DISCARD_ATTACHED_ENERGY);
+            assertThat(effect.target()).isEqualTo(EffectTarget.ATTACKER_ACTIVE);
+            assertThat(effect.amount()).isEqualTo(1);
+        });
+
+        assertThat(catalog.effectsForAttack("xy1-22", "Fireworks")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.DISCARD_ATTACHED_ENERGY);
+            assertThat(effect.target()).isEqualTo(EffectTarget.ATTACKER_ACTIVE);
+            assertThat(effect.amount()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void coinFlipSelfDamageMappingUsesTailsBranch() {
+        assertThat(catalog.effectsForAttack("xy1-29", "Splash Bomb")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.COIN_FLIP);
+            assertThat(effect.headsEffect()).isNull();
+            assertThat(effect.tailsEffect()).satisfies(tails -> {
+                assertThat(tails.type()).isEqualTo(EffectType.DEAL_DAMAGE);
+                assertThat(tails.target()).isEqualTo(EffectTarget.ATTACKER_ACTIVE);
+                assertThat(tails.amount()).isEqualTo(30);
+            });
+        });
+    }
+
+    @Test
+    void coinFlipCompositeMappingKeepsStatusAndDiscardEnergyTogether() {
+        assertThat(catalog.effectsForAttack("xy1-32", "Clamp Crush")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.COIN_FLIP);
+            assertThat(effect.headsEffect()).satisfies(heads -> {
+                assertThat(heads.type()).isEqualTo(EffectType.COMPOSITE);
+                assertThat(heads.children()).hasSize(2);
+                assertThat(heads.children()).extracting(EffectDefinition::type)
+                        .containsExactly(EffectType.APPLY_SPECIAL_CONDITION, EffectType.DISCARD_ATTACHED_ENERGY);
+            });
+            assertThat(effect.tailsEffect()).isNull();
+        });
+    }
+
+    @Test
     void auditDoesNotClaimFullXy1Completion() {
         assertThat(catalog.expectedCardCount()).isEqualTo(146);
         assertThat(catalog.auditedCardCount()).isLessThan(catalog.expectedCardCount());

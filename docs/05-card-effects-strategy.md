@@ -200,6 +200,18 @@ Fase 11 agrega mappings controlados para un subconjunto representativo, verifica
 - `xy1-68 Sableye / Filch`: roba 1 carta.
 - `xy1-68 Sableye / Rip Claw`: moneda; con cara descarta 1 Energía del Activo defensor.
 
+## Fase 11E.1 - Mapeo progresivo de Pokémon XY1
+
+Fase 11E.1 agrega 17 mappings de ataques Pokémon verificados contra datos oficiales de `xy1`, usando solo handlers ya existentes:
+
+- DAMAGE_ONLY: `Ledyba / Spinning Attack`, `Scatterbug / Bug Bite`, `Spewpa / Bug Bite`, `Skiddo / Tackle`, `Magcargo / Heat Blast`, `Pansear / Live Coal`, `Fennekin / Will-O-Wisp`, `Fletchinder / Fire Wing`, `Shellder / Rain Splash`.
+- DAMAGE_PLUS_STATUS: `M Venusaur-EX / Crisis Vine`, `Beedrill / Poison Jab`, `Volbeat / Signal Beam`.
+- DAMAGE_PLUS_HEAL: `Chesnaught / Touchdown`.
+- DAMAGE_PLUS_COIN_FLIP: `Blastoise-EX / Splash Bomb`, `Cloyster / Clamp Crush`.
+- DISCARD_ENERGY: `Slugma / Flamethrower`, `Pansear / Fireworks`, más descarte condicional dentro de `Cloyster / Clamp Crush`.
+
+No se afirma cobertura completa de XY1: ataques como `Flash Needle`, `Lead`, `Magma Mantle`, `Rapid Spin`, `Spike Cannon`, `Spiky Shield` y `Sweet Veil` siguen marcados como pendientes cuando requieren selección, daño variable, prevención futura, habilidades reactivas o custom handlers.
+
 Gaps documentados, no implementados como soporte completo:
 
 - `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
