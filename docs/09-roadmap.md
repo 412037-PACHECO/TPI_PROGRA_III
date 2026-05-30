@@ -179,12 +179,12 @@ Decisiones fase 10:
 
 ## Fase 11 - Auditoría y mapeo progresivo XY1
 
-- Estado: implementada como auditoría/mapping incremental de subset representativo, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Estado: implementada como auditoría/mapping incremental y herramienta interna para generar auditoría completa desde cache local; pendiente de ejecución local final de `mvn test` por restricción de entorno.
 - Objetivo: auditar cartas reales `xy1`, clasificar efectos y mapear efectos soportados a `EffectDefinition` sin parser automático de texto natural.
-- Entregables: matriz `docs/11-xy1-audit-matrix.md`, estados/categorías de auditoría, `Xy1EffectCatalog`, mappings por `cardId` + ataque, tests unitarios de mapping y test de ejecución representativa con `AttackService`.
+- Entregables: matriz `docs/11-xy1-audit-matrix.md`, estados/categorías de auditoría, `Xy1EffectCatalog`, mappings por `cardId` + ataque, `Xy1AuditService`, `Xy1AuditReportGenerator`, `Xy1CardClassifier`, modelos de reporte, tests unitarios de mapping/auditoría y test de ejecución representativa con `AttackService`.
 - Dependencias: Fase 10 - motor de efectos.
 - Riesgos: afirmar cobertura completa sin auditar 146 cartas, confundir texto de catálogo con lógica ejecutable, forzar Trainers/habilidades complejas en handlers genéricos incorrectos.
-- Criterio: subset real mapeado/testeado, gaps documentados, auditoría explícitamente incompleta, sin WebSocket/frontend/persistencia/endpoints de juego.
+- Criterio: subset real mapeado/testeado, herramienta lista para auditar 146 cartas desde catálogo local, gaps documentados, auditoría de implementación explícitamente incompleta, sin WebSocket/frontend/persistencia/endpoints de juego.
 
 Decisiones fase 11:
 
@@ -193,6 +193,8 @@ Decisiones fase 11:
 - Se mapearon efectos representativos con handlers existentes: condición especial, curación, robo, moneda y descarte de energía.
 - Trainers como `Professor's Letter` y `Shauna` quedan documentados como gaps porque requieren búsqueda/shuffle/manipulación de mano o mazo.
 - Habilidades pasivas/continuas como `Spiky Shield` y `Sweet Veil` quedan como `REQUIRES_CUSTOM_HANDLER` / `NOT_IMPLEMENTED_YET`.
+- La subfase `feature/xy1-full-audit` no implementa handlers faltantes; clasifica efectos desde cache local y genera reporte con `importedCardCount`, conteos por complejidad y gaps.
+- Si no hay `backend/data`/cache importado, no se puede afirmar auditoría factual de las 146 cartas en ese entorno; debe importarse `xy1` antes de ejecutar el reporte completo.
 
 ## Fase 12 - Persistencia de snapshots/logs
 

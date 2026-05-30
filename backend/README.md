@@ -38,6 +38,7 @@ Incluye:
 - Integración de efectos simples posteriores al daño dentro de ataques.
 - Auditoría XY1 progresiva con estados/categorías explícitas.
 - Mappings representativos de cartas reales XY1 a `EffectDefinition` mediante `Xy1EffectCatalog`.
+- Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 
 ## Modelo Game State
 
@@ -300,6 +301,22 @@ Reglas de diseño de Fase 11:
 - La ausencia de mapping no equivale a “sin efecto real”; se consulta la matriz de auditoría.
 - No se parsea texto natural automáticamente.
 - No se agregan WebSocket, frontend, persistencia de partida ni endpoints REST de juego.
+
+### Auditoría completa desde cache local
+
+La subfase `feature/xy1-full-audit` agrega soporte interno para auditar las 146 cartas cuando el catálogo local esté importado:
+
+- `Xy1AuditService.generateReportFromLocalCache()` lee `setId=xy1` desde `CardRepository`.
+- `Xy1AuditReportGenerator` produce conteos, entradas por carta y gaps.
+- `Xy1CardClassifier` clasifica ataques, habilidades y reglas desde JSON/texto cacheado.
+
+En este entorno no había `backend/data` local disponible, por lo que no se afirma que el reporte completo de 146 cartas haya sido ejecutado acá. Para generar el reporte real primero importá:
+
+```http
+POST /api/cards/import/xy1
+```
+
+Luego verificá que haya 146 cartas cacheadas antes de cerrar la auditoría completa.
 
 ## Endpoints de catálogo
 

@@ -172,3 +172,43 @@ Gaps documentados, no implementados como soporte completo:
 4. Si no entra, marcar `REQUIRES_CUSTOM_HANDLER` / `NOT_IMPLEMENTED_YET`; no forzar el efecto en un handler incorrecto.
 5. Agregar tests de lookup y, cuando corresponda, test de ejecución con `AttackService` o `EffectExecutionService`.
 6. Recién marcar `FULLY_TESTED` cuando exista evidencia de test.
+
+## Estrategia para completar XY1 al 100%
+
+La subfase `feature/xy1-full-audit` agrega una herramienta interna de auditoría estática desde catálogo local:
+
+- `Xy1AuditService` lee cartas `xy1` cacheadas desde `CardRepository`.
+- `Xy1AuditReportGenerator` arma un reporte agregado.
+- `Xy1CardClassifier` clasifica ataques, habilidades y reglas desde `attacks`, `abilities` y `rules` como JSON/texto de evidencia.
+- La clasificación usa heurísticas revisables, pero **no ejecuta reglas ni genera mappings automáticamente**.
+
+Orden recomendado para completar soporte:
+
+1. Importar/cachear las 146 cartas con `POST /api/cards/import/xy1`.
+2. Generar `Xy1AuditReport` desde `Xy1AuditService.generateReportFromLocalCache()`.
+3. Resolver primero `DAMAGE_ONLY`, `DAMAGE_PLUS_STATUS`, `DAMAGE_PLUS_HEAL`, `DRAW_CARDS`, `DISCARD_ENERGY` porque ya tienen soporte genérico parcial o completo.
+4. Implementar luego handlers reutilizables para `SEARCH_DECK`, `DISCARD_CARD`, `SWITCH_ACTIVE`, `ATTACH_ENERGY`, `MOVE_ENERGY` y `MODIFY_DAMAGE`.
+5. Dejar para después efectos persistentes: `TOOL_EFFECT`, `STADIUM_EFFECT`, `ABILITY_PASSIVE`, `CONTINUOUS_EFFECT`, `PREVENT_DAMAGE`, `MODIFY_RETREAT_COST`.
+6. Solo crear handlers custom cuando una carta real no encaje razonablemente en un genérico.
+
+Handlers/infraestructura faltante detectada por categoría:
+
+- Búsqueda/reveal/shuffle de mazo.
+- Descarte de cartas de mano/mazo no energía.
+- Adjuntar/mover energía por efecto.
+- Cambio de Activo propio/rival.
+- Colocar contadores de daño directamente.
+- Modificar daño hecho/recibido.
+- Prevenir daño/efectos.
+- Modificar coste de retirada.
+- Habilidades activadas, pasivas y reactivas.
+- Efectos continuos de Tools y Stadiums.
+- Selección de objetivo desde zonas ocultas con privacidad.
+
+Riesgos:
+
+- Confundir carta clasificada con carta implementada.
+- Marcar `FULLY_TESTED` sin test real de mapping/ejecución.
+- Clasificar mal texto ambiguo por heurística: toda fila conserva texto original y notas para revisión manual.
+- Implementar búsqueda/reveal sin contrato de privacidad.
+- Forzar Trainers/habilidades en handlers de ataque.

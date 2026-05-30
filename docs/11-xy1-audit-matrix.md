@@ -4,9 +4,40 @@
 
 Auditar progresivamente las cartas del set obligatorio `xy1`, clasificar sus efectos reales y mapear un subconjunto representativo a `EffectDefinition` sin parser automático de texto natural.
 
-Esta matriz **no representa cobertura completa de las 146 cartas XY1**. Queda preparada para crecer de forma incremental: cada carta/efecto debe indicar evidencia, categoría, soporte del engine, handler requerido, estado de implementación y estado de testing.
+Esta matriz **no representa todavía cobertura completa implementada de las 146 cartas XY1**. La subfase `feature/xy1-full-audit` agrega una herramienta interna para auditar las 146 cartas desde el catálogo local cacheado y clasificar efectos sin ejecutarlos.
 
-Fuente usada para el subset inicial de Fase 11: campos oficiales `attacks`, `abilities`, `rules`, `subtypes`, `supertype` y `rawJson` del catálogo/API `pokemontcg.io` para `set.id=xy1`. En entorno local, esos datos se conservan cacheados por `CardEntity` como JSON/texto; si no hay DB local importada, los tests usan fixtures/mappings explícitos y no dependen de la API externa.
+Fuente esperada para auditoría completa: campos oficiales `attacks`, `abilities`, `rules`, `subtypes`, `supertype` y `rawJson` cacheados en `CardEntity` para `set.id=xy1`. En este entorno no hay `backend/data` local disponible, por lo tanto no se puede afirmar que las 146 cartas hayan sido auditadas desde DB local. La herramienta queda lista para generar el reporte completo después de importar `xy1`.
+
+## Subfase: herramienta de auditoría completa XY1
+
+Estado real actual:
+
+- Set objetivo: `xy1`.
+- Cantidad esperada: 146 cartas.
+- Cache local disponible en este entorno: no (`backend/data` ausente durante la implementación).
+- Auditoría ejecutable completa desde cache local: pendiente de importar datos.
+- Fuente de ejecución de efectos: mappings explícitos en `Xy1EffectCatalog`, no texto natural.
+
+Herramienta interna agregada:
+
+- `Xy1AuditService`: servicio interno Spring, sin endpoint público, que lee cartas `xy1` desde `CardRepository`.
+- `Xy1AuditReportGenerator`: genera reporte desde una lista de `CardEntity`.
+- `Xy1CardClassifier`: clasifica ataques, habilidades y reglas desde JSON/texto de catálogo.
+- Modelos de reporte: `Xy1AuditReport`, `Xy1CardAuditEntry`, `Xy1AttackAuditEntry`, `Xy1AbilityAuditEntry`, `Xy1RuleAuditEntry`, `Xy1UnsupportedEffectReport`.
+
+Proceso para auditar las 146 cartas:
+
+1. Levantar backend con perfil local.
+2. Importar catálogo XY1:
+
+   ```http
+   POST /api/cards/import/xy1
+   ```
+
+3. Verificar que el resumen indique 146 cartas recibidas/cacheadas para `setId=xy1`.
+4. Ejecutar `Xy1AuditService.generateReportFromLocalCache()` desde test, runner interno o futura tarea administrativa.
+5. Exportar el `Xy1AuditReport` a matriz Markdown/CSV si el equipo decide automatizar la documentación.
+6. No marcar cierre completo hasta que el reporte tenga `importedCardCount == 146` y todos los gaps estén clasificados.
 
 ## Estados de implementación
 
@@ -41,6 +72,9 @@ Una carta no debe marcarse `FULLY_TESTED` solo porque exista un handler genéric
 - `ABILITY_ACTIVATED`
 - `ABILITY_PASSIVE`
 - `CONTINUOUS_EFFECT`
+- `PREVENT_DAMAGE`
+- `MODIFY_DAMAGE`
+- `MODIFY_RETREAT_COST`
 - `CUSTOM_REQUIRED`
 - `UNSUPPORTED_YET`
 
@@ -57,6 +91,8 @@ Una carta no debe marcarse `FULLY_TESTED` solo porque exista un handler genéric
 La existencia de un handler no implica cobertura completa de carta. La lógica base de daño sigue en `AttackService`; los mappings solo agregan efectos secundarios estructurados.
 
 ## Matriz inicial Fase 11
+
+La tabla siguiente sigue siendo el subset explícitamente mapeado/documentado. Para convertirla en matriz completa de 146 filas debe generarse el reporte desde cache local importado y volcar sus resultados.
 
 | cardId | name | supertype | subtypes | attacks | abilities | rules | effectText | effectCategory | complexity | supportedByCurrentEngine | genericHandlers | customHandlerRequired | implementationStatus | tested | notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -76,6 +112,26 @@ La existencia de un handler no implica cobertura completa de carta. La lógica b
 3. Si un ataque solo hace daño base, puede quedar auditado con mapping vacío y nota `DAMAGE_ONLY`.
 4. Si un efecto requiere buscar/revelar desde mazo, documentar privacidad y selección.
 5. Si un efecto requiere persistencia temporal, habilidad pasiva, reemplazo forzado, búsqueda, descarte de mano/mazo o modificación de reglas, marcar gap antes de implementar.
+
+## Gaps detectables por la herramienta
+
+Handlers/infraestructura faltante para completar XY1:
+
+- `SearchDeckEffectHandler` y reveal de cartas buscadas.
+- `ShuffleDeckEffectHandler`.
+- `DiscardCardsEffectHandler` para mano/mazo no energía.
+- `AttachEnergyEffectHandler`.
+- `MoveEnergyEffectHandler`.
+- `SwitchActiveEffectHandler`.
+- `PlaceDamageCountersEffectHandler`.
+- `DamageModifierEffectHandler`.
+- `PreventDamageEffectHandler`.
+- `RetreatCostModifierEffectHandler`.
+- Infraestructura de habilidades activadas.
+- Infraestructura de habilidades pasivas/reactivas.
+- Efectos continuos de Tool/Stadium.
+- Selección desde zonas ocultas, reveal y privacidad de mano/mazo/premios.
+- Timing avanzado: before damage, after damage, between turns, on damaged, while in play, next turn.
 
 ## Aclaración ACE SPEC
 
