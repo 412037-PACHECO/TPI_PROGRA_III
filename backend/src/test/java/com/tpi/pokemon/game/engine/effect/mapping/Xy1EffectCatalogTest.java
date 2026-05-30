@@ -3,10 +3,16 @@ package com.tpi.pokemon.game.engine.effect.mapping;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tpi.pokemon.game.domain.enums.SpecialCondition;
+import com.tpi.pokemon.game.domain.enums.CardSubtype;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
+import com.tpi.pokemon.game.engine.effect.EffectCardZone;
 import com.tpi.pokemon.game.engine.effect.EffectTarget;
 import com.tpi.pokemon.game.engine.effect.EffectTiming;
 import com.tpi.pokemon.game.engine.effect.EffectType;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierLayer;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierOperation;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierTargetRole;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierType;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -196,6 +202,102 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void trainerWithoutMappingReturnsEmptyEffects() {
+        assertThat(catalog.effectsForTrainer("xy1-999")).isEmpty();
+        assertThat(catalog.continuousEffectsForTrainer("xy1-999")).isEmpty();
+        assertThat(catalog.trainerMappingForCard("xy1-999")).isEmpty();
+    }
+
+    @Test
+    void itemCoinFlipDrawMappingBuildsExpectedEffectDefinition() {
+        assertThat(catalog.effectsForTrainer("xy1-125")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.COIN_FLIP);
+            assertThat(effect.timing()).isEqualTo(EffectTiming.ON_PLAY_TRAINER);
+            assertThat(effect.headsEffect()).satisfies(heads -> {
+                assertThat(heads.type()).isEqualTo(EffectType.DRAW_CARDS);
+                assertThat(heads.target()).isEqualTo(EffectTarget.ACTING_PLAYER);
+                assertThat(heads.amount()).isEqualTo(3);
+            });
+            assertThat(effect.tailsEffect()).isNull();
+        });
+    }
+
+    @Test
+    void itemSearchMappingKeepsRevealShuffleAndBasicEnergyFilterExplicit() {
+        assertThat(catalog.effectsForTrainer("xy1-123")).hasSize(2);
+        assertThat(catalog.effectsForTrainer("xy1-123").get(0)).satisfies(search -> {
+            assertThat(search.type()).isEqualTo(EffectType.SEARCH_DECK);
+            assertThat(search.target()).isEqualTo(EffectTarget.ACTING_PLAYER);
+            assertThat(search.amount()).isEqualTo(2);
+            assertThat(search.sourceZone()).isEqualTo(EffectCardZone.DECK);
+            assertThat(search.destinationZone()).isEqualTo(EffectCardZone.HAND);
+            assertThat(search.cardFilter().subtype()).isEqualTo(CardSubtype.BASIC_ENERGY);
+            assertThat(search.revealSelectedCards()).isTrue();
+            assertThat(search.requiresShuffle()).isTrue();
+            assertThat(search.timing()).isEqualTo(EffectTiming.ON_PLAY_TRAINER);
+        });
+        assertThat(catalog.effectsForTrainer("xy1-123").get(1)).satisfies(shuffle -> {
+            assertThat(shuffle.type()).isEqualTo(EffectType.SHUFFLE_DECK);
+            assertThat(shuffle.target()).isEqualTo(EffectTarget.ACTING_PLAYER);
+            assertThat(shuffle.timing()).isEqualTo(EffectTiming.ON_PLAY_TRAINER);
+        });
+    }
+
+    @Test
+    void supporterDiscardEnergyMappingUsesExistingAttachedEnergyHandler() {
+        assertThat(catalog.effectsForTrainer("xy1-129")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.DISCARD_ATTACHED_ENERGY);
+            assertThat(effect.target()).isEqualTo(EffectTarget.DEFENDER_ACTIVE);
+            assertThat(effect.amount()).isEqualTo(1);
+            assertThat(effect.timing()).isEqualTo(EffectTiming.ON_PLAY_TRAINER);
+        });
+    }
+
+    @Test
+    void toolContinuousMappingsBuildExpectedModifierDefinitions() {
+        assertThat(catalog.continuousEffectsForTrainer("xy1-119")).singleElement().satisfies(effect -> {
+            assertThat(effect.effectId()).isEqualTo("hard-charm-damage-reduction");
+            assertThat(effect.modifiers()).singleElement().satisfies(modifier -> {
+                assertThat(modifier.type()).isEqualTo(ModifierType.DAMAGE);
+                assertThat(modifier.operation()).isEqualTo(ModifierOperation.SUBTRACT);
+                assertThat(modifier.layer()).isEqualTo(ModifierLayer.AFTER_WEAKNESS_RESISTANCE);
+                assertThat(modifier.amount()).isEqualTo(20);
+                assertThat(modifier.targetRole()).isEqualTo(ModifierTargetRole.DEFENDER);
+            });
+        });
+
+        assertThat(catalog.continuousEffectsForTrainer("xy1-121")).singleElement().satisfies(effect -> {
+            assertThat(effect.effectId()).isEqualTo("muscle-band-damage-bonus");
+            assertThat(effect.modifiers()).singleElement().satisfies(modifier -> {
+                assertThat(modifier.type()).isEqualTo(ModifierType.DAMAGE);
+                assertThat(modifier.operation()).isEqualTo(ModifierOperation.ADD);
+                assertThat(modifier.layer()).isEqualTo(ModifierLayer.BEFORE_WEAKNESS_RESISTANCE);
+                assertThat(modifier.amount()).isEqualTo(20);
+                assertThat(modifier.targetRole()).isEqualTo(ModifierTargetRole.ATTACKER);
+            });
+        });
+    }
+
+    @Test
+    void pendingTrainerMappingsDoNotClaimFullyTested() {
+        assertThat(catalog.auditEntriesForCard("xy1-127")).singleElement().satisfies(entry -> {
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.tested()).isFalse();
+        });
+        assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement().satisfies(entry -> {
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.tested()).isFalse();
+        });
+        assertThat(catalog.auditEntriesForCard("xy1-117")).singleElement().satisfies(entry -> {
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.tested()).isFalse();
+        });
+    }
+
+    @Test
     void auditDoesNotClaimFullXy1Completion() {
         assertThat(catalog.expectedCardCount()).isEqualTo(146);
         assertThat(catalog.auditedCardCount()).isLessThan(catalog.expectedCardCount());
@@ -205,7 +307,7 @@ class Xy1EffectCatalogTest {
     @Test
     void unsupportedTrainerAndAbilityGapsRemainDocumented() {
         assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement()
-                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.NOT_IMPLEMENTED_YET));
+                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
         assertThat(catalog.auditEntriesForCard("xy1-95")).singleElement()
                 .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER));
     }

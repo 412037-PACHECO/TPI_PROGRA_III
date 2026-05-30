@@ -212,6 +212,19 @@ Fase 11E.1 agrega 17 mappings de ataques Pokémon verificados contra datos ofici
 
 No se afirma cobertura completa de XY1: ataques como `Flash Needle`, `Lead`, `Magma Mantle`, `Rapid Spin`, `Spike Cannon`, `Spiky Shield` y `Sweet Veil` siguen marcados como pendientes cuando requieren selección, daño variable, prevención futura, habilidades reactivas o custom handlers.
 
+## Fase 11E.2 - Mapeo progresivo de Trainers XY1
+
+Fase 11E.2 extiende `Xy1EffectCatalog` con mappings progresivos de cartas Trainer reales del set `xy1`, sin parser automático ni soporte público completo de UI/API:
+
+- Items mapeados: `Roller Skates` como moneda + robo; `Professor's Letter` como búsqueda/reveal/shuffle estructural pendiente de contrato público de selección y privacidad.
+- Supporters mapeados: `Team Flare Grunt` como descarte de Energía unida al Activo rival.
+- Tools mapeadas: `Hard Charm` y `Muscle Band` como `CardEffectDefinition` continuos sobre el pipeline de modificadores de daño.
+- Stadiums revisados pero no mapeados como completos: `Fairy Garden` y `Shadow Circle` requieren condiciones por Energía unida y modificación continua de retreat/weakness todavía no cerrada carta por carta.
+
+Trainers pendientes documentados: `Cassius`, `Evosoda`, `Fairy Garden`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shadow Circle`, `Shauna` y `Super Potion`. Los motivos principales son selección desde zonas ocultas, reveal, shuffle con privacidad, mover mano completa al mazo, evolución directa, condiciones por Energía unida o lógica custom.
+
+Para Trainers, `EFFECT_MAPPED` no equivale automáticamente a “jugable desde UI/API”. Puede existir mapping engine-interno testeado mientras siga pendiente el contrato público de selección, reveal, privacidad o sincronización.
+
 Gaps documentados, no implementados como soporte completo:
 
 - `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
@@ -226,7 +239,8 @@ Gaps documentados, no implementados como soporte completo:
 3. Si entra en handlers genéricos, agregar un `AttackEffectMapping` en `Xy1EffectCatalog`.
 4. Si no entra, marcar `REQUIRES_CUSTOM_HANDLER` / `NOT_IMPLEMENTED_YET`; no forzar el efecto en un handler incorrecto.
 5. Agregar tests de lookup y, cuando corresponda, test de ejecución con `AttackService` o `EffectExecutionService`.
-6. Recién marcar `FULLY_TESTED` cuando exista evidencia de test.
+6. Para Trainers, documentar si el uso requiere selección pública/API, reveal, shuffle, privacidad de zonas ocultas o persistencia/continuidad.
+7. Recién marcar `FULLY_TESTED` cuando exista evidencia de test.
 
 ## Estrategia para completar XY1 al 100%
 

@@ -1,9 +1,21 @@
 package com.tpi.pokemon.game.engine.effect.mapping;
 
+import com.tpi.pokemon.game.domain.enums.CardSubtype;
 import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
+import com.tpi.pokemon.game.engine.effect.CardFilterSpec;
 import com.tpi.pokemon.game.engine.effect.EffectTarget;
 import com.tpi.pokemon.game.engine.effect.EffectTiming;
+import com.tpi.pokemon.game.engine.effect.ability.CardEffectDefinition;
+import com.tpi.pokemon.game.engine.effect.ability.EffectActivationKind;
+import com.tpi.pokemon.game.engine.effect.ability.EffectCondition;
+import com.tpi.pokemon.game.engine.effect.ability.EffectScope;
+import com.tpi.pokemon.game.engine.effect.ability.EffectSourceKind;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierDefinition;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierLayer;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierOperation;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierTargetRole;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierType;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -18,15 +30,21 @@ public final class Xy1EffectCatalog {
 
     private final Map<CardAttackKey, AttackEffectMapping> attackMappings;
     private final Map<String, List<AttackEffectMapping>> mappingsByCardId;
+    private final Map<String, TrainerEffectMapping> trainerMappingsByCardId;
     private final Map<String, List<Xy1AuditEntry>> auditEntriesByCardId;
 
     public Xy1EffectCatalog() {
-        this(defaultAttackMappings(), defaultAuditEntries());
+        this(defaultAttackMappings(), defaultTrainerMappings(), defaultAuditEntries());
     }
 
     public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<Xy1AuditEntry> auditEntries) {
+        this(attackMappings, List.of(), auditEntries);
+    }
+
+    public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<TrainerEffectMapping> trainerMappings, List<Xy1AuditEntry> auditEntries) {
         this.attackMappings = indexAttackMappings(attackMappings);
         this.mappingsByCardId = indexMappingsByCardId(attackMappings);
+        this.trainerMappingsByCardId = indexTrainerMappingsByCardId(trainerMappings);
         this.auditEntriesByCardId = indexAuditEntriesByCardId(auditEntries);
     }
 
@@ -57,6 +75,25 @@ public final class Xy1EffectCatalog {
         }
         return Optional.ofNullable(attackMappings.get(CardAttackKey.of(cardId, attackNameOrId)))
                 .map(AttackEffectMapping::effects)
+                .orElse(List.of());
+    }
+
+    public Optional<TrainerEffectMapping> trainerMappingForCard(String cardId) {
+        if (isBlank(cardId)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(trainerMappingsByCardId.get(cardId.trim().toLowerCase(java.util.Locale.ROOT)));
+    }
+
+    public List<EffectDefinition> effectsForTrainer(String cardId) {
+        return trainerMappingForCard(cardId)
+                .map(TrainerEffectMapping::playEffects)
+                .orElse(List.of());
+    }
+
+    public List<CardEffectDefinition> continuousEffectsForTrainer(String cardId) {
+        return trainerMappingForCard(cardId)
+                .map(TrainerEffectMapping::continuousEffects)
                 .orElse(List.of());
     }
 
@@ -94,6 +131,14 @@ public final class Xy1EffectCatalog {
             indexed.computeIfAbsent(mapping.cardId().toLowerCase(java.util.Locale.ROOT), ignored -> new ArrayList<>()).add(mapping);
         }
         return copyListMap(indexed);
+    }
+
+    private static Map<String, TrainerEffectMapping> indexTrainerMappingsByCardId(List<TrainerEffectMapping> mappings) {
+        Map<String, TrainerEffectMapping> indexed = new LinkedHashMap<>();
+        for (TrainerEffectMapping mapping : mappings) {
+            indexed.put(mapping.cardId().toLowerCase(java.util.Locale.ROOT), mapping);
+        }
+        return Map.copyOf(indexed);
     }
 
     private static Map<String, List<Xy1AuditEntry>> indexAuditEntriesByCardId(List<Xy1AuditEntry> entries) {
@@ -228,6 +273,61 @@ public final class Xy1EffectCatalog {
         );
     }
 
+    private static List<TrainerEffectMapping> defaultTrainerMappings() {
+        return List.of(
+                trainer("xy1-119", "Hard Charm", "Pokémon Tool", "Any damage done to the Pokémon this card is attached to by an opponent's attack is reduced by 20 (after applying Weakness and Resistance).",
+                        categories(Xy1EffectCategory.TOOL_EFFECT, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM,
+                        List.of(),
+                        List.of(continuousTrainerEffect("hard-charm-damage-reduction", "Hard Charm", EffectSourceKind.TOOL, EffectScope.SELF,
+                                new ModifierDefinition(ModifierType.DAMAGE, ModifierOperation.SUBTRACT, ModifierLayer.AFTER_WEAKNESS_RESISTANCE, 20, ModifierTargetRole.DEFENDER))),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED),
+                        true,
+                        "Tool attachment rule is handled by TurnActionService; this mapping only declares the continuous damage reduction."),
+                trainer("xy1-121", "Muscle Band", "Pokémon Tool", "The attacks of the Pokémon this card is attached to do 20 more damage to your opponent's Active Pokémon (before applying Weakness and Resistance).",
+                        categories(Xy1EffectCategory.TOOL_EFFECT, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM,
+                        List.of(),
+                        List.of(continuousTrainerEffect("muscle-band-damage-bonus", "Muscle Band", EffectSourceKind.TOOL, EffectScope.SELF,
+                                new ModifierDefinition(ModifierType.DAMAGE, ModifierOperation.ADD, ModifierLayer.BEFORE_WEAKNESS_RESISTANCE, 20, ModifierTargetRole.ATTACKER))),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED),
+                        true,
+                        "Tool attachment rule is handled by TurnActionService; this mapping only declares the continuous attack damage bonus."),
+                trainer("xy1-123", "Professor's Letter", "Item", "Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.",
+                        categories(Xy1EffectCategory.SEARCH_DECK, Xy1EffectCategory.SHUFFLE_DECK), Xy1EffectComplexity.MEDIUM,
+                        List.of(
+                                EffectDefinition.searchDeck(EffectTarget.ACTING_PLAYER, 2, CardFilterSpec.subtype(CardSubtype.BASIC_ENERGY), List.of(), true, true, EffectTiming.ON_PLAY_TRAINER),
+                                EffectDefinition.shuffleDeck(EffectTarget.ACTING_PLAYER, EffectTiming.ON_PLAY_TRAINER)),
+                        List.of(),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET),
+                        false,
+                        "Mapping captures search/reveal/shuffle structure, but public hidden-zone selection and reveal privacy remain pending."),
+                trainer("xy1-125", "Roller Skates", "Item", "Flip a coin. If heads, draw 3 cards.",
+                        categories(Xy1EffectCategory.DRAW_CARDS, Xy1EffectCategory.DAMAGE_PLUS_COIN_FLIP), Xy1EffectComplexity.LOW,
+                        List.of(EffectDefinition.coinFlip(
+                                EffectDefinition.drawCards(EffectTarget.ACTING_PLAYER, 3, EffectTiming.ON_PLAY_TRAINER),
+                                null,
+                                EffectTiming.ON_PLAY_TRAINER)),
+                        List.of(),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED),
+                        true,
+                        "Coin-flip draw maps directly to CoinFlipEffectHandler plus DrawCardsEffectHandler."),
+                trainer("xy1-129", "Team Flare Grunt", "Supporter", "Discard an Energy attached to your opponent's Active Pokémon.",
+                        categories(Xy1EffectCategory.DISCARD_ENERGY), Xy1EffectComplexity.LOW,
+                        List.of(EffectDefinition.discardAttachedEnergy(EffectTarget.DEFENDER_ACTIVE, 1, List.of(), EffectTiming.ON_PLAY_TRAINER)),
+                        List.of(),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED),
+                        true,
+                        "Supporter play-limit remains handled by TurnActionService; mapping only discards one attached Energy from opponent's Active Pokémon.")
+        );
+    }
+
+    private static CardEffectDefinition continuousTrainerEffect(String effectId, String name, EffectSourceKind sourceKind, EffectScope scope, ModifierDefinition modifier) {
+        return new CardEffectDefinition(effectId, name, sourceKind, EffectActivationKind.CONTINUOUS, EffectTiming.CONTINUOUS, scope, EffectCondition.always(), List.of(modifier));
+    }
+
+    private static TrainerEffectMapping trainer(String cardId, String cardName, String subtype, String effectText, Set<Xy1EffectCategory> categories, Xy1EffectComplexity complexity, List<EffectDefinition> playEffects, List<CardEffectDefinition> continuousEffects, Set<Xy1AuditStatus> statuses, boolean tested, String notes) {
+        return new TrainerEffectMapping(cardId, cardName, subtype, effectText, categories, complexity, playEffects, continuousEffects, statuses, tested, notes);
+    }
+
     private static AttackEffectMapping attack(String cardId, String cardName, String attackId, String attackName, String effectText, Set<Xy1EffectCategory> categories, Xy1EffectComplexity complexity, List<EffectDefinition> effects, String notes) {
         return new AttackEffectMapping(
                 cardId,
@@ -264,8 +364,21 @@ public final class Xy1EffectCatalog {
                 audit("xy1-29", "Blastoise-EX", "Pokémon", "Basic, EX", "Rapid Spin; Splash Bomb", "none", "Pokémon-EX rule", "Rapid Spin switches both Active Pokémon. Splash Bomb flips a coin; tails does 30 damage to itself.", categories(Xy1EffectCategory.SWITCH_ACTIVE, Xy1EffectCategory.DAMAGE_PLUS_COIN_FLIP), Xy1EffectComplexity.MEDIUM, true, "CoinFlipEffectHandler; DealDamageEffectHandler partial", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Splash Bomb mapped/tested; Rapid Spin left pending for coordinated switch mapping."),
                 audit("xy1-31", "Shellder", "Pokémon", "Basic", "Rain Splash", "none", "none", "Rain Splash is damage-only.", categories(Xy1EffectCategory.DAMAGE_ONLY), Xy1EffectComplexity.LOW, true, "AttackService", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Damage-only mapping added in Phase 11E.1."),
                 audit("xy1-32", "Cloyster", "Pokémon", "Stage 1", "Clamp Crush; Spike Cannon", "none", "none", "Clamp Crush flips a coin; heads Paralyzes and discards an Energy from opponent's Active. Spike Cannon flips 5 coins for variable damage.", categories(Xy1EffectCategory.DAMAGE_PLUS_COIN_FLIP, Xy1EffectCategory.DAMAGE_PLUS_STATUS, Xy1EffectCategory.DISCARD_ENERGY), Xy1EffectComplexity.MEDIUM, true, "CoinFlipEffectHandler; CompositeEffectHandler; ApplySpecialConditionEffectHandler; DiscardAttachedEnergyEffectHandler", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Clamp Crush mapped/tested; Spike Cannon remains pending due variable damage."),
-                audit("xy1-123", "Professor's Letter", "Trainer", "Item", "none", "none", "Item", "Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.", categories(Xy1EffectCategory.SEARCH_DECK), Xy1EffectComplexity.MEDIUM, false, "none", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires SearchDeck + reveal + shuffle support and privacy-aware selection from deck."),
+                audit("xy1-115", "Cassius", "Trainer", "Supporter", "none", "none", "Supporter", "Shuffle 1 of your Pokémon and all cards attached to it into your deck.", categories(Xy1EffectCategory.SHUFFLE_DECK, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH, false, "none", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires selecting a Pokémon in play, moving it with attachments to deck, board validation, and shuffle."),
+                audit("xy1-116", "Evosoda", "Trainer", "Item", "none", "none", "Item", "Search your deck for a card that evolves from 1 of your Pokémon and put it onto that Pokémon. Shuffle your deck afterward.", categories(Xy1EffectCategory.SEARCH_DECK, Xy1EffectCategory.SHUFFLE_DECK, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH, false, "SearchDeckEffectHandler partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires evolution legality checks and putting evolution directly onto a Pokémon."),
+                audit("xy1-117", "Fairy Garden", "Trainer", "Stadium", "none", "none", "Stadium", "Each Pokémon that has any Fairy Energy attached to it has no Retreat Cost.", categories(Xy1EffectCategory.STADIUM_EFFECT, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_RETREAT_COST), Xy1EffectComplexity.HIGH, false, "ModifierResolver partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Retreat modifier infrastructure exists, but condition by attached Fairy Energy is not modeled yet."),
+                audit("xy1-118", "Great Ball", "Trainer", "Item", "none", "none", "Item", "Look at the top 7 cards of your deck. You may reveal a Pokémon you find there and put it into your hand. Shuffle the other cards back into your deck.", categories(Xy1EffectCategory.SEARCH_DECK, Xy1EffectCategory.SHUFFLE_DECK, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH, false, "SearchDeckEffectHandler partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires top-7 private inspection, optional reveal, and shuffling non-selected cards."),
+                audit("xy1-119", "Hard Charm", "Trainer", "Pokémon Tool", "none", "none", "Tool", "Damage done to the attached Pokémon by opponent's attacks is reduced by 20 after Weakness and Resistance.", categories(Xy1EffectCategory.TOOL_EFFECT, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM, true, "CardEffectDefinition; ModifierResolver", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Phase 11E.2 maps the continuous Tool modifier; attachment rules remain structural in TurnActionService."),
+                audit("xy1-120", "Max Revive", "Trainer", "Item", "none", "none", "Item", "Put a Pokémon from your discard pile on top of your deck.", categories(Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.MEDIUM, false, "none", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires moving a selected Pokémon from discard to top of deck."),
+                audit("xy1-121", "Muscle Band", "Trainer", "Pokémon Tool", "none", "none", "Tool", "Attacks of the attached Pokémon do 20 more damage to opponent's Active before Weakness and Resistance.", categories(Xy1EffectCategory.TOOL_EFFECT, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM, true, "CardEffectDefinition; ModifierResolver", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Phase 11E.2 maps the continuous Tool modifier; attachment rules remain structural in TurnActionService."),
+                audit("xy1-122", "Professor Sycamore", "Trainer", "Supporter", "none", "none", "Supporter", "Discard your hand and draw 7 cards.", categories(Xy1EffectCategory.DISCARD_CARD, Xy1EffectCategory.DRAW_CARDS, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.MEDIUM, false, "DrawCardsEffectHandler partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "DiscardCardsEffectHandler requires explicit selected cards and cannot currently express discard whole hand dynamically."),
+                audit("xy1-123", "Professor's Letter", "Trainer", "Item", "none", "none", "Item", "Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.", categories(Xy1EffectCategory.SEARCH_DECK, Xy1EffectCategory.SHUFFLE_DECK), Xy1EffectComplexity.MEDIUM, true, "SearchDeckEffectHandler; ShuffleDeckEffectHandler", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Mapping captures search/reveal/shuffle structure; public hidden-zone selection and reveal privacy remain pending."),
+                audit("xy1-124", "Red Card", "Trainer", "Item", "none", "none", "Item", "Your opponent shuffles his or her hand into his or her deck and draws 4 cards.", categories(Xy1EffectCategory.SHUFFLE_DECK, Xy1EffectCategory.DRAW_CARDS, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH, false, "DrawCardsEffectHandler partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires opponent hand-to-deck shuffle with hidden-zone privacy and forced draw."),
+                audit("xy1-125", "Roller Skates", "Trainer", "Item", "none", "none", "Item", "Flip a coin. If heads, draw 3 cards.", categories(Xy1EffectCategory.DRAW_CARDS, Xy1EffectCategory.DAMAGE_PLUS_COIN_FLIP), Xy1EffectComplexity.LOW, true, "CoinFlipEffectHandler; DrawCardsEffectHandler", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Phase 11E.2 maps coin-flip draw."),
+                audit("xy1-126", "Shadow Circle", "Trainer", "Stadium", "none", "none", "Stadium", "Each Pokémon that has any Darkness Energy attached to it has no Weakness.", categories(Xy1EffectCategory.STADIUM_EFFECT, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH, false, "none", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires continuous weakness suppression by attached Darkness Energy."),
                 audit("xy1-127", "Shauna", "Trainer", "Supporter", "none", "none", "Supporter", "Shuffle your hand into your deck. Then, draw 5 cards.", categories(Xy1EffectCategory.DRAW_CARDS, Xy1EffectCategory.DISCARD_CARD, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.MEDIUM, false, "DrawCardsEffectHandler partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Draw handler alone is insufficient because the card must shuffle hand into deck before drawing."),
+                audit("xy1-128", "Super Potion", "Trainer", "Item", "none", "none", "Item", "Heal 60 damage from 1 of your Pokémon. If you do, discard an Energy attached to that Pokémon.", categories(Xy1EffectCategory.HEAL_DAMAGE, Xy1EffectCategory.DISCARD_ENERGY, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.MEDIUM, false, "HealDamageEffectHandler; DiscardAttachedEnergyEffectHandler partial", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires choosing one own Pokémon and conditional discard only if healing occurs."),
+                audit("xy1-129", "Team Flare Grunt", "Trainer", "Supporter", "none", "none", "Supporter", "Discard an Energy attached to your opponent's Active Pokémon.", categories(Xy1EffectCategory.DISCARD_ENERGY), Xy1EffectComplexity.LOW, true, "DiscardAttachedEnergyEffectHandler", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Phase 11E.2 maps attached Energy discard from opponent Active."),
                 audit("xy1-14", "Chesnaught", "Pokémon", "Stage 2", "Touchdown", "Spiky Shield", "none", "Spiky Shield reacts when damaged by an opponent's attack; Touchdown heals 20 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.DAMAGE_PLUS_HEAL, Xy1EffectCategory.CONTINUOUS_EFFECT), Xy1EffectComplexity.HIGH, true, "HealDamageEffectHandler partial for Touchdown only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Touchdown mapped/tested in Phase 11E.1; Spiky Shield reactive ability remains pending."),
                 audit("xy1-95", "Slurpuff", "Pokémon", "Stage 1", "Draining Kiss", "Sweet Veil", "none", "Sweet Veil prevents/removes Special Conditions for own Pokémon with Fairy Energy; Draining Kiss heals 30 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.DAMAGE_PLUS_HEAL), Xy1EffectComplexity.HIGH, false, "HealDamageEffectHandler partial for Draining Kiss only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Continuous prevention/removal ability requires future persistent/continuous effect support.")
         );

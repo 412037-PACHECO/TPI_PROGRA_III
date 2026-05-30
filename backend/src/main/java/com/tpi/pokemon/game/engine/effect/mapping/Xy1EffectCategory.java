@@ -22,6 +22,7 @@ public enum Xy1EffectCategory {
     PREVENT_DAMAGE,
     MODIFY_DAMAGE,
     MODIFY_RETREAT_COST,
+    SHUFFLE_DECK,
     CUSTOM_REQUIRED,
     UNSUPPORTED_YET
 }

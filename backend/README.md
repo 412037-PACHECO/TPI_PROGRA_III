@@ -316,6 +316,7 @@ Componentes principales:
 
 - `Xy1EffectCatalog`: catálogo puro Java de mappings explícitos para el set `xy1`.
 - `AttackEffectMapping`: vínculo entre `cardId`, ataque real y `EffectDefinition`.
+- `TrainerEffectMapping`: vínculo entre `cardId`, carta Trainer real, efectos al jugarla y efectos continuos de Tool/Stadium cuando aplica.
 - `Xy1AuditEntry`: metadata de auditoría para documentación y tests.
 - `Xy1AuditStatus`: estados como `DATA_IMPORTED`, `EFFECT_CLASSIFIED`, `EFFECT_MAPPED`, `FULLY_TESTED`, `REQUIRES_CUSTOM_HANDLER` y `NOT_IMPLEMENTED_YET`.
 - `Xy1EffectCategory`: categorías como `DAMAGE_ONLY`, `DAMAGE_PLUS_STATUS`, `DAMAGE_PLUS_HEAL`, `DRAW_CARDS`, `DISCARD_ENERGY`, `ABILITY_PASSIVE` y `CONTINUOUS_EFFECT`.
@@ -330,10 +331,23 @@ Mappings representativos implementados/testeados:
 - `xy1-68 Sableye / Filch`: roba 1 carta.
 - `xy1-68 Sableye / Rip Claw`: moneda; si sale cara, descarta 1 Energía del Activo defensor.
 
+Fase 11E.2 agrega mapeo progresivo de Trainers XY1 usando handlers existentes o infraestructura continua:
+
+- `xy1-119 Hard Charm`: Tool continua que reduce 20 daño recibido después de Debilidad/Resistencia.
+- `xy1-121 Muscle Band`: Tool continua que suma 20 daño antes de Debilidad/Resistencia.
+- `xy1-123 Professor's Letter`: búsqueda/reveal/shuffle estructural, pendiente de contrato público de selección/privacidad.
+- `xy1-125 Roller Skates`: moneda; con cara roba 3 cartas.
+- `xy1-129 Team Flare Grunt`: descarta una Energía del Activo rival.
+
+Esto no implica soporte completo de Trainers, Stadiums, Tools ni efectos continuos. La ejecución pública de Trainers que requieren selección desde mazo/mano, reveal, shuffle o privacidad de zonas ocultas sigue limitada porque no hay endpoints REST de partida, WebSocket, frontend ni vistas seguras por jugador.
+
 Gaps documentados:
 
 - `xy1-123 Professor's Letter`: búsqueda en mazo + reveal + shuffle.
 - `xy1-127 Shauna`: mezclar mano en mazo + robar.
+- Trainers con búsqueda desde mazo: falta contrato público de selección, reveal, shuffle y privacidad.
+- Trainers que mezclan mano/mazo y luego roban: requieren composición completa y eventos seguros.
+- Stadium/Tool con efectos continuos condicionados por Energía unida: requieren mapping carta por carta, timing y tests.
 - `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva.
 - `xy1-95 Slurpuff / Sweet Veil`: efecto continuo/preventivo.
 
