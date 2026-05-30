@@ -205,6 +205,15 @@ Decisiones fase 11:
 - Riesgos: confundir handler disponible con carta soportada, filtrar información de zonas ocultas, resolver selección futura sin contrato público y duplicar lógica de KO.
 - Criterio: handlers testeados aisladamente, selección pendiente modelada, categorías documentadas y matriz sin afirmar cobertura completa.
 
+### Fase 11D - Abilities, continuous effects y modificadores
+
+- Estado: infraestructura mínima implementada como engine puro Java, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: habilitar efectos continuos y modificadores reutilizables sin mapear todavía las 146 cartas XY1 ni interpretar texto natural.
+- Entregables: `CardEffectDefinition`, modelos de ability/source/scope/condition, `EffectSourceCollector`, `ModifierResolver`, modificadores de daño/retiro/condiciones especiales, eventos de modificación/prevención y tests unitarios mínimos.
+- Fuera de alcance: mappings completos de XY1, abilities activadas con uso una vez por turno, reactive effects completos como `Spiky Shield`, cleanup continuo completo como `Sweet Veil`, WebSocket, frontend, persistencia, endpoints de juego y parser automático.
+- Riesgos: confundir infraestructura con carta soportada, orden incorrecto de modificadores, stacking simultáneo de múltiples fuentes y semántica inicial simple de scopes/conditions.
+- Criterio: comportamiento no-op compatible con fases previas, daño/retiro/prevención testeados, sin dependencias Spring/JPA/API dentro del engine.
+
 ## Fase 12 - Persistencia de snapshots/logs
 
 - Objetivo: guardar/reconstruir partida.

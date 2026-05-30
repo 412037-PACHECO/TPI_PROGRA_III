@@ -16,15 +16,24 @@ import com.tpi.pokemon.game.domain.model.StadiumInPlay;
 import com.tpi.pokemon.game.domain.model.TurnState;
 import com.tpi.pokemon.game.domain.value.CardInstanceId;
 import com.tpi.pokemon.game.domain.value.PlayerId;
+import com.tpi.pokemon.game.engine.effect.modifier.AppliedModifier;
+import com.tpi.pokemon.game.engine.effect.modifier.DefaultModifierResolver;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierResolutionResult;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierResolver;
+import com.tpi.pokemon.game.engine.effect.modifier.RetreatCostModifierContext;
+import com.tpi.pokemon.game.engine.effect.modifier.SpecialConditionModifierContext;
 import com.tpi.pokemon.game.engine.event.ActivePokemonRetreatedEvent;
 import com.tpi.pokemon.game.engine.event.BasicPokemonBenchedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.event.PokemonEvolvedEvent;
+import com.tpi.pokemon.game.engine.event.RetreatCostModifiedEvent;
 import com.tpi.pokemon.game.engine.event.SpecialConditionAppliedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionPreventedEvent;
 import com.tpi.pokemon.game.engine.event.StadiumReplacedEvent;
 import com.tpi.pokemon.game.engine.event.TrainerPlayedEvent;
 import com.tpi.pokemon.game.engine.special.ApplySpecialConditionCommand;
+import com.tpi.pokemon.game.engine.special.SpecialConditionApplication;
 import com.tpi.pokemon.game.engine.special.StatusEffectManager;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -33,7 +42,17 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class TurnActionService {
-    private final StatusEffectManager statusEffectManager = new StatusEffectManager();
+    private final StatusEffectManager statusEffectManager;
+    private final ModifierResolver modifierResolver;
+
+    public TurnActionService() {
+        this(new StatusEffectManager(), new DefaultModifierResolver());
+    }
+
+    public TurnActionService(StatusEffectManager statusEffectManager, ModifierResolver modifierResolver) {
+        this.statusEffectManager = Objects.requireNonNull(statusEffectManager, "statusEffectManager must not be null");
+        this.modifierResolver = Objects.requireNonNull(modifierResolver, "modifierResolver must not be null");
+    }
 
     public GameState putBasicPokemonOnBench(GameState state, PutBasicPokemonOnBenchCommand command) {
         Context context = requireMainTurn(state, command.playerId());
@@ -110,6 +129,8 @@ public final class TurnActionService {
         if (cost == null) {
             throw new ActionException("Retreat cost is unknown");
         }
+        ModifierResolutionResult retreatCost = modifierResolver.resolveRetreatCost(new RetreatCostModifierContext(state, command.playerId(), active, cost));
+        cost = retreatCost.value();
         List<CardInstanceId> discardIds = command.energyCardsToDiscard() == null ? List.of() : command.energyCardsToDiscard();
         if (new HashSet<>(discardIds).size() != discardIds.size()) {
             throw new ActionException("Energy cards to discard must not contain duplicates");
@@ -133,12 +154,25 @@ public final class TurnActionService {
         attachedEnergies.stream().filter(card -> discardSet.contains(card.id())).forEach(discard::add);
         BoardState board = new BoardState(new ActivePokemon(newActive), new Bench(updatedBench));
         PlayerGameState updatedPlayer = rebuildPlayer(context.playerState(), context.playerState().getHand(), new DiscardPile(discard), board, context.playerState().getTurnsTaken());
-        return withEvent(context.state(), updatedPlayer, context.turnState().withRetreated(), context.state().getActiveStadium().orElse(null), new ActivePokemonRetreatedEvent(context.state().getGameId(), command.playerId(), newActive.getTopCard().id(), discardIds));
+        List<GameEvent> extraEvents = retreatCost.appliedModifiers().stream()
+                .map(modifier -> (GameEvent) new RetreatCostModifiedEvent(context.state().getGameId(), modifier.sourceCardId(), modifier.effectId(), active.getTopCard().id(), modifier.valueBefore(), modifier.valueAfter()))
+                .toList();
+        GameState retreatedState = replacePlayer(context.state(), updatedPlayer, context.turnState().withRetreated(), context.state().getActiveStadium().orElse(null), extraEvents);
+        return appendEvent(retreatedState, new ActivePokemonRetreatedEvent(context.state().getGameId(), command.playerId(), newActive.getTopCard().id(), discardIds));
     }
 
     public GameState applySpecialCondition(GameState state, ApplySpecialConditionCommand command) {
         Context context = requireMainTurn(state, command.playerId());
-        TargetUpdate update = updateTarget(context.playerState().getBoard(), command.target(), pokemon -> statusEffectManager.applyCondition(pokemon, command.condition()));
+        PokemonInPlay target = getTarget(context.playerState().getBoard(), command.target());
+        SpecialConditionApplication application = statusEffectManager.applyCondition(new SpecialConditionModifierContext(state, command.playerId(), command.playerId(), target, command.condition()), modifierResolver);
+        if (application.prevented()) {
+            GameState preventedState = context.state();
+            for (AppliedModifier modifier : application.appliedModifiers()) {
+                preventedState = appendEvent(preventedState, new SpecialConditionPreventedEvent(context.state().getGameId(), modifier.sourceCardId(), modifier.effectId(), target.getTopCard().id(), command.condition()));
+            }
+            return preventedState;
+        }
+        TargetUpdate update = updateTarget(context.playerState().getBoard(), command.target(), ignored -> application.pokemon());
         PlayerGameState updatedPlayer = rebuildPlayer(context.playerState(), context.playerState().getHand(), context.playerState().getDiscardPile(), update.board(), context.playerState().getTurnsTaken());
         return withEvent(context.state(), updatedPlayer, context.turnState(), context.state().getActiveStadium().orElse(null), new SpecialConditionAppliedEvent(context.state().getGameId(), command.playerId(), update.updatedPokemon().getTopCard().id(), command.condition()));
     }

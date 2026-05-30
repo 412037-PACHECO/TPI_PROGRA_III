@@ -240,7 +240,7 @@ Componentes principales:
 - `EffectExecutionService`: ejecuta efectos simples o compuestos en orden.
 - Matriz `docs/11-xy1-audit-matrix.md`: registra qué cartas/efectos XY1 están clasificados, implementados y testeados.
 
-Handlers genéricos disponibles hasta Fase 11C:
+Handlers genéricos disponibles hasta Fase 11C e infraestructura de Fase 11D:
 
 - `DealDamageEffectHandler`.
 - `HealDamageEffectHandler`.
@@ -256,6 +256,8 @@ Handlers genéricos disponibles hasta Fase 11C:
 - `PlaceDamageCountersEffectHandler`.
 - `CoinFlipEffectHandler`.
 - `CompositeEffectHandler`.
+- `CardEffectDefinition` + `EffectSourceCollector` para efectos continuos declarados por carta.
+- `ModifierResolver` para modificadores de daño, prevención de daño, coste de retirada y prevención de condiciones especiales.
 
 Reglas de diseño:
 
@@ -292,6 +294,19 @@ Limitaciones:
 - `PlaceDamageCountersEffectHandler` integra KO/premios/victoria para Activo; distribución compleja y KOs de Banca quedan para fases futuras.
 - No se implementan habilidades pasivas/reactivas/continuas, prevent damage completo, modificadores globales de daño ni modificadores de retreat cost.
 - No hay WebSocket, frontend, persistencia de partida ni endpoints REST de juego.
+
+### Fase 11D - Infraestructura de abilities y modificadores
+
+La Fase 11D incorpora infraestructura pura Java para efectos persistentes sin implementar todavía cobertura completa de cartas:
+
+- `CardDefinitionRef` puede declarar `CardEffectDefinition` para abilities, Tools, Stadiums y otros efectos de carta.
+- `EffectSourceCollector` descubre fuentes activas desde Pokémon en juego, Herramientas adjuntas y Estadio activo.
+- `DamageCalculator` tiene cálculo contextual con modificadores antes/después de debilidad/resistencia y prevención.
+- `TurnActionService` aplica modificadores de coste de retirada.
+- `StatusEffectManager` permite prevención contextual de condiciones especiales.
+- Eventos nuevos registran modificación/prevención para auditoría del motor.
+
+Limitación honesta: esta infraestructura no marca cartas XY1 como soportadas por sí sola. Cada carta requiere mapping explícito, validación de timing y tests.
 
 ## Auditoría y mapping XY1
 

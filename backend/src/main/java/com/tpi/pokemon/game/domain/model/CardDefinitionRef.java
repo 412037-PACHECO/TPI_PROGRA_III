@@ -3,6 +3,7 @@ package com.tpi.pokemon.game.domain.model;
 import com.tpi.pokemon.game.domain.enums.CardSubtype;
 import com.tpi.pokemon.game.domain.enums.CardSupertype;
 import com.tpi.pokemon.game.domain.enums.PokemonType;
+import com.tpi.pokemon.game.engine.effect.ability.CardEffectDefinition;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,7 +21,8 @@ public record CardDefinitionRef(
         List<AttackDefinition> attacks,
         List<Weakness> weaknesses,
         List<Resistance> resistances,
-        EnergyProfile energyProfile
+        EnergyProfile energyProfile,
+        List<CardEffectDefinition> effects
 ) {
     public CardDefinitionRef {
         if (cardId == null || cardId.isBlank()) {
@@ -45,6 +47,7 @@ public record CardDefinitionRef(
         Objects.requireNonNull(weaknesses, "weaknesses must not be null");
         Objects.requireNonNull(resistances, "resistances must not be null");
         Objects.requireNonNull(energyProfile, "energyProfile must not be null");
+        Objects.requireNonNull(effects, "effects must not be null");
         if (pokemonTypes.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("pokemonTypes must not contain null values");
         }
@@ -57,11 +60,15 @@ public record CardDefinitionRef(
         if (resistances.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("resistances must not contain null values");
         }
+        if (effects.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("effects must not contain null values");
+        }
         subtypes = Set.copyOf(subtypes);
         pokemonTypes = List.copyOf(pokemonTypes);
         attacks = List.copyOf(attacks);
         weaknesses = List.copyOf(weaknesses);
         resistances = List.copyOf(resistances);
+        effects = List.copyOf(effects);
         if (evolvesFrom != null && evolvesFrom.isBlank()) {
             evolvesFrom = null;
         }
@@ -76,7 +83,11 @@ public record CardDefinitionRef(
     }
 
     public CardDefinitionRef(String cardId, String name, CardSupertype supertype, Set<CardSubtype> subtypes, String evolvesFrom, Integer retreatCost) {
-        this(cardId, name, supertype, subtypes, evolvesFrom, retreatCost, null, List.of(), List.of(), List.of(), List.of(), EnergyProfile.none());
+        this(cardId, name, supertype, subtypes, evolvesFrom, retreatCost, null, List.of(), List.of(), List.of(), List.of(), EnergyProfile.none(), List.of());
+    }
+
+    public CardDefinitionRef(String cardId, String name, CardSupertype supertype, Set<CardSubtype> subtypes, String evolvesFrom, Integer retreatCost, Integer hp, List<PokemonType> pokemonTypes, List<AttackDefinition> attacks, List<Weakness> weaknesses, List<Resistance> resistances, EnergyProfile energyProfile) {
+        this(cardId, name, supertype, subtypes, evolvesFrom, retreatCost, hp, pokemonTypes, attacks, weaknesses, resistances, energyProfile, List.of());
     }
 
     public boolean isPokemon() {

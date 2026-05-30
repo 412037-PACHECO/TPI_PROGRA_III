@@ -31,8 +31,23 @@ import com.tpi.pokemon.game.engine.event.BasicPokemonBenchedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.event.PokemonEvolvedEvent;
+import com.tpi.pokemon.game.engine.event.RetreatCostModifiedEvent;
 import com.tpi.pokemon.game.engine.event.StadiumReplacedEvent;
 import com.tpi.pokemon.game.engine.event.TrainerPlayedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionAppliedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionPreventedEvent;
+import com.tpi.pokemon.game.engine.effect.EffectTiming;
+import com.tpi.pokemon.game.engine.effect.ability.CardEffectDefinition;
+import com.tpi.pokemon.game.engine.effect.ability.EffectActivationKind;
+import com.tpi.pokemon.game.engine.effect.ability.EffectCondition;
+import com.tpi.pokemon.game.engine.effect.ability.EffectScope;
+import com.tpi.pokemon.game.engine.effect.ability.EffectSourceKind;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierDefinition;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierLayer;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierOperation;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierTargetRole;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierType;
+import com.tpi.pokemon.game.engine.special.ApplySpecialConditionCommand;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -168,6 +183,48 @@ class TurnActionServiceTest {
     }
 
     @Test
+    void retreatUsesContinuousModifierToReduceCost() {
+        CardInstance energy = card("reduced-retreat-energy", ENERGY, PLAYER_ONE);
+        CardDefinitionRef reducedRetreatBasic = definitionWithEffects("reduced-retreat-basic", "Bulbasaur", CardSupertype.POKEMON, Set.of(CardSubtype.BASIC), null, 2, List.of(continuousModifier("light-step", ModifierType.RETREAT_COST, ModifierOperation.SUBTRACT, 1, ModifierLayer.AFTER_WEAKNESS_RESISTANCE)));
+        PokemonInPlay active = new PokemonInPlay(List.of(card("reduced-retreat-active", reducedRetreatBasic, PLAYER_ONE)), new AttachedCards(List.of(energy)), 1, null);
+        PokemonInPlay benched = PokemonInPlay.withoutAttachments(card("reduced-retreat-bench", OTHER_BASIC, PLAYER_ONE));
+        GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), active, List.of(benched), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        GameState updated = service.retreatActivePokemon(state, new RetreatActivePokemonCommand(PLAYER_ONE, 0, List.of(energy.id())));
+
+        assertThat(activePokemon(updated, PLAYER_ONE).getTopCard()).isEqualTo(benched.getTopCard());
+        assertThat(updated.getPlayerOneState().getDiscardPile().getCards()).containsExactly(energy);
+        assertThat(eventsOfType(updated, RetreatCostModifiedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void retreatCostModifierCanReduceCostToZeroWithoutDiscardingEnergy() {
+        CardDefinitionRef freeRetreatBasic = definitionWithEffects("free-retreat-basic", "Bulbasaur", CardSupertype.POKEMON, Set.of(CardSubtype.BASIC), null, 1, List.of(continuousModifier("free-step", ModifierType.RETREAT_COST, ModifierOperation.SUBTRACT, 20, ModifierLayer.AFTER_WEAKNESS_RESISTANCE)));
+        PokemonInPlay active = PokemonInPlay.withoutAttachments(card("free-retreat-active", freeRetreatBasic, PLAYER_ONE));
+        PokemonInPlay benched = PokemonInPlay.withoutAttachments(card("free-retreat-bench", OTHER_BASIC, PLAYER_ONE));
+        GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), active, List.of(benched), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        GameState updated = service.retreatActivePokemon(state, new RetreatActivePokemonCommand(PLAYER_ONE, 0, List.of()));
+
+        assertThat(activePokemon(updated, PLAYER_ONE).getTopCard()).isEqualTo(benched.getTopCard());
+        assertThat(updated.getPlayerOneState().getDiscardPile().getCards()).isEmpty();
+        assertThat(eventsOfType(updated, RetreatCostModifiedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void applySpecialConditionCanBePreventedByContinuousModifier() {
+        CardDefinitionRef protectedBasic = definitionWithEffects("protected-basic", "Bulbasaur", CardSupertype.POKEMON, Set.of(CardSubtype.BASIC), null, 1, List.of(continuousModifier("sweet-veil", ModifierType.PREVENT_SPECIAL_CONDITION, ModifierOperation.PREVENT, 0, ModifierLayer.PREVENTION)));
+        PokemonInPlay active = PokemonInPlay.withoutAttachments(card("protected-active", protectedBasic, PLAYER_ONE));
+        GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), active, List.of(), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        GameState updated = service.applySpecialCondition(state, new ApplySpecialConditionCommand(PLAYER_ONE, PokemonTarget.active(), SpecialCondition.POISONED));
+
+        assertThat(activePokemon(updated, PLAYER_ONE).hasSpecialCondition(SpecialCondition.POISONED)).isFalse();
+        assertThat(eventsOfType(updated, SpecialConditionPreventedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, SpecialConditionAppliedEvent.class)).isEmpty();
+    }
+
+    @Test
     void retreatRejectsAsleepAndParalyzedActivePokemon() {
         CardInstance energy = card("status-retreat-energy", ENERGY, PLAYER_ONE);
         PokemonInPlay benched = PokemonInPlay.withoutAttachments(card("status-retreat-bench", OTHER_BASIC, PLAYER_ONE));
@@ -281,6 +338,23 @@ class TurnActionServiceTest {
 
     private CardInstance card(String id, CardDefinitionRef definition, PlayerId owner) {
         return new CardInstance(new CardInstanceId(id), definition, owner);
+    }
+
+    private CardDefinitionRef definitionWithEffects(String id, String name, CardSupertype supertype, Set<CardSubtype> subtypes, String evolvesFrom, Integer retreatCost, List<CardEffectDefinition> effects) {
+        return new CardDefinitionRef(id, name, supertype, subtypes, evolvesFrom, retreatCost, null, List.of(), List.of(), List.of(), List.of(), com.tpi.pokemon.game.domain.model.EnergyProfile.none(), effects);
+    }
+
+    private CardEffectDefinition continuousModifier(String effectId, ModifierType type, ModifierOperation operation, int amount, ModifierLayer layer) {
+        return new CardEffectDefinition(
+                effectId,
+                "Continuous modifier",
+                EffectSourceKind.POKEMON_ABILITY,
+                EffectActivationKind.CONTINUOUS,
+                EffectTiming.CONTINUOUS,
+                EffectScope.SELF,
+                EffectCondition.always(),
+                List.of(new ModifierDefinition(type, operation, layer, amount, ModifierTargetRole.DEFAULT_TARGET))
+        );
     }
 
     private PokemonInPlay activePokemon(GameState state, PlayerId playerId) {

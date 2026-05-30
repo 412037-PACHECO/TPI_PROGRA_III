@@ -4,7 +4,7 @@
 
 Soportar efectos reales de cartas XY1 sin convertir el motor en una colección desordenada de `if cardId == ...`.
 
-Estado Fase 11: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService` y handlers genéricos iniciales. Además existe un primer catálogo explícito de mappings XY1 representativos (`Xy1EffectCatalog`) y una matriz de auditoría progresiva. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
+Estado Fase 11D: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales e infraestructura de efectos continuos/modificadores. Además existe un primer catálogo explícito de mappings XY1 representativos (`Xy1EffectCatalog`) y una matriz de auditoría progresiva. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
 
 ## CardDefinition vs CardInstance
 
@@ -67,16 +67,15 @@ Los handlers no deben depender de Spring, JPA, WebSocket ni API externa.
 - `MoveEnergyEffect`
 - `SwitchActiveEffect`
 - `PlaceDamageCountersEffect`
+- Infraestructura para `DamageModifierEffect`, `PreventDamageEffect`, `RetreatCostModifierEffect` y prevención de condiciones especiales mediante efectos continuos.
 
 Pendientes o futuros:
 
 - `NoOpEffect` para ataques cuyo único efecto actual sea daño base ya cubierto por `AttackService`.
-- `RetreatCostModifierEffect`
-- `DamageModifierEffect`
-- `PreventDamageEffect`
-- `PersistentEffect`
+- Mappings reales para `RetreatCostModifierEffect`, `DamageModifierEffect`, `PreventDamageEffect` y efectos preventivos.
+- Persistencia temporal avanzada hasta fin de turno/próximo ataque.
 - Habilidades activadas/pasivas/reactivas completas.
-- Efectos continuos complejos de Tool/Stadium.
+- Efectos continuos complejos de Tool/Stadium con mappings carta por carta.
 - Contrato público de selección/reveal para frontend/API futura.
 
 Prioridad recomendada para XY1:
@@ -105,6 +104,27 @@ Limitaciones de Fase 11C:
 - No hay WebSocket, frontend, persistencia de partida ni endpoints REST de juego.
 - No se implementan habilidades pasivas/reactivas/continuas ni modificadores globales de daño/retiro/prevent.
 - `PlaceDamageCountersEffectHandler` resuelve KO del Activo; KOs complejos/distribuidos a Banca quedan para fases futuras.
+
+## Fase 11D - Abilities, efectos continuos y modificadores
+
+La Fase 11D agrega infraestructura genérica para representar fuentes de efectos persistentes sin hardcodear cartas por `cardId`:
+
+- `CardEffectDefinition` en `CardDefinitionRef` para declarar efectos de carta separados de ataques.
+- `EffectSourceCollector` para descubrir efectos desde Pokémon en juego, Tools adjuntas y Estadio activo.
+- `ModifierResolver` para aplicar modificadores de daño, coste de retirada y prevención de condiciones especiales.
+- Eventos de auditoría como `DamageModifiedEvent`, `DamagePreventedEvent`, `RetreatCostModifiedEvent` y `SpecialConditionPreventedEvent`.
+
+Orden documentado para daño contextual:
+
+1. daño base impreso;
+2. modificadores `BEFORE_WEAKNESS_RESISTANCE`;
+3. debilidad;
+4. resistencia;
+5. modificadores `AFTER_WEAKNESS_RESISTANCE`;
+6. prevención;
+7. clamp a `0` y múltiplos de 10.
+
+Decisión importante: infraestructura disponible no equivale a soporte completo de una carta. `xy1-14 Chesnaught / Spiky Shield` y `xy1-95 Slurpuff / Sweet Veil` siguen requiriendo mapping explícito y tests antes de considerarse soportadas.
 
 ## Handlers custom
 

@@ -2,6 +2,9 @@ package com.tpi.pokemon.game.engine.special;
 
 import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.model.PokemonInPlay;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierResolutionResult;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierResolver;
+import com.tpi.pokemon.game.engine.effect.modifier.SpecialConditionModifierContext;
 import java.util.Objects;
 
 public final class StatusEffectManager {
@@ -9,6 +12,16 @@ public final class StatusEffectManager {
         Objects.requireNonNull(pokemon, "pokemon must not be null");
         Objects.requireNonNull(condition, "condition must not be null");
         return pokemon.applySpecialCondition(condition);
+    }
+
+    public SpecialConditionApplication applyCondition(SpecialConditionModifierContext context, ModifierResolver modifierResolver) {
+        Objects.requireNonNull(context, "context must not be null");
+        Objects.requireNonNull(modifierResolver, "modifierResolver must not be null");
+        ModifierResolutionResult prevention = modifierResolver.resolveSpecialConditionPrevention(context);
+        if (prevention.prevented()) {
+            return new SpecialConditionApplication(context.target(), true, prevention.appliedModifiers());
+        }
+        return new SpecialConditionApplication(applyCondition(context.target(), context.condition()), false, prevention.appliedModifiers());
     }
 
     public PokemonInPlay removeCondition(PokemonInPlay pokemon, SpecialCondition condition) {

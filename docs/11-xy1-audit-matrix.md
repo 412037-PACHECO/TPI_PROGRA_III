@@ -44,6 +44,7 @@ Proceso para auditar las 146 cartas:
 - `DATA_IMPORTED`: la carta existe en catálogo/cache local o fue verificada contra fuente oficial.
 - `EFFECT_CLASSIFIED`: el efecto fue leído y categorizado.
 - `EFFECT_SUPPORTED_BY_GENERIC_HANDLER`: el efecto entra en handlers genéricos actuales.
+- `EFFECT_INFRASTRUCTURE_AVAILABLE`: existe infraestructura genérica para modelar la categoría, pero la carta aún requiere mapping y test explícitos.
 - `EFFECT_MAPPED`: existe mapping estructurado hacia `EffectDefinition`.
 - `FULLY_TESTED`: existen tests del mapping/ejecución para el alcance declarado.
 - `REQUIRES_CUSTOM_HANDLER`: el efecto no entra razonablemente en genéricos actuales.
@@ -95,6 +96,12 @@ Una carta no debe marcarse `FULLY_TESTED` solo porque exista un handler genéric
 - `CoinFlipEffectHandler`
 - `CompositeEffectHandler`
 
+Infraestructura genérica disponible desde Fase 11D, todavía no equivalente a mapping completo de cartas:
+
+- `CardEffectDefinition` para abilities/effects declarados por carta.
+- `EffectSourceCollector` para Pokémon en juego, Tools y Stadium.
+- `ModifierResolver` para `MODIFY_DAMAGE`, `PREVENT_DAMAGE`, `MODIFY_RETREAT_COST` y `PREVENT_SPECIAL_CONDITION`.
+
 La existencia de un handler no implica cobertura completa de carta. La lógica base de daño sigue en `AttackService`; los mappings solo agregan efectos secundarios estructurados.
 
 ## Matriz inicial Fase 11
@@ -109,8 +116,8 @@ La tabla siguiente sigue siendo el subset explícitamente mapeado/documentado. P
 | xy1-68 | Sableye | Pokémon | Basic | Filch; Rip Claw | none | none | Filch: `Draw a card.` Rip Claw: `Flip a coin. If heads, discard an Energy attached to your opponent's Active Pokémon.` | DRAW_CARDS; DAMAGE_PLUS_COIN_FLIP; DISCARD_ENERGY | MEDIUM | yes | DrawCardsEffectHandler; CoinFlipEffectHandler; DiscardAttachedEnergyEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Mapping creado para robo y descarte condicional de energía. |
 | xy1-123 | Professor's Letter | Trainer | Item | none | none | Item | `Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.` | SEARCH_DECK | MEDIUM | partial | SearchDeckEffectHandler; ShuffleDeckEffectHandler | no/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | Handler genérico disponible, pero falta mapping carta por carta y contrato público de selección/reveal. |
 | xy1-127 | Shauna | Trainer | Supporter | none | none | Supporter rule | `Shuffle your hand into your deck. Then, draw 5 cards.` | DRAW_CARDS; DISCARD_CARD; CUSTOM_REQUIRED | MEDIUM | partial | DiscardCardsEffectHandler; ShuffleDeckEffectHandler; DrawCardsEffectHandler | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | Los handlers base existen parcialmente; falta composición/mapping y modelar mover mano completa al mazo. |
-| xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Gap representativo: habilidad reactiva `on damaged by attack` no soportada por timing actual. |
-| xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Gap representativo de efecto continuo/preventivo condicionado por energía unida. |
+| xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; reactive infra pendiente | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_INFRASTRUCTURE_AVAILABLE; NOT_IMPLEMENTED_YET | no | Fase 11D agrega modelos/eventos, pero falta resolver trigger reactivo real `on damaged by attack` y mapping/test. |
+| xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; SpecialConditionPrevention infra partial | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_INFRASTRUCTURE_AVAILABLE; NOT_IMPLEMENTED_YET | no | Fase 11D permite prevención genérica, pero falta condición por Energía Fairy, cleanup continuo y mapping/test de carta. |
 
 ## Reglas de auditoría
 
@@ -132,14 +139,19 @@ Handlers/infraestructura que deja de ser gap base en Fase 11C, aunque todavía r
 - `SwitchActiveEffectHandler`.
 - `PlaceDamageCountersEffectHandler`.
 
+Infraestructura que deja de ser gap base en Fase 11D, aunque todavía requiere mappings y tests por carta:
+
+- `DamageModifierEffect` / `PreventDamageEffect` vía `ModifierResolver`.
+- `RetreatCostModifierEffect` vía `ModifierResolver`.
+- Prevención de condiciones especiales vía `StatusEffectManager` contextual.
+- Fuentes continuas desde Pokémon, Tool y Stadium.
+
 Gaps todavía pendientes para completar XY1:
 
-- `DamageModifierEffectHandler`.
-- `PreventDamageEffectHandler`.
-- `RetreatCostModifierEffectHandler`.
-- Infraestructura de habilidades activadas.
-- Infraestructura de habilidades pasivas/reactivas.
-- Efectos continuos de Tool/Stadium.
+- Mappings/tests reales para modificadores de daño, prevención, retiro y condiciones.
+- Servicio completo de habilidades activadas con límites de uso.
+- Resolver reactivo completo para habilidades pasivas/reactivas.
+- Efectos continuos complejos de Tool/Stadium con condiciones/duración avanzadas.
 - Selección desde zonas ocultas, reveal y privacidad de mano/mazo/premios.
 - Timing avanzado: before damage, after damage, between turns, on damaged, while in play, next turn.
 
