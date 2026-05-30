@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 10 - Motor de efectos de cartas
+## Alcance actual: Fase 11 - Auditoría y mapeo progresivo XY1
 
-El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota y condiciones especiales. La Fase 10 agrega una arquitectura extensible para ejecutar efectos de cartas mediante definiciones estructuradas, handlers genéricos y registry de efectos.
+El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y motor extensible de efectos. La Fase 11 agrega auditoría progresiva de cartas reales XY1 y un primer catálogo explícito de mappings hacia `EffectDefinition`, sin intentar cubrir todo XY1 de golpe y sin parser automático de texto natural.
 
 Incluye:
 
@@ -36,6 +36,8 @@ Incluye:
 - Limpieza de condiciones al evolucionar y al retirar a Banca.
 - Motor de efectos basado en definiciones estructuradas, registry y handlers genéricos.
 - Integración de efectos simples posteriores al daño dentro de ataques.
+- Auditoría XY1 progresiva con estados/categorías explícitas.
+- Mappings representativos de cartas reales XY1 a `EffectDefinition` mediante `Xy1EffectCatalog`.
 
 ## Modelo Game State
 
@@ -261,6 +263,43 @@ Limitaciones honestas de Fase 10:
 - No todas las cartas XY1 están mapeadas.
 - No hay ejecución completa de habilidades, Trainers, Estadios, Herramientas ni Energías Especiales.
 - No hay persistencia de partidas, WebSocket ni vistas seguras por jugador.
+
+## Auditoría y mapping XY1
+
+La Fase 11 incorpora trazabilidad concreta entre cartas reales XY1 y efectos estructurados del engine.
+
+Componentes principales:
+
+- `Xy1EffectCatalog`: catálogo puro Java de mappings explícitos para el set `xy1`.
+- `AttackEffectMapping`: vínculo entre `cardId`, ataque real y `EffectDefinition`.
+- `Xy1AuditEntry`: metadata de auditoría para documentación y tests.
+- `Xy1AuditStatus`: estados como `DATA_IMPORTED`, `EFFECT_CLASSIFIED`, `EFFECT_MAPPED`, `FULLY_TESTED`, `REQUIRES_CUSTOM_HANDLER` y `NOT_IMPLEMENTED_YET`.
+- `Xy1EffectCategory`: categorías como `DAMAGE_ONLY`, `DAMAGE_PLUS_STATUS`, `DAMAGE_PLUS_HEAL`, `DRAW_CARDS`, `DISCARD_ENERGY`, `ABILITY_PASSIVE` y `CONTINUOUS_EFFECT`.
+
+Mappings representativos implementados/testeados:
+
+- `xy1-1 Venusaur-EX / Poison Powder`: aplica `POISONED` al Activo defensor.
+- `xy1-1 Venusaur-EX / Jungle Hammer`: cura 30 al Activo atacante.
+- `xy1-10 Pansage / Vine Whip`: daño base puro, sin efecto adicional.
+- `xy1-10 Pansage / Leech Seed`: cura 10 al Activo atacante.
+- `xy1-16 Spewpa / Stun Spore`: moneda; si sale cara, aplica `PARALYZED`.
+- `xy1-68 Sableye / Filch`: roba 1 carta.
+- `xy1-68 Sableye / Rip Claw`: moneda; si sale cara, descarta 1 Energía del Activo defensor.
+
+Gaps documentados:
+
+- `xy1-123 Professor's Letter`: búsqueda en mazo + reveal + shuffle.
+- `xy1-127 Shauna`: mezclar mano en mazo + robar.
+- `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva.
+- `xy1-95 Slurpuff / Sweet Veil`: efecto continuo/preventivo.
+
+Reglas de diseño de Fase 11:
+
+- `Xy1EffectCatalog.isCompleteAudit()` devuelve `false`; no se afirma cobertura completa de las 146 cartas.
+- Una carta/ataque sin mapping devuelve `List.of()` y no rompe daño base.
+- La ausencia de mapping no equivale a “sin efecto real”; se consulta la matriz de auditoría.
+- No se parsea texto natural automáticamente.
+- No se agregan WebSocket, frontend, persistencia de partida ni endpoints REST de juego.
 
 ## Endpoints de catálogo
 

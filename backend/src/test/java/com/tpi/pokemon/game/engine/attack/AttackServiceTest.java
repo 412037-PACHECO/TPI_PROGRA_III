@@ -48,6 +48,7 @@ import com.tpi.pokemon.game.engine.event.TurnEndedEvent;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
 import com.tpi.pokemon.game.engine.effect.EffectTarget;
 import com.tpi.pokemon.game.engine.effect.EffectTiming;
+import com.tpi.pokemon.game.engine.effect.mapping.Xy1EffectCatalog;
 import com.tpi.pokemon.game.engine.random.CoinFlipResult;
 import com.tpi.pokemon.game.engine.special.StatusEffectManager;
 import com.tpi.pokemon.game.engine.knockout.ActivePokemonReplacementResolver;
@@ -326,6 +327,21 @@ class AttackServiceTest {
     }
 
     @Test
+    void attackWithMappedXy1EffectExecutesStructuredEffect() {
+        List<EffectDefinition> mappedEffects = new Xy1EffectCatalog().effectsForAttack("xy1-1", "Poison Powder");
+        AttackDefinition poisonPowder = new AttackDefinition("poison-powder", "Poison Powder", List.of(EnergyType.COLORLESS), 60, mappedEffects);
+
+        GameState result = attackService.declareAttack(
+                activeGame(activeAttacker(List.of(poisonPowder), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))), activeDefenderWithHp(120)),
+                command("poison-powder")
+        );
+
+        PokemonInPlay defender = activePokemon(result.getPlayerTwoState());
+        assertThat(defender.getDamageCounters()).isEqualTo(7);
+        assertThat(defender.hasSpecialCondition(SpecialCondition.POISONED)).isTrue();
+    }
+
+    @Test
     void attackThatKnocksOutDefenderDiscardsDefenderTakesPrizeAndRequiresReplacementWhenBenchExists() {
         PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
         PokemonInPlay defender = activeDefender();
@@ -474,6 +490,12 @@ class AttackServiceTest {
         return activeDefender(Set.of(CardSubtype.BASIC));
     }
 
+    private PokemonInPlay activeDefenderWithHp(int hp) {
+        return PokemonInPlay.withoutAttachments(
+                card("p2-active", PLAYER_TWO, pokemonDefinition("p2-active-def", PokemonType.GRASS, List.of(), List.of(), List.of(), Set.of(CardSubtype.BASIC), hp))
+        );
+    }
+
     private PokemonInPlay activeDefender(Set<CardSubtype> subtypes) {
         return PokemonInPlay.withoutAttachments(
                 card("p2-active", PLAYER_TWO, pokemonDefinition("p2-active-def", PokemonType.GRASS, List.of(), List.of(), List.of(), subtypes))
@@ -489,6 +511,10 @@ class AttackServiceTest {
     }
 
     private CardDefinitionRef pokemonDefinition(String id, PokemonType type, List<AttackDefinition> attacks, List<Weakness> weaknesses, List<Resistance> resistances, Set<CardSubtype> subtypes) {
+        return pokemonDefinition(id, type, attacks, weaknesses, resistances, subtypes, 60);
+    }
+
+    private CardDefinitionRef pokemonDefinition(String id, PokemonType type, List<AttackDefinition> attacks, List<Weakness> weaknesses, List<Resistance> resistances, Set<CardSubtype> subtypes, int hp) {
         return new CardDefinitionRef(
                 id,
                 "Pokemon " + id,
@@ -496,7 +522,7 @@ class AttackServiceTest {
                 subtypes,
                 null,
                 1,
-                60,
+                hp,
                 List.of(type),
                 attacks,
                 weaknesses,

@@ -1,0 +1,24 @@
+package com.tpi.pokemon.game.engine.effect.mapping;
+
+public enum Xy1EffectCategory {
+    DAMAGE_ONLY,
+    DAMAGE_PLUS_STATUS,
+    DAMAGE_PLUS_HEAL,
+    DAMAGE_PLUS_COIN_FLIP,
+    APPLY_STATUS,
+    HEAL_DAMAGE,
+    DRAW_CARDS,
+    DISCARD_ENERGY,
+    DISCARD_CARD,
+    SEARCH_DECK,
+    SWITCH_ACTIVE,
+    ATTACH_ENERGY,
+    MOVE_ENERGY,
+    TOOL_EFFECT,
+    STADIUM_EFFECT,
+    ABILITY_ACTIVATED,
+    ABILITY_PASSIVE,
+    CONTINUOUS_EFFECT,
+    CUSTOM_REQUIRED,
+    UNSUPPORTED_YET
+}

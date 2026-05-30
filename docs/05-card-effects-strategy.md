@@ -4,7 +4,7 @@
 
 Soportar efectos reales de cartas XY1 sin convertir el motor en una colección desordenada de `if cardId == ...`.
 
-Estado Fase 10: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService` y handlers genéricos iniciales. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
+Estado Fase 11: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService` y handlers genéricos iniciales. Además existe un primer catálogo explícito de mappings XY1 representativos (`Xy1EffectCatalog`) y una matriz de auditoría progresiva. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
 
 ## CardDefinition vs CardInstance
 
@@ -17,6 +17,13 @@ Estado Fase 10: arquitectura base implementada con `EffectDefinition`, `EffectEx
 - `EffectExecutionContext`: ejecución contextual del efecto sobre un `GameState`, con jugador, targets, fase, aleatoriedad controlada y eventos resultantes.
 
 Regla obligatoria: `EffectDefinition` se carga desde una auditoría explícita o mapping mantenido por el equipo. No se genera automáticamente desde texto natural de cartas.
+
+En Fase 11, los mappings reales auditados viven en `com.tpi.pokemon.game.engine.effect.mapping`. El catálogo inicial permite:
+
+- buscar mappings por `cardId`;
+- buscar efectos por `cardId` + `attackName` o `attackId`;
+- devolver `List.of()` cuando una carta/ataque no tiene mapping explícito;
+- declarar que la auditoría de XY1 no está completa.
 
 ## EffectRegistry
 
@@ -137,3 +144,31 @@ Estados permitidos en la auditoría:
 ## Matriz de auditoría XY1
 
 La auditoría se mantiene en `docs/11-xy1-audit-matrix.md`. Debe indicar complejidad, categoría, handlers requeridos, estado de implementación y tests.
+
+## Mappings XY1 iniciales
+
+Fase 11 agrega mappings controlados para un subconjunto representativo, verificado contra datos oficiales del set `xy1`:
+
+- `xy1-1 Venusaur-EX / Poison Powder`: aplica `POISONED` al Activo defensor después del daño.
+- `xy1-1 Venusaur-EX / Jungle Hammer`: cura 30 al Activo atacante después del daño.
+- `xy1-10 Pansage / Vine Whip`: daño base puro, sin `EffectDefinition` adicional.
+- `xy1-10 Pansage / Leech Seed`: cura 10 al Activo atacante después del daño.
+- `xy1-16 Spewpa / Stun Spore`: moneda; con cara aplica `PARALYZED` al Activo defensor.
+- `xy1-68 Sableye / Filch`: roba 1 carta.
+- `xy1-68 Sableye / Rip Claw`: moneda; con cara descarta 1 Energía del Activo defensor.
+
+Gaps documentados, no implementados como soporte completo:
+
+- `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
+- `xy1-127 Shauna`: requiere mezclar mano en mazo y robar 5; `DrawCardsEffectHandler` solo no alcanza.
+- `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva al recibir daño.
+- `xy1-95 Slurpuff / Sweet Veil`: efecto continuo/preventivo condicionado por Energía Fairy.
+
+## Cómo agregar un nuevo mapping
+
+1. Verificar la carta contra catálogo local importado o fuente oficial de `xy1`.
+2. Agregar/actualizar fila en `docs/11-xy1-audit-matrix.md` con categoría, complejidad, handlers y estado real.
+3. Si entra en handlers genéricos, agregar un `AttackEffectMapping` en `Xy1EffectCatalog`.
+4. Si no entra, marcar `REQUIRES_CUSTOM_HANDLER` / `NOT_IMPLEMENTED_YET`; no forzar el efecto en un handler incorrecto.
+5. Agregar tests de lookup y, cuando corresponda, test de ejecución con `AttackService` o `EffectExecutionService`.
+6. Recién marcar `FULLY_TESTED` cuando exista evidencia de test.

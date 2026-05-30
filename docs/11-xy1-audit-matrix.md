@@ -2,82 +2,81 @@
 
 ## Objetivo
 
-Preparar la auditoría del set obligatorio `xy1` antes de implementar efectos carta por carta. No se inventa una auditoría completa hasta importar o consultar formalmente las cartas.
+Auditar progresivamente las cartas del set obligatorio `xy1`, clasificar sus efectos reales y mapear un subconjunto representativo a `EffectDefinition` sin parser automático de texto natural.
 
-Estado Fase 10: matriz preparada para trazabilidad. No representa cobertura completa de XY1 ni debe leerse como listado exhaustivo de efectos implementados.
+Esta matriz **no representa cobertura completa de las 146 cartas XY1**. Queda preparada para crecer de forma incremental: cada carta/efecto debe indicar evidencia, categoría, soporte del engine, handler requerido, estado de implementación y estado de testing.
 
-Handlers genéricos disponibles para mapear filas auditadas:
+Fuente usada para el subset inicial de Fase 11: campos oficiales `attacks`, `abilities`, `rules`, `subtypes`, `supertype` y `rawJson` del catálogo/API `pokemontcg.io` para `set.id=xy1`. En entorno local, esos datos se conservan cacheados por `CardEntity` como JSON/texto; si no hay DB local importada, los tests usan fixtures/mappings explícitos y no dependen de la API externa.
 
-- `DealDamageEffectHandler`.
-- `HealDamageEffectHandler`.
-- `ApplySpecialConditionEffectHandler`.
-- `DrawCardsEffectHandler`.
-- `DiscardAttachedEnergyEffectHandler`.
-- `CoinFlipEffectHandler`.
-- `CompositeEffectHandler`.
+## Estados de implementación
 
-La existencia de un handler no implica que una carta XY1 esté soportada: cada carta requiere fila auditada y tests.
+- `DATA_IMPORTED`: la carta existe en catálogo/cache local o fue verificada contra fuente oficial.
+- `EFFECT_CLASSIFIED`: el efecto fue leído y categorizado.
+- `EFFECT_SUPPORTED_BY_GENERIC_HANDLER`: el efecto entra en handlers genéricos actuales.
+- `EFFECT_MAPPED`: existe mapping estructurado hacia `EffectDefinition`.
+- `FULLY_TESTED`: existen tests del mapping/ejecución para el alcance declarado.
+- `REQUIRES_CUSTOM_HANDLER`: el efecto no entra razonablemente en genéricos actuales.
+- `NOT_IMPLEMENTED_YET`: efecto válido de XY1, pendiente de soporte/mapping/test.
+- `OUT_OF_SCOPE_FOR_XY1`: regla/efecto no aplicable al set obligatorio XY1.
 
-## Aclaración ACE SPEC
+Una carta no debe marcarse `FULLY_TESTED` solo porque exista un handler genérico. Debe existir mapping explícito y test del comportamiento declarado.
 
-El set obligatorio `xy1` no contiene cartas AS TÁCTICO / ACE SPEC. En consecuencia, la matriz XY1 no debe exigir implementación ni testing de la validación "máximo 1 AS TÁCTICO / ACE SPEC por mazo". Esa regla queda documentada como condicional para expansiones opcionales futuras que sí incluyan esa mecánica.
+## Categorías de efectos
 
-| Tema | Aplicabilidad XY1 | Decisión |
-|---|---|---|
-| AS TÁCTICO / ACE SPEC | No aplica; `xy1` no contiene cartas ACE SPEC | No validar máximo 1 por mazo en alcance obligatorio. Implementar solo si se agregan sets opcionales con ACE SPEC. |
+- `DAMAGE_ONLY`
+- `DAMAGE_PLUS_STATUS`
+- `DAMAGE_PLUS_HEAL`
+- `DAMAGE_PLUS_COIN_FLIP`
+- `APPLY_STATUS`
+- `HEAL_DAMAGE`
+- `DRAW_CARDS`
+- `DISCARD_ENERGY`
+- `DISCARD_CARD`
+- `SEARCH_DECK`
+- `SWITCH_ACTIVE`
+- `ATTACH_ENERGY`
+- `MOVE_ENERGY`
+- `TOOL_EFFECT`
+- `STADIUM_EFFECT`
+- `ABILITY_ACTIVATED`
+- `ABILITY_PASSIVE`
+- `CONTINUOUS_EFFECT`
+- `CUSTOM_REQUIRED`
+- `UNSUPPORTED_YET`
 
-## Columnas oficiales
+## Handlers genéricos disponibles
 
-| cardId | name | supertype | subtypes | source | effectText | effectCategory | complexity | genericHandlers | customHandlerRequired | auditStatus | implemented | tested | notes |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| _pendiente_ | _pendiente_ | _pendiente_ | _pendiente_ | attack/ability/rule/trainer | _pendiente_ | _pendiente_ | _pendiente_ | _pendiente_ | _pendiente_ | not_audited | no | no | Completar tras importación/revisión formal de XY1 |
+- `DealDamageEffectHandler`
+- `HealDamageEffectHandler`
+- `ApplySpecialConditionEffectHandler`
+- `DrawCardsEffectHandler`
+- `DiscardAttachedEnergyEffectHandler`
+- `CoinFlipEffectHandler`
+- `CompositeEffectHandler`
 
-## Categorías sugeridas
+La existencia de un handler no implica cobertura completa de carta. La lógica base de daño sigue en `AttackService`; los mappings solo agregan efectos secundarios estructurados.
 
-- `DAMAGE`
-- `SPECIAL_CONDITION`
-- `HEALING`
-- `DRAW`
-- `SEARCH`
-- `DISCARD`
-- `ENERGY_ATTACHMENT`
-- `ENERGY_DISCARD`
-- `SWITCH`
-- `STADIUM`
-- `TOOL`
-- `ABILITY`
-- `PERSISTENT_MODIFIER`
-- `CUSTOM`
+## Matriz inicial Fase 11
 
-## Complejidad sugerida
-
-- `LOW`: efecto directo y genérico.
-- `MEDIUM`: requiere targets, condiciones o timing específico.
-- `HIGH`: modifica reglas, tiene persistencia temporal o interacción compleja.
-- `CUSTOM`: requiere handler específico.
+| cardId | name | supertype | subtypes | attacks | abilities | rules | effectText | effectCategory | complexity | supportedByCurrentEngine | genericHandlers | customHandlerRequired | implementationStatus | tested | notes |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| xy1-1 | Venusaur-EX | Pokémon | Basic, EX | Poison Powder; Jungle Hammer | none | Pokémon-EX rule | Poison Powder: `Your opponent's Active Pokémon is now Poisoned.` Jungle Hammer: `Heal 30 damage from this Pokémon.` | DAMAGE_PLUS_STATUS; DAMAGE_PLUS_HEAL | MEDIUM | yes | ApplySpecialConditionEffectHandler; HealDamageEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Mapping creado para ambos ataques. El daño base queda en `AttackDefinition`; la regla EX ya se soporta por subtype EX en premios. |
+| xy1-10 | Pansage | Pokémon | Basic | Vine Whip; Leech Seed | none | none | Vine Whip: daño base sin texto. Leech Seed: `Heal 10 damage from this Pokémon.` | DAMAGE_ONLY; DAMAGE_PLUS_HEAL | LOW | yes | AttackService; HealDamageEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | `Vine Whip` devuelve lista vacía de efectos por ser daño puro; `Leech Seed` mapea curación. |
+| xy1-16 | Spewpa | Pokémon | Stage 1 | Bug Bite; Stun Spore | none | none | Stun Spore: `Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed.` | DAMAGE_ONLY; DAMAGE_PLUS_COIN_FLIP; DAMAGE_PLUS_STATUS | MEDIUM | yes | CoinFlipEffectHandler; ApplySpecialConditionEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Mapping creado con rama heads Paralyzed y tails sin efecto secundario. |
+| xy1-68 | Sableye | Pokémon | Basic | Filch; Rip Claw | none | none | Filch: `Draw a card.` Rip Claw: `Flip a coin. If heads, discard an Energy attached to your opponent's Active Pokémon.` | DRAW_CARDS; DAMAGE_PLUS_COIN_FLIP; DISCARD_ENERGY | MEDIUM | yes | DrawCardsEffectHandler; CoinFlipEffectHandler; DiscardAttachedEnergyEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Mapping creado para robo y descarte condicional de energía. |
+| xy1-123 | Professor's Letter | Trainer | Item | none | none | Item | `Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.` | SEARCH_DECK | MEDIUM | no | none | no/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | Requiere `SearchDeckEffect`, reveal, shuffle y tratamiento de zona oculta. |
+| xy1-127 | Shauna | Trainer | Supporter | none | none | Supporter rule | `Shuffle your hand into your deck. Then, draw 5 cards.` | DRAW_CARDS; DISCARD_CARD; CUSTOM_REQUIRED | MEDIUM | no | DrawCardsEffectHandler partial only | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | No alcanza con robar 5: primero debe mezclar mano en mazo y barajar. |
+| xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Gap representativo: habilidad reactiva `on damaged by attack` no soportada por timing actual. |
+| xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Gap representativo de efecto continuo/preventivo condicionado por energía unida. |
 
 ## Reglas de auditoría
 
-1. Primero clasificar todas las cartas XY1.
-2. Luego implementar handlers genéricos reutilizables.
-3. Recién después implementar handlers custom.
-4. Una carta no se considera terminada si no está `implemented=yes` y `tested=yes`.
-5. Si el texto requiere revelar/buscar cartas, documentar impacto de privacidad.
-6. No inferir implementación desde texto natural: `effectText` es evidencia, no lógica ejecutable.
-7. Si un ataque solo hace daño base ya soportado por `AttackService`, marcar handler como `NoOpEffect` o `DealDamageEffect` según corresponda y aclararlo en notas.
+1. No interpretar `effectText`, `rules`, `attacks` ni `abilities` como lógica ejecutable.
+2. No marcar cobertura completa de XY1 hasta auditar las 146 cartas y testear efectos implementados.
+3. Si un ataque solo hace daño base, puede quedar auditado con mapping vacío y nota `DAMAGE_ONLY`.
+4. Si un efecto requiere buscar/revelar desde mazo, documentar privacidad y selección.
+5. Si un efecto requiere persistencia temporal, habilidad pasiva, reemplazo forzado, búsqueda, descarte de mano/mazo o modificación de reglas, marcar gap antes de implementar.
 
-## Estados de auditoría
+## Aclaración ACE SPEC
 
-- `not_audited`: fila placeholder o carta sin revisar.
-- `audited`: carta/efecto clasificado, implementación pendiente.
-- `implemented`: handler implementado, cobertura de test insuficiente o pendiente de confirmar.
-- `tested`: implementación y tests existentes; efecto soportado para el alcance declarado.
-
-## Trazabilidad mínima por fila
-
-Cada fila completa debe permitir responder:
-
-- Qué texto/campo del catálogo motivó el efecto.
-- Qué categoría genérica o handler custom lo resuelve.
-- Qué timing aplica: ataque, acción MAIN, entre turnos, continuo o disparado.
-- Qué tests prueban mutación de estado, eventos, targets y privacidad.
+El set obligatorio `xy1` no contiene cartas AS TÁCTICO / ACE SPEC. La validación “máximo 1 ACE SPEC por mazo” queda fuera del alcance obligatorio XY1 y solo debería agregarse si se habilitan sets futuros que sí incluyan esa mecánica.

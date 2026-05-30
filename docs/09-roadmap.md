@@ -177,15 +177,32 @@ Decisiones fase 10:
 - Handlers iniciales: daño, curación, condición especial, robo, descarte de energía, moneda y composición.
 - `AttackDefinition` acepta efectos estructurados sin romper el daño base existente.
 
-## Fase 11 - Persistencia de snapshots/logs
+## Fase 11 - Auditoría y mapeo progresivo XY1
+
+- Estado: implementada como auditoría/mapping incremental de subset representativo, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Objetivo: auditar cartas reales `xy1`, clasificar efectos y mapear efectos soportados a `EffectDefinition` sin parser automático de texto natural.
+- Entregables: matriz `docs/11-xy1-audit-matrix.md`, estados/categorías de auditoría, `Xy1EffectCatalog`, mappings por `cardId` + ataque, tests unitarios de mapping y test de ejecución representativa con `AttackService`.
+- Dependencias: Fase 10 - motor de efectos.
+- Riesgos: afirmar cobertura completa sin auditar 146 cartas, confundir texto de catálogo con lógica ejecutable, forzar Trainers/habilidades complejas en handlers genéricos incorrectos.
+- Criterio: subset real mapeado/testeado, gaps documentados, auditoría explícitamente incompleta, sin WebSocket/frontend/persistencia/endpoints de juego.
+
+Decisiones fase 11:
+
+- `Xy1EffectCatalog` devuelve lista vacía para cartas/ataques sin mapping explícito; eso no significa que la carta no tenga efecto real.
+- La auditoría completa de XY1 se declara `false` hasta revisar y testear el set completo.
+- Se mapearon efectos representativos con handlers existentes: condición especial, curación, robo, moneda y descarte de energía.
+- Trainers como `Professor's Letter` y `Shauna` quedan documentados como gaps porque requieren búsqueda/shuffle/manipulación de mano o mazo.
+- Habilidades pasivas/continuas como `Spiky Shield` y `Sweet Veil` quedan como `REQUIRES_CUSTOM_HANDLER` / `NOT_IMPLEMENTED_YET`.
+
+## Fase 12 - Persistencia de snapshots/logs
 
 - Objetivo: guardar/reconstruir partida.
 - Entregables: snapshots versionados, log inmutable.
-- Dependencias: Game State estable.
+- Dependencias: Game State estable y auditoría/mapping incremental para efectos ejecutables.
 - Riesgos: pérdida de información oculta.
 - Criterio: reconstrucción exacta en tests.
 
-## Fase 12 - WebSockets
+## Fase 13 - WebSockets
 
 - Objetivo: sincronización realtime.
 - Entregables: canales, eventos, reconexión, vistas seguras.
@@ -193,7 +210,7 @@ Decisiones fase 10:
 - Riesgos: filtración o duplicados.
 - Criterio: contrato WS testeado.
 
-## Fase 13 - Tests fuertes
+## Fase 14 - Tests fuertes
 
 - Objetivo: cobertura y casos críticos.
 - Entregables: unit/integration/WS/E2E mínimos.
@@ -201,7 +218,7 @@ Decisiones fase 10:
 - Riesgos: tests frágiles.
 - Criterio: JaCoCo >=80% y críticos >90%.
 
-## Fase 14 - Preparación para frontend
+## Fase 15 - Preparación para frontend
 
 - Objetivo: contratos estables para Angular.
 - Entregables: OpenAPI, DTOs, eventos, vistas seguras.
