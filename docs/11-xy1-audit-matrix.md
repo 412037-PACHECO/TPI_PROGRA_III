@@ -111,6 +111,8 @@ Fase 11E.1 agrega 17 mappings de ataques Pokémon XY1 verificados contra datos o
 
 Fase 11E.2 agrega mappings progresivos de 5 cartas Trainer XY1 (`Hard Charm`, `Muscle Band`, `Professor's Letter`, `Roller Skates`, `Team Flare Grunt`) y documenta los gaps del resto de Trainers del set. Esto no implica jugabilidad pública completa de Trainers desde UI/API.
 
+Fase 11E.3 agrega mappings progresivos de habilidades Pokémon XY1 (`Fur Coat`, prevención parcial de `Sweet Veil`) y documenta `Spiky Shield` como gap reactivo. Esto no implica cobertura completa de habilidades XY1.
+
 | cardId | name | supertype | subtypes | attacks | abilities | rules | effectText | effectCategory | complexity | supportedByCurrentEngine | genericHandlers | customHandlerRequired | implementationStatus | tested | notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | xy1-1 | Venusaur-EX | Pokémon | Basic, EX | Poison Powder; Jungle Hammer | none | Pokémon-EX rule | Poison Powder: `Your opponent's Active Pokémon is now Poisoned.` Jungle Hammer: `Heal 30 damage from this Pokémon.` | DAMAGE_PLUS_STATUS; DAMAGE_PLUS_HEAL | MEDIUM | yes | ApplySpecialConditionEffectHandler; HealDamageEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Mapping creado para ambos ataques. El daño base queda en `AttackDefinition`; la regla EX ya se soporta por subtype EX en premios. |
@@ -147,7 +149,8 @@ Fase 11E.2 agrega mappings progresivos de 5 cartas Trainer XY1 (`Hard Charm`, `M
 | xy1-128 | Super Potion | Trainer | Item | none | none | Item | Cura 60 de 1 Pokémon propio; si cura, descarta una Energía unida a ese Pokémon. | HEAL_DAMAGE; DISCARD_ENERGY; CUSTOM_REQUIRED | MEDIUM | partial | HealDamageEffectHandler; DiscardAttachedEnergyEffectHandler partial | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Requiere seleccionar Pokémon propio y condicionar el descarte a que haya curación. |
 | xy1-129 | Team Flare Grunt | Trainer | Supporter | none | none | Supporter rule | `Discard an Energy attached to your opponent's Active Pokémon.` | DISCARD_ENERGY | LOW | yes | DiscardAttachedEnergyEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.2 mapea descarte de Energía del Activo rival. |
 | xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; reactive infra pendiente | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_MAPPED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Touchdown mapeado/testeado; Spiky Shield queda pendiente. |
-| xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; SpecialConditionPrevention infra partial | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Fase 11D permite prevención genérica, pero falta condición por Energía Fairy, cleanup continuo y mapping/test de carta. |
+| xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; ModifierResolver PREVENT_SPECIAL_CONDITION partial | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; NOT_IMPLEMENTED_YET | no | Fase 11E.3 mapea prevención de nuevas condiciones si el target tiene Energía Fairy unida; falta remover condiciones existentes para completar Sweet Veil. |
+| xy1-114 | Furfrou | Pokémon | Basic | Energy Cutoff | Fur Coat | none | Ability: daño hecho a este Pokémon por ataques se reduce 20 después de Debilidad/Resistencia. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; MODIFY_DAMAGE | MEDIUM | yes | CardEffectDefinition; ModifierResolver | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.3 mapea Fur Coat como modificador continuo self/defender después de Debilidad/Resistencia. Energy Cutoff no queda cubierto por este mapping de habilidad. |
 
 ## Reglas de auditoría
 
@@ -176,11 +179,19 @@ Infraestructura que deja de ser gap base en Fase 11D, aunque todavía requiere m
 - Prevención de condiciones especiales vía `StatusEffectManager` contextual.
 - Fuentes continuas desde Pokémon, Tool y Stadium.
 
+Infraestructura/mappings agregados en Fase 11E.3:
+
+- `AbilityEffectMapping` para habilidades Pokémon reales separadas de ataques y Trainers.
+- Condición `TARGET_HAS_ATTACHED_ENERGY_PROVIDING` para efectos condicionados por Energía unida.
+- `Fur Coat` mapeada/testeada como modificador de daño.
+- `Sweet Veil` parcialmente mapeada para prevención de nuevas condiciones especiales con Energía Fairy.
+
 Gaps todavía pendientes para completar XY1:
 
-- Mappings/tests reales para modificadores de daño, prevención, retiro y condiciones.
+- Más mappings/tests reales para modificadores de daño, prevención, retiro y condiciones.
 - Servicio completo de habilidades activadas con límites de uso.
 - Resolver reactivo completo para habilidades pasivas/reactivas.
+- Cleanup continuo de condiciones especiales existentes para completar `Sweet Veil`.
 - Efectos continuos complejos de Tool/Stadium con condiciones/duración avanzadas.
 - Selección desde zonas ocultas, reveal y privacidad de mano/mazo/premios.
 - Timing avanzado: before damage, after damage, between turns, on damaged, while in play, next turn.

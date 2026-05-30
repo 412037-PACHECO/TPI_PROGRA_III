@@ -1,6 +1,7 @@
 package com.tpi.pokemon.game.engine.effect.mapping;
 
 import com.tpi.pokemon.game.domain.enums.CardSubtype;
+import com.tpi.pokemon.game.domain.enums.EnergyType;
 import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
 import com.tpi.pokemon.game.engine.effect.CardFilterSpec;
@@ -31,20 +32,28 @@ public final class Xy1EffectCatalog {
     private final Map<CardAttackKey, AttackEffectMapping> attackMappings;
     private final Map<String, List<AttackEffectMapping>> mappingsByCardId;
     private final Map<String, TrainerEffectMapping> trainerMappingsByCardId;
+    private final Map<CardAttackKey, AbilityEffectMapping> abilityMappings;
+    private final Map<String, List<AbilityEffectMapping>> abilityMappingsByCardId;
     private final Map<String, List<Xy1AuditEntry>> auditEntriesByCardId;
 
     public Xy1EffectCatalog() {
-        this(defaultAttackMappings(), defaultTrainerMappings(), defaultAuditEntries());
+        this(defaultAttackMappings(), defaultTrainerMappings(), defaultAbilityMappings(), defaultAuditEntries());
     }
 
     public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<Xy1AuditEntry> auditEntries) {
-        this(attackMappings, List.of(), auditEntries);
+        this(attackMappings, List.of(), List.of(), auditEntries);
     }
 
     public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<TrainerEffectMapping> trainerMappings, List<Xy1AuditEntry> auditEntries) {
+        this(attackMappings, trainerMappings, List.of(), auditEntries);
+    }
+
+    public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<TrainerEffectMapping> trainerMappings, List<AbilityEffectMapping> abilityMappings, List<Xy1AuditEntry> auditEntries) {
         this.attackMappings = indexAttackMappings(attackMappings);
         this.mappingsByCardId = indexMappingsByCardId(attackMappings);
         this.trainerMappingsByCardId = indexTrainerMappingsByCardId(trainerMappings);
+        this.abilityMappings = indexAbilityMappings(abilityMappings);
+        this.abilityMappingsByCardId = indexAbilityMappingsByCardId(abilityMappings);
         this.auditEntriesByCardId = indexAuditEntriesByCardId(auditEntries);
     }
 
@@ -97,6 +106,29 @@ public final class Xy1EffectCatalog {
                 .orElse(List.of());
     }
 
+    public Optional<AbilityEffectMapping> abilityMappingForName(String cardId, String abilityName) {
+        if (isBlank(cardId) || isBlank(abilityName)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(abilityMappings.get(CardAttackKey.of(cardId, abilityName)));
+    }
+
+    public List<AbilityEffectMapping> abilityMappingsForCard(String cardId) {
+        if (isBlank(cardId)) {
+            return List.of();
+        }
+        return abilityMappingsByCardId.getOrDefault(cardId.trim().toLowerCase(java.util.Locale.ROOT), List.of());
+    }
+
+    public List<CardEffectDefinition> continuousEffectsForPokemon(String cardId) {
+        if (isBlank(cardId)) {
+            return List.of();
+        }
+        return abilityMappingsForCard(cardId).stream()
+                .flatMap(mapping -> mapping.continuousEffects().stream())
+                .toList();
+    }
+
     public List<Xy1AuditEntry> auditEntriesForCard(String cardId) {
         if (isBlank(cardId)) {
             return List.of();
@@ -139,6 +171,23 @@ public final class Xy1EffectCatalog {
             indexed.put(mapping.cardId().toLowerCase(java.util.Locale.ROOT), mapping);
         }
         return Map.copyOf(indexed);
+    }
+
+    private static Map<CardAttackKey, AbilityEffectMapping> indexAbilityMappings(List<AbilityEffectMapping> mappings) {
+        Map<CardAttackKey, AbilityEffectMapping> indexed = new LinkedHashMap<>();
+        for (AbilityEffectMapping mapping : mappings) {
+            indexed.put(CardAttackKey.of(mapping.cardId(), mapping.abilityName()), mapping);
+            indexed.put(CardAttackKey.of(mapping.cardId(), mapping.abilityId()), mapping);
+        }
+        return Map.copyOf(indexed);
+    }
+
+    private static Map<String, List<AbilityEffectMapping>> indexAbilityMappingsByCardId(List<AbilityEffectMapping> mappings) {
+        Map<String, List<AbilityEffectMapping>> indexed = new LinkedHashMap<>();
+        for (AbilityEffectMapping mapping : mappings) {
+            indexed.computeIfAbsent(mapping.cardId().toLowerCase(java.util.Locale.ROOT), ignored -> new ArrayList<>()).add(mapping);
+        }
+        return copyListMap(indexed);
     }
 
     private static Map<String, List<Xy1AuditEntry>> indexAuditEntriesByCardId(List<Xy1AuditEntry> entries) {
@@ -320,6 +369,48 @@ public final class Xy1EffectCatalog {
         );
     }
 
+    private static List<AbilityEffectMapping> defaultAbilityMappings() {
+        return List.of(
+                ability("xy1-95", "Slurpuff", "sweet-veil", "Sweet Veil", "Each of your Pokémon that has any Fairy Energy attached to it can't be affected by any Special Conditions. (Remove any Special Conditions affecting those Pokémon.)",
+                        categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT), Xy1EffectComplexity.HIGH,
+                        List.of(new CardEffectDefinition(
+                                "sweet-veil-special-condition-prevention",
+                                "Sweet Veil",
+                                EffectSourceKind.POKEMON_ABILITY,
+                                EffectActivationKind.CONTINUOUS,
+                                EffectTiming.CONTINUOUS,
+                                EffectScope.OWN_POKEMON,
+                                EffectCondition.targetHasAttachedEnergyProviding(EnergyType.FAIRY),
+                                List.of(new ModifierDefinition(ModifierType.PREVENT_SPECIAL_CONDITION, ModifierOperation.PREVENT, ModifierLayer.PREVENTION, 0, ModifierTargetRole.DEFAULT_TARGET)))),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET),
+                        false,
+                        "Prevents new Special Conditions for own Pokémon with attached Fairy Energy; continuous cleanup/removal of existing conditions remains pending."),
+                ability("xy1-114", "Furfrou", "fur-coat", "Fur Coat", "Any damage done to this Pokémon by attacks is reduced by 20 (after applying Weakness and Resistance).",
+                        categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM,
+                        List.of(new CardEffectDefinition(
+                                "fur-coat-damage-reduction",
+                                "Fur Coat",
+                                EffectSourceKind.POKEMON_ABILITY,
+                                EffectActivationKind.CONTINUOUS,
+                                EffectTiming.CONTINUOUS,
+                                EffectScope.SELF,
+                                EffectCondition.always(),
+                                List.of(new ModifierDefinition(ModifierType.DAMAGE, ModifierOperation.SUBTRACT, ModifierLayer.AFTER_WEAKNESS_RESISTANCE, 20, ModifierTargetRole.DEFENDER)))),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED),
+                        true,
+                        "Continuous self damage reduction maps directly to ModifierResolver after Weakness/Resistance."),
+                ability("xy1-14", "Chesnaught", "spiky-shield", "Spiky Shield", "If this Pokémon is your Active Pokémon and is damaged by an opponent's attack (even if this Pokémon is Knocked Out), put 3 damage counters on the Attacking Pokémon.",
+                        categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH,
+                        List.of(),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET),
+                        false,
+                        "Requires a reactive on-damaged-by-attack resolver that can place 3 damage counters on the attacker, even if Chesnaught is Knocked Out."));
+    }
+
+    private static AbilityEffectMapping ability(String cardId, String cardName, String abilityId, String abilityName, String effectText, Set<Xy1EffectCategory> categories, Xy1EffectComplexity complexity, List<CardEffectDefinition> continuousEffects, Set<Xy1AuditStatus> statuses, boolean tested, String notes) {
+        return new AbilityEffectMapping(cardId, cardName, abilityId, abilityName, effectText, categories, complexity, continuousEffects, statuses, tested, notes);
+    }
+
     private static CardEffectDefinition continuousTrainerEffect(String effectId, String name, EffectSourceKind sourceKind, EffectScope scope, ModifierDefinition modifier) {
         return new CardEffectDefinition(effectId, name, sourceKind, EffectActivationKind.CONTINUOUS, EffectTiming.CONTINUOUS, scope, EffectCondition.always(), List.of(modifier));
     }
@@ -379,8 +470,9 @@ public final class Xy1EffectCatalog {
                 audit("xy1-127", "Shauna", "Trainer", "Supporter", "none", "none", "Supporter", "Shuffle your hand into your deck. Then, draw 5 cards.", categories(Xy1EffectCategory.DRAW_CARDS, Xy1EffectCategory.DISCARD_CARD, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.MEDIUM, false, "DrawCardsEffectHandler partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Draw handler alone is insufficient because the card must shuffle hand into deck before drawing."),
                 audit("xy1-128", "Super Potion", "Trainer", "Item", "none", "none", "Item", "Heal 60 damage from 1 of your Pokémon. If you do, discard an Energy attached to that Pokémon.", categories(Xy1EffectCategory.HEAL_DAMAGE, Xy1EffectCategory.DISCARD_ENERGY, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.MEDIUM, false, "HealDamageEffectHandler; DiscardAttachedEnergyEffectHandler partial", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Requires choosing one own Pokémon and conditional discard only if healing occurs."),
                 audit("xy1-129", "Team Flare Grunt", "Trainer", "Supporter", "none", "none", "Supporter", "Discard an Energy attached to your opponent's Active Pokémon.", categories(Xy1EffectCategory.DISCARD_ENERGY), Xy1EffectComplexity.LOW, true, "DiscardAttachedEnergyEffectHandler", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Phase 11E.2 maps attached Energy discard from opponent Active."),
-                audit("xy1-14", "Chesnaught", "Pokémon", "Stage 2", "Touchdown", "Spiky Shield", "none", "Spiky Shield reacts when damaged by an opponent's attack; Touchdown heals 20 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.DAMAGE_PLUS_HEAL, Xy1EffectCategory.CONTINUOUS_EFFECT), Xy1EffectComplexity.HIGH, true, "HealDamageEffectHandler partial for Touchdown only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Touchdown mapped/tested in Phase 11E.1; Spiky Shield reactive ability remains pending."),
-                audit("xy1-95", "Slurpuff", "Pokémon", "Stage 1", "Draining Kiss", "Sweet Veil", "none", "Sweet Veil prevents/removes Special Conditions for own Pokémon with Fairy Energy; Draining Kiss heals 30 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.DAMAGE_PLUS_HEAL), Xy1EffectComplexity.HIGH, false, "HealDamageEffectHandler partial for Draining Kiss only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Continuous prevention/removal ability requires future persistent/continuous effect support.")
+                audit("xy1-14", "Chesnaught", "Pokémon", "Stage 2", "Touchdown", "Spiky Shield", "none", "Spiky Shield reacts when damaged by an opponent's attack; Touchdown heals 20 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.DAMAGE_PLUS_HEAL, Xy1EffectCategory.CONTINUOUS_EFFECT), Xy1EffectComplexity.HIGH, true, "HealDamageEffectHandler partial for Touchdown only; reactive ability resolver pending", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Touchdown mapped/tested in Phase 11E.1; Spiky Shield ability mapping remains pending because ON_DAMAGE_RECEIVED reactive resolution is not implemented."),
+                audit("xy1-95", "Slurpuff", "Pokémon", "Stage 1", "Draining Kiss", "Sweet Veil", "none", "Sweet Veil prevents/removes Special Conditions for own Pokémon with Fairy Energy; Draining Kiss heals 30 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.DAMAGE_PLUS_HEAL), Xy1EffectComplexity.HIGH, true, "ModifierResolver PREVENT_SPECIAL_CONDITION partial; HealDamageEffectHandler partial", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Sweet Veil prevention of new Special Conditions is mapped/tested for Fairy Energy targets; removing existing Special Conditions remains pending."),
+                audit("xy1-114", "Furfrou", "Pokémon", "Basic", "Energy Cutoff", "Fur Coat", "none", "Fur Coat reduces damage done to this Pokémon by attacks by 20 after Weakness and Resistance.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM, true, "ModifierResolver", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Fur Coat continuous self damage reduction mapped/tested in Phase 11E.3; Energy Cutoff attack remains outside this ability mapping.")
         );
     }
 

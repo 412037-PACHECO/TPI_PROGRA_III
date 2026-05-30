@@ -2,18 +2,31 @@ package com.tpi.pokemon.game.engine.effect.mapping;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.enums.CardSubtype;
+import com.tpi.pokemon.game.domain.enums.CardSupertype;
+import com.tpi.pokemon.game.domain.enums.EnergyType;
+import com.tpi.pokemon.game.domain.enums.SpecialCondition;
+import com.tpi.pokemon.game.domain.model.AttachedCards;
+import com.tpi.pokemon.game.domain.model.CardDefinitionRef;
+import com.tpi.pokemon.game.domain.model.CardInstance;
+import com.tpi.pokemon.game.domain.model.EnergyProfile;
+import com.tpi.pokemon.game.domain.model.PokemonInPlay;
+import com.tpi.pokemon.game.domain.value.CardInstanceId;
+import com.tpi.pokemon.game.domain.value.PlayerId;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
 import com.tpi.pokemon.game.engine.effect.EffectCardZone;
 import com.tpi.pokemon.game.engine.effect.EffectTarget;
 import com.tpi.pokemon.game.engine.effect.EffectTiming;
 import com.tpi.pokemon.game.engine.effect.EffectType;
+import com.tpi.pokemon.game.engine.effect.ability.EffectConditionType;
+import com.tpi.pokemon.game.engine.effect.ability.EffectScope;
+import com.tpi.pokemon.game.engine.effect.ability.EffectSourceKind;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierLayer;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierOperation;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierTargetRole;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierType;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class Xy1EffectCatalogTest {
@@ -279,6 +292,70 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void abilityMappingLookupFindsFurCoatByCardIdAndAbilityName() {
+        assertThat(catalog.abilityMappingForName("xy1-114", "Fur Coat")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.cardName()).isEqualTo("Furfrou");
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.continuousEffects()).singleElement().satisfies(effect -> {
+                assertThat(effect.effectId()).isEqualTo("fur-coat-damage-reduction");
+                assertThat(effect.sourceKind()).isEqualTo(EffectSourceKind.POKEMON_ABILITY);
+                assertThat(effect.scope()).isEqualTo(EffectScope.SELF);
+                assertThat(effect.modifiers()).singleElement().satisfies(modifier -> {
+                    assertThat(modifier.type()).isEqualTo(ModifierType.DAMAGE);
+                    assertThat(modifier.operation()).isEqualTo(ModifierOperation.SUBTRACT);
+                    assertThat(modifier.layer()).isEqualTo(ModifierLayer.AFTER_WEAKNESS_RESISTANCE);
+                    assertThat(modifier.amount()).isEqualTo(20);
+                    assertThat(modifier.targetRole()).isEqualTo(ModifierTargetRole.DEFENDER);
+                });
+            });
+        });
+    }
+
+    @Test
+    void abilityWithoutMappingReturnsEmptyEffects() {
+        assertThat(catalog.abilityMappingForName("xy1-999", "Unknown Ability")).isEmpty();
+        assertThat(catalog.abilityMappingsForCard("xy1-999")).isEmpty();
+        assertThat(catalog.continuousEffectsForPokemon("xy1-999")).isEmpty();
+    }
+
+    @Test
+    void sweetVeilAbilityKeepsFairyEnergyConditionExplicit() {
+        assertThat(catalog.abilityMappingForName("xy1-95", "Sweet Veil")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.continuousEffects()).singleElement().satisfies(effect -> {
+                assertThat(effect.scope()).isEqualTo(EffectScope.OWN_POKEMON);
+                assertThat(effect.condition().type()).isEqualTo(EffectConditionType.TARGET_HAS_ATTACHED_ENERGY_PROVIDING);
+                assertThat(effect.condition().energyType()).isEqualTo(EnergyType.FAIRY);
+                assertThat(effect.modifiers()).singleElement().satisfies(modifier -> {
+                    assertThat(modifier.type()).isEqualTo(ModifierType.PREVENT_SPECIAL_CONDITION);
+                    assertThat(modifier.operation()).isEqualTo(ModifierOperation.PREVENT);
+                });
+            });
+        });
+    }
+
+    @Test
+    void attachedEnergyConditionMatchesOnlyWhenTargetHasFairyEnergy() {
+        var sweetVeil = catalog.continuousEffectsForPokemon("xy1-95").get(0);
+        PokemonInPlay withFairyEnergy = pokemon("target").withAttachedEnergy(energy("fairy", EnergyType.FAIRY));
+        PokemonInPlay withWaterEnergy = pokemon("target-2").withAttachedEnergy(energy("water", EnergyType.WATER));
+
+        assertThat(sweetVeil.condition().matches(withFairyEnergy)).isTrue();
+        assertThat(sweetVeil.condition().matches(withWaterEnergy)).isFalse();
+    }
+
+    @Test
+    void spikyShieldRemainsDocumentedGapUntilReactiveResolverExists() {
+        assertThat(catalog.abilityMappingForName("xy1-14", "Spiky Shield")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.continuousEffects()).isEmpty();
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.tested()).isFalse();
+        });
+    }
+
+    @Test
     void pendingTrainerMappingsDoNotClaimFullyTested() {
         assertThat(catalog.auditEntriesForCard("xy1-127")).singleElement().satisfies(entry -> {
             assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
@@ -309,6 +386,34 @@ class Xy1EffectCatalogTest {
         assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement()
                 .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
         assertThat(catalog.auditEntriesForCard("xy1-95")).singleElement()
-                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER));
+                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
+        assertThat(catalog.auditEntriesForCard("xy1-14")).singleElement()
+                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
+    }
+
+    private static PokemonInPlay pokemon(String id) {
+        CardDefinitionRef definition = new CardDefinitionRef(
+                id + "-def",
+                "Pokemon " + id,
+                CardSupertype.POKEMON,
+                Set.of(CardSubtype.BASIC));
+        return new PokemonInPlay(new CardInstance(new CardInstanceId(id), definition, new PlayerId("p1")), AttachedCards.empty());
+    }
+
+    private static CardInstance energy(String id, EnergyType type) {
+        CardDefinitionRef definition = new CardDefinitionRef(
+                id + "-def",
+                type + " Energy",
+                CardSupertype.ENERGY,
+                Set.of(CardSubtype.BASIC_ENERGY),
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                EnergyProfile.basic(type));
+        return new CardInstance(new CardInstanceId(id), definition, new PlayerId("p1"));
     }
 }

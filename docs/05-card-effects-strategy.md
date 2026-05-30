@@ -4,7 +4,7 @@
 
 Soportar efectos reales de cartas XY1 sin convertir el motor en una colección desordenada de `if cardId == ...`.
 
-Estado Fase 11D: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales e infraestructura de efectos continuos/modificadores. Además existe un primer catálogo explícito de mappings XY1 representativos (`Xy1EffectCatalog`) y una matriz de auditoría progresiva. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
+Estado Fase 11E.3: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales e infraestructura de efectos continuos/modificadores. Además existe un catálogo explícito de mappings XY1 progresivos (`Xy1EffectCatalog`) para ataques, Trainers y primeras habilidades Pokémon. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
 
 ## CardDefinition vs CardInstance
 
@@ -22,6 +22,7 @@ En Fase 11, los mappings reales auditados viven en `com.tpi.pokemon.game.engine.
 
 - buscar mappings por `cardId`;
 - buscar efectos por `cardId` + `attackName` o `attackId`;
+- buscar mappings de habilidades por `cardId` + nombre/id de habilidad;
 - devolver `List.of()` cuando una carta/ataque no tiene mapping explícito;
 - declarar que la auditoría de XY1 no está completa.
 
@@ -124,7 +125,7 @@ Orden documentado para daño contextual:
 6. prevención;
 7. clamp a `0` y múltiplos de 10.
 
-Decisión importante: infraestructura disponible no equivale a soporte completo de una carta. `xy1-14 Chesnaught / Spiky Shield` y `xy1-95 Slurpuff / Sweet Veil` siguen requiriendo mapping explícito y tests antes de considerarse soportadas.
+Decisión importante: infraestructura disponible no equivale a soporte completo de una carta. `xy1-14 Chesnaught / Spiky Shield` sigue requiriendo resolver reactivo real antes de considerarse soportada. `xy1-95 Slurpuff / Sweet Veil` tiene prevención de nuevas condiciones modelada parcialmente, pero no se considera completa hasta remover condiciones existentes de forma continua.
 
 ## Handlers custom
 
@@ -225,12 +226,28 @@ Trainers pendientes documentados: `Cassius`, `Evosoda`, `Fairy Garden`, `Great B
 
 Para Trainers, `EFFECT_MAPPED` no equivale automáticamente a “jugable desde UI/API”. Puede existir mapping engine-interno testeado mientras siga pendiente el contrato público de selección, reveal, privacidad o sincronización.
 
+## Fase 11E.3 - Mapeo progresivo de habilidades Pokémon XY1
+
+Fase 11E.3 agrega `AbilityEffectMapping` y APIs de catálogo para habilidades reales de Pokémon XY1 sin activar parser automático ni afirmar cobertura total:
+
+- `xy1-114 Furfrou / Fur Coat`: mapeada como habilidad continua `POKEMON_ABILITY` con `ModifierType.DAMAGE`, resta 20 después de Debilidad/Resistencia al propio Furfrou cuando es defensor. Esta parte queda `FULLY_TESTED` para el alcance declarado.
+- `xy1-95 Slurpuff / Sweet Veil`: mapeada parcialmente como prevención continua de nuevas condiciones especiales para Pokémon propios que tengan Energía Fairy unida. La condición por Energía Fairy queda explícita en `EffectCondition`. No queda `FULLY_TESTED` como carta completa porque todavía falta remover condiciones especiales existentes como pide el texto oficial.
+- `xy1-14 Chesnaught / Spiky Shield`: queda documentada como gap; requiere resolver reactivo `on damaged by opponent's attack` y colocar 3 contadores en el atacante incluso si Chesnaught queda KO.
+
+Nuevo soporte estructural de 11E.3:
+
+- `AbilityEffectMapping` separa habilidades de ataques y Trainers.
+- `EffectConditionType.TARGET_HAS_ATTACHED_ENERGY_PROVIDING` permite condicionar efectos continuos por Energía unida sin hardcodear `cardId`.
+- `Xy1EffectCatalog.continuousEffectsForPokemon(cardId)` devuelve efectos continuos de habilidades mapeadas para que futuras importaciones puedan poblar `CardDefinitionRef.effects`.
+
+Limitación honesta: una habilidad puede estar parcialmente modelada para una parte segura del texto y seguir marcada pendiente si falta cleanup, timing reactivo, selección, privacidad o integración pública.
+
 Gaps documentados, no implementados como soporte completo:
 
 - `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
 - `xy1-127 Shauna`: requiere mezclar mano en mazo y robar 5; `DrawCardsEffectHandler` solo no alcanza.
 - `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva al recibir daño.
-- `xy1-95 Slurpuff / Sweet Veil`: efecto continuo/preventivo condicionado por Energía Fairy.
+- `xy1-95 Slurpuff / Sweet Veil`: prevención por Energía Fairy parcialmente mapeada; falta remover condiciones existentes.
 
 ## Cómo agregar un nuevo mapping
 
