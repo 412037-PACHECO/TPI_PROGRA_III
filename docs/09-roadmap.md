@@ -159,13 +159,23 @@ Decisiones fase 9:
 - `TurnManager.endTurn` resuelve `BetweenTurnsService` antes de preparar el turno del oponente.
 - El motor no interpreta texto libre de cartas XY1 ni habilidades en esta fase.
 
-## Fase 10 - Motor de efectos
+## Fase 10 - Motor de efectos de cartas
 
-- Objetivo: soportar efectos reales XY1 incrementalmente, incluyendo aplicación automática de condiciones desde ataques y habilidades.
-- Entregables: EffectRegistry, handlers genéricos/custom y auditoría XY1.
+- Estado: implementada como arquitectura base de engine puro Java, pendiente de ejecución local final de `mvn test` por restricción de entorno.
+- Objetivo: soportar efectos reales XY1 incrementalmente mediante arquitectura genérica auditable, incluyendo efectos simples de ataques y, más adelante, habilidades.
+- Entregables: `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales y auditoría XY1 incremental.
 - Dependencias: condiciones especiales, KO/premios/victoria y auditoría XY1.
-- Riesgos: hardcode desordenado.
-- Criterio: cada efecto implementado está auditado y testeado.
+- Riesgos: hardcode desordenado, interpretar texto natural como lógica ejecutable, declarar cobertura XY1 sin matriz ni tests.
+- Criterio: cada efecto implementado está auditado y testeado; los efectos no mapeados permanecen explícitamente pendientes.
+
+Decisiones fase 10:
+
+- No se implementa parser de texto natural para cartas.
+- La auditoría XY1 es la fuente de trazabilidad entre carta, efecto, handler, implementación y test.
+- Se priorizan handlers genéricos reutilizables antes que custom por carta.
+- La fase no equivale a cobertura completa del set XY1.
+- Handlers iniciales: daño, curación, condición especial, robo, descarte de energía, moneda y composición.
+- `AttackDefinition` acepta efectos estructurados sin romper el daño base existente.
 
 ## Fase 11 - Persistencia de snapshots/logs
 

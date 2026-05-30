@@ -45,6 +45,9 @@ import com.tpi.pokemon.game.engine.event.PrizeCardsTakenEvent;
 import com.tpi.pokemon.game.engine.event.ConfusionCheckResolvedEvent;
 import com.tpi.pokemon.game.engine.event.SpecialConditionDamageAppliedEvent;
 import com.tpi.pokemon.game.engine.event.TurnEndedEvent;
+import com.tpi.pokemon.game.engine.effect.EffectDefinition;
+import com.tpi.pokemon.game.engine.effect.EffectTarget;
+import com.tpi.pokemon.game.engine.effect.EffectTiming;
 import com.tpi.pokemon.game.engine.random.CoinFlipResult;
 import com.tpi.pokemon.game.engine.special.StatusEffectManager;
 import com.tpi.pokemon.game.engine.knockout.ActivePokemonReplacementResolver;
@@ -279,6 +282,47 @@ class AttackServiceTest {
         assertThat(result.getPlayerOneState().getDiscardPile().getCards()).extracting(CardInstance::id).contains(new CardInstanceId("p1-active"));
         assertThat(result.getPlayerTwoState().getPrizeCards().remainingCount()).isEqualTo(5);
         assertThat(result.getFinishResult()).hasValueSatisfying(finish -> assertThat(finish.winnerId()).isEqualTo(PLAYER_TWO));
+    }
+
+    @Test
+    void attackWithPostDamageEffectAppliesSpecialConditionAfterDamage() {
+        AttackDefinition poisonScratch = new AttackDefinition(
+                "poison-scratch",
+                "Poison Scratch",
+                List.of(EnergyType.COLORLESS),
+                30,
+                List.of(EffectDefinition.applySpecialCondition(EffectTarget.DEFENDER_ACTIVE, SpecialCondition.POISONED, EffectTiming.AFTER_DAMAGE))
+        );
+
+        GameState result = attackService.declareAttack(
+                activeGame(activeAttacker(List.of(poisonScratch), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))), activeDefender()),
+                command("poison-scratch")
+        );
+
+        PokemonInPlay defender = activePokemon(result.getPlayerTwoState());
+        assertThat(defender.getDamageCounters()).isEqualTo(4);
+        assertThat(defender.hasSpecialCondition(SpecialCondition.POISONED)).isTrue();
+        assertThat(eventsOfType(result, DamageCalculatedEvent.class)).singleElement()
+                .satisfies(event -> assertThat(event.finalDamage()).isEqualTo(30));
+        assertThat(eventsOfType(result, SpecialConditionDamageAppliedEvent.class)).singleElement()
+                .satisfies(event -> assertThat(event.condition()).isEqualTo(SpecialCondition.POISONED));
+    }
+
+    @Test
+    void attackWithHealingEffectHealsAttackerAfterDamage() {
+        AttackDefinition healingScratch = new AttackDefinition(
+                "healing-scratch",
+                "Healing Scratch",
+                List.of(EnergyType.COLORLESS),
+                30,
+                List.of(EffectDefinition.healDamage(EffectTarget.ATTACKER_ACTIVE, 20, EffectTiming.AFTER_DAMAGE))
+        );
+        PokemonInPlay damagedAttacker = activeAttacker(List.of(healingScratch), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))).withDamageCounters(3);
+
+        GameState result = attackService.declareAttack(activeGame(damagedAttacker, activeDefender()), command("healing-scratch"));
+
+        assertThat(activePokemon(result.getPlayerOneState()).getDamageCounters()).isEqualTo(1);
+        assertThat(activePokemon(result.getPlayerTwoState()).getDamageCounters()).isEqualTo(3);
     }
 
     @Test

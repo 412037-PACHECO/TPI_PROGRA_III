@@ -4,7 +4,7 @@
 
 El Game Engine es una máquina de estados determinística de dominio. Recibe un estado y un comando, valida reglas, muta el estado, emite eventos y no conoce infraestructura.
 
-Estado actual: la Fase 9 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno, acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y daño entre turnos. Efectos complejos XY1, habilidades, daño a Banca, WebSocket, endpoints de partida, persistencia y frontend quedan fuera del alcance actual.
+Estado actual: la Fase 10 implementa el modelo interno base de `GameState`, setup/mulligan, estructura de turno, acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales, daño entre turnos y una arquitectura genérica para efectos de cartas. No declara cubiertos todos los efectos XY1. Habilidades completas, daño a Banca amplio, WebSocket, endpoints de partida, persistencia y frontend quedan fuera del alcance actual.
 
 ```text
 GameCommand
@@ -14,6 +14,37 @@ GameCommand
 → DomainEvents
 → SafePlayerViews
 ```
+
+## Fase 10 - Motor de efectos de cartas
+
+El motor de efectos extiende el engine puro Java sin acoplarlo a controllers, JPA, WebSocket ni API externa.
+
+Flujo conceptual:
+
+```text
+Card/Attack/Ability source
+→ EffectDefinition auditada
+→ EffectRegistry
+→ EffectHandler genérico o custom justificado
+→ EffectExecutionContext
+→ execute(GameState)
+→ DomainEvents
+```
+
+Decisiones:
+
+- Obligatorio: usar efectos estructurados y auditables; el texto natural de la carta no se ejecuta directamente.
+- Obligatorio: mantener aleatoriedad mediante proveedores inyectables, como ya ocurre con moneda/barajado.
+- Obligatorio: reutilizar resolutores existentes para daño, condiciones, KO, premios y victoria cuando aplique.
+- Implementado: handlers genéricos iniciales para daño, curación, condición especial, robo, descarte de energía, moneda y composición.
+- Recomendado: cubrir primero efectos genéricos frecuentes antes de handlers custom.
+- Opcional/futuro: generar reportes de cobertura XY1 desde la matriz de auditoría.
+
+Fuera de alcance de esta fase:
+
+- Parser NLP o regex automático para transformar texto de cartas en lógica.
+- Mapeo completo carta por carta de XY1.
+- Persistencia, WebSocket y vistas seguras por jugador.
 
 ## Estados de partida
 
@@ -79,7 +110,7 @@ Implementado hasta Fase 9:
 
 Pendiente para fases posteriores:
 
-1. Efectos complejos de cartas.
+1. Implementación incremental de efectos complejos de cartas según matriz XY1.
 2. Daño a Banca y habilidades.
 
 ## Acciones MAIN implementadas en Fase 6
@@ -246,4 +277,4 @@ En Fase 9 existen comandos/modelos específicos de setup, turno/acciones MAIN, d
 ## Validadores y resolutores
 
 - Implementados: validaciones/resolución de setup, mulligan inicial, turno básico, acciones MAIN estructurales, ataque base, coste de energía, daño base con debilidad/resistencia, knockout, premios, reemplazo de Activo, condiciones básicas de victoria, condiciones especiales y daño entre turnos.
-- Futuros: efectos activos/complejos, habilidades, daño a Banca, Muerte Súbita jugable, persistencia y vistas seguras.
+- Futuros: implementación completa de efectos activos/complejos, habilidades, daño a Banca, Muerte Súbita jugable, persistencia y vistas seguras.

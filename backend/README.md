@@ -2,9 +2,9 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 9 - Condiciones especiales y daño entre turnos
+## Alcance actual: Fase 10 - Motor de efectos de cartas
 
-El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios y condiciones básicas de victoria/derrota. La Fase 9 agrega condiciones especiales oficiales y daño entre turnos, integrados con ataque, retiro, evolución, KO, premios y victoria.
+El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota y condiciones especiales. La Fase 10 agrega una arquitectura extensible para ejecutar efectos de cartas mediante definiciones estructuradas, handlers genéricos y registry de efectos.
 
 Incluye:
 
@@ -34,6 +34,8 @@ Incluye:
 - Restricciones de ataque/retiro por condición y chequeos con moneda inyectable.
 - Daño entre turnos por Envenenado/Quemado e integración con KO/premios/victoria.
 - Limpieza de condiciones al evolucionar y al retirar a Banca.
+- Motor de efectos basado en definiciones estructuradas, registry y handlers genéricos.
+- Integración de efectos simples posteriores al daño dentro de ataques.
 
 ## Modelo Game State
 
@@ -222,6 +224,44 @@ Limitaciones honestas de Fase 9:
 - No se implementan modificadores por Herramientas, Estadios, Energías Especiales o texto complejo.
 - No hay endpoints REST de juego, WebSocket, frontend ni persistencia de partida.
 
+## Motor de efectos de cartas
+
+La Fase 10 implementa la base para ejecutar efectos reales de cartas sin convertir el engine en condicionales por `cardId` ni en un parser de texto natural.
+
+Componentes principales:
+
+- `EffectDefinition`: representación estructurada de un efecto auditable.
+- `EffectExecutionContext`: partida, jugador, fuente, targets, timing y servicios deterministas disponibles.
+- `EffectHandler`: valida y ejecuta una categoría de efecto sobre `GameState`.
+- `EffectRegistry`: resuelve handlers genéricos y excepciones custom explícitas.
+- `EffectExecutionService`: ejecuta efectos simples o compuestos en orden.
+- Matriz `docs/11-xy1-audit-matrix.md`: registra qué cartas/efectos XY1 están clasificados, implementados y testeados.
+
+Handlers genéricos iniciales:
+
+- `DealDamageEffectHandler`.
+- `HealDamageEffectHandler`.
+- `ApplySpecialConditionEffectHandler`.
+- `DrawCardsEffectHandler`.
+- `DiscardAttachedEnergyEffectHandler`.
+- `CoinFlipEffectHandler`.
+- `CompositeEffectHandler`.
+
+Reglas de diseño:
+
+- No se parsea automáticamente el texto natural de cartas como mecanismo de ejecución.
+- Los campos textuales del catálogo sirven como evidencia/auditoría, no como lógica ejecutable.
+- Primero se implementan handlers genéricos reutilizables; los handlers custom se justifican carta por carta.
+- Una carta XY1 se considera cubierta solo si su fila de auditoría indica implementación y tests.
+- El robo por efecto toma hasta la cantidad disponible del mazo y no dispara deck-out; deck-out sigue reservado al robo obligatorio de turno.
+- La curación se expresa en puntos de daño y no baja de 0.
+
+Limitaciones honestas de Fase 10:
+
+- No todas las cartas XY1 están mapeadas.
+- No hay ejecución completa de habilidades, Trainers, Estadios, Herramientas ni Energías Especiales.
+- No hay persistencia de partidas, WebSocket ni vistas seguras por jugador.
+
 ## Endpoints de catálogo
 
 ### Importar/cachear XY1
@@ -409,6 +449,8 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Daño a Banca.
 - Flujo completo de Muerte Súbita.
 - Efectos complejos de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.
+- Mapeo completo de todos los efectos XY1.
+- Parseo automático de texto natural de cartas.
 - Endpoints REST de juego.
 - Persistencia de partidas.
 - WebSocket/realtime.

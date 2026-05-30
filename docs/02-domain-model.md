@@ -26,12 +26,12 @@ La tabla describe el modelo objetivo del TPI. La sección siguiente indica qué 
 
 ## Estado de implementación actual
 
-La Fase 9 implementa el modelo interno base, setup/mulligan, motor de turnos con acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y daño entre turnos bajo `backend/src/main/java/com/tpi/pokemon/game/`.
+La Fase 10 implementa el modelo interno base, setup/mulligan, motor de turnos con acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales, daño entre turnos y motor genérico de efectos bajo `backend/src/main/java/com/tpi/pokemon/game/`.
 
 Incluye:
 
 - Value objects: `GameId`, `PlayerId`, `CardInstanceId`.
-- Enums: `GameStatus`, `TurnPhase`, `ZoneType`, `CardSupertype`, `CardSubtype`, `EnergyType`, `PokemonType`.
+- Enums: `GameStatus`, `TurnPhase`, `ZoneType`, `CardSupertype`, `CardSubtype`, `EnergyType`, `PokemonType`, `EffectType`, `EffectTiming`, `EffectTarget`.
 - Modelo: `GameState`, `PlayerGameState`, `BoardState`, `TurnState`, `CardDefinitionRef`, `CardInstance`, `PokemonInPlay`, `ActivePokemon`, `Bench`, `AttachedCards`, `DeckZone`, `HandZone`, `PrizeCards`, `DiscardPile`, `StadiumInPlay`, `AttackDefinition`, `EnergyProfile`, `Weakness`, `Resistance`.
 - Eventos base: `GameCreatedEvent`, `GameStateInitializedEvent`, `CardMovedEvent`, `TurnPhaseChangedEvent`, eventos de setup/mulligan, eventos de turno/acciones MAIN, eventos de ataque/daño y eventos de KO/premios/victoria.
 - Comandos base: `GameCommand`, `PlayerCommand`, `CommandResult`.
@@ -40,8 +40,9 @@ Incluye:
 - Ataques: `AttackService`, `EnergyCostValidator`, `DamageCalculator`, `DeclareAttackCommand`.
 - Knockout/victoria: `KnockoutResolver`, `PrizeResolver`, `PostAttackResolutionService`, `ActivePokemonReplacementResolver`, `VictoryConditionChecker`, `GameFinishResult`.
 - Condiciones especiales: `SpecialCondition`, `SpecialConditionSet`, `StatusEffectManager`, `BetweenTurnsService`, `CoinFlipProvider`.
+- Efectos: `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService` y handlers genéricos iniciales.
 
-No implementa todavía efectos complejos XY1, habilidades, daño a Banca, flujo jugable completo de Muerte Súbita, endpoints de partida, WebSocket, persistencia de partidas ni frontend.
+No implementa todavía auditoría/mapeo completo de XY1, parser automático de texto natural, habilidades, daño a Banca, flujo jugable completo de Muerte Súbita, endpoints de partida, WebSocket, persistencia de partidas ni frontend.
 
 ## Relaciones
 
@@ -52,7 +53,7 @@ No implementa todavía efectos complejos XY1, habilidades, daño a Banca, flujo 
 - `Turn` pertenece al `Game` y define fase/flags.
 - `GameLog` pertenece a `Game/Match` y registra eventos derivados del motor.
 
-## Invariantes implementadas hasta Fase 9
+## Invariantes implementadas hasta Fase 10
 
 - Una `CardInstance` está en una sola zona lógica: deck, mano, premios, descarte, activo, banca, unida o removida.
 - Cada jugador tiene como máximo 1 Pokémon activo.

@@ -20,6 +20,10 @@ import com.tpi.pokemon.game.engine.event.DamageAppliedEvent;
 import com.tpi.pokemon.game.engine.event.DamageCalculatedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyCostValidatedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
+import com.tpi.pokemon.game.engine.effect.EffectDefinition;
+import com.tpi.pokemon.game.engine.effect.EffectExecutionContext;
+import com.tpi.pokemon.game.engine.effect.EffectExecutionService;
+import com.tpi.pokemon.game.engine.effect.EffectTiming;
 import com.tpi.pokemon.game.engine.knockout.PostAttackResolutionService;
 import com.tpi.pokemon.game.engine.random.CoinFlipProvider;
 import com.tpi.pokemon.game.engine.random.CoinFlipResult;
@@ -39,26 +43,32 @@ public final class AttackService {
     private final PostAttackResolutionService postAttackResolutionService;
     private final StatusEffectManager statusEffectManager;
     private final CoinFlipProvider coinFlipProvider;
+    private final EffectExecutionService effectExecutionService;
 
     public AttackService() {
         this(new TurnManager());
     }
 
     public AttackService(TurnManager turnManager) {
-        this(turnManager, new EnergyCostValidator(), new DamageCalculator(), new PostAttackResolutionService(), new StatusEffectManager(), new RandomCoinFlipProvider());
+        this(turnManager, new EnergyCostValidator(), new DamageCalculator(), new PostAttackResolutionService(), new StatusEffectManager(), new RandomCoinFlipProvider(), new EffectExecutionService());
     }
 
     public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService) {
-        this(turnManager, energyCostValidator, damageCalculator, postAttackResolutionService, new StatusEffectManager(), new RandomCoinFlipProvider());
+        this(turnManager, energyCostValidator, damageCalculator, postAttackResolutionService, new StatusEffectManager(), new RandomCoinFlipProvider(), new EffectExecutionService());
     }
 
     public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService, StatusEffectManager statusEffectManager, CoinFlipProvider coinFlipProvider) {
+        this(turnManager, energyCostValidator, damageCalculator, postAttackResolutionService, statusEffectManager, coinFlipProvider, new EffectExecutionService());
+    }
+
+    public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService, StatusEffectManager statusEffectManager, CoinFlipProvider coinFlipProvider, EffectExecutionService effectExecutionService) {
         this.turnManager = Objects.requireNonNull(turnManager, "turnManager must not be null");
         this.energyCostValidator = Objects.requireNonNull(energyCostValidator, "energyCostValidator must not be null");
         this.damageCalculator = Objects.requireNonNull(damageCalculator, "damageCalculator must not be null");
         this.postAttackResolutionService = Objects.requireNonNull(postAttackResolutionService, "postAttackResolutionService must not be null");
         this.statusEffectManager = Objects.requireNonNull(statusEffectManager, "statusEffectManager must not be null");
         this.coinFlipProvider = Objects.requireNonNull(coinFlipProvider, "coinFlipProvider must not be null");
+        this.effectExecutionService = Objects.requireNonNull(effectExecutionService, "effectExecutionService must not be null");
     }
 
     public GameState declareAttack(GameState state, DeclareAttackCommand command) {
@@ -109,8 +119,6 @@ public final class AttackService {
         events.add(new EnergyCostValidatedEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId()));
         events.add(new DamageCalculatedEvent(state.getGameId(), attacker.getTopCard().id(), defender.getTopCard().id(), damage.baseDamage(), damage.weaknessApplied(), damage.resistanceApplied(), damage.finalDamage()));
         events.add(new DamageAppliedEvent(state.getGameId(), defender.getTopCard().id(), damage.finalDamage(), damage.countersAdded(), damagedDefender.getDamageCounters()));
-        events.add(new AttackResolvedEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId()));
-
         GameState attackState = new GameState(
                 state.getGameId(),
                 GameStatus.ACTIVE,
@@ -120,7 +128,31 @@ public final class AttackService {
                 state.getActiveStadium().orElse(null),
                 events
         );
-        return postAttackResolutionService.resolveAfterAttack(attackState, command.playerId(), defenderPlayer.getPlayerId(), events);
+        GameState afterEffects = executeAttackEffects(attackState, command.playerId(), defenderPlayer.getPlayerId(), attack, events);
+        events.add(new AttackResolvedEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId()));
+        GameState resolvedAttackState = new GameState(
+                afterEffects.getGameId(),
+                afterEffects.getStatus(),
+                afterEffects.getPlayerOneState(),
+                afterEffects.getPlayerTwoState(),
+                afterEffects.getTurnState(),
+                afterEffects.getActiveStadium().orElse(null),
+                afterEffects.getFinishResult().orElse(null),
+                afterEffects.getPendingActiveReplacement().orElse(null),
+                events
+        );
+        return postAttackResolutionService.resolveAfterAttack(resolvedAttackState, command.playerId(), defenderPlayer.getPlayerId(), events);
+    }
+
+    private GameState executeAttackEffects(GameState state, PlayerId attackerId, PlayerId defenderId, AttackDefinition attack, List<GameEvent> events) {
+        List<EffectDefinition> effects = attack.effects().stream()
+                .filter(effect -> effect.timing() == EffectTiming.AFTER_DAMAGE || effect.timing() == EffectTiming.AFTER_ATTACK)
+                .toList();
+        if (effects.isEmpty()) {
+            return state;
+        }
+        EffectExecutionContext context = new EffectExecutionContext(state, attackerId, defenderId, attack.attackId(), events, coinFlipProvider);
+        return effectExecutionService.executeAll(effects, context).state();
     }
 
     private GameState resolveFailedConfusedAttack(GameState state, PlayerId attackerId, PlayerId defenderId, PokemonInPlay attacker, AttackDefinition attack, List<GameEvent> events) {
