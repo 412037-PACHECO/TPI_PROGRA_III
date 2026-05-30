@@ -44,7 +44,7 @@ Proceso para auditar las 146 cartas:
 - `DATA_IMPORTED`: la carta existe en catálogo/cache local o fue verificada contra fuente oficial.
 - `EFFECT_CLASSIFIED`: el efecto fue leído y categorizado.
 - `EFFECT_SUPPORTED_BY_GENERIC_HANDLER`: el efecto entra en handlers genéricos actuales.
-- `EFFECT_MAPPED`: existe mapping estructurado hacia `EffectDefinition`.
+- `EFFECT_MAPPED`: existe mapping estructurado hacia `EffectDefinition`, `CardEffectDefinition` o perfil/metadata ejecutable equivalente para el alcance declarado.
 - `FULLY_TESTED`: existen tests del mapping/ejecución para el alcance declarado.
 - `REQUIRES_CUSTOM_HANDLER`: el efecto no entra razonablemente en genéricos actuales.
 - `NOT_IMPLEMENTED_YET`: efecto válido de XY1, pendiente de soporte/mapping/test.
@@ -186,12 +186,20 @@ Infraestructura/mappings agregados en Fase 11E.3:
 - `Fur Coat` mapeada/testeada como modificador de daño.
 - `Sweet Veil` parcialmente mapeada para prevención de nuevas condiciones especiales con Energía Fairy.
 
+Infraestructura/mappings agregados en Fase 11E.4:
+
+- `EnergyEffectMapping` para trazar cartas Energy reales separadas de ataques, Trainers y habilidades.
+- `Double Colorless Energy` mapeada/testeada como dos símbolos `COLORLESS` en `EnergyProfile`.
+- Energías Básicas `xy1-132` a `xy1-140` auditadas como comportamiento estructural sin `EffectDefinition` textual.
+- `Rainbow Energy` documentada como gap por energía dinámica one-at-a-time y trigger al adjuntar desde mano.
+
 Gaps todavía pendientes para completar XY1:
 
 - Más mappings/tests reales para modificadores de daño, prevención, retiro y condiciones.
 - Servicio completo de habilidades activadas con límites de uso.
 - Resolver reactivo completo para habilidades pasivas/reactivas.
 - Cleanup continuo de condiciones especiales existentes para completar `Sweet Veil`.
+- Soporte completo de `Rainbow Energy`: provisión dinámica de cualquier tipo como una sola Energía a la vez y trigger `on attach from hand` para colocar 1 contador de daño.
 - Efectos continuos complejos de Tool/Stadium con condiciones/duración avanzadas.
 - Selección desde zonas ocultas, reveal y privacidad de mano/mazo/premios.
 - Timing avanzado: before damage, after damage, between turns, on damaged, while in play, next turn.

@@ -7,12 +7,14 @@ import com.tpi.pokemon.game.domain.enums.CardSupertype;
 import com.tpi.pokemon.game.domain.enums.EnergyType;
 import com.tpi.pokemon.game.domain.enums.SpecialCondition;
 import com.tpi.pokemon.game.domain.model.AttachedCards;
+import com.tpi.pokemon.game.domain.model.AttackDefinition;
 import com.tpi.pokemon.game.domain.model.CardDefinitionRef;
 import com.tpi.pokemon.game.domain.model.CardInstance;
 import com.tpi.pokemon.game.domain.model.EnergyProfile;
 import com.tpi.pokemon.game.domain.model.PokemonInPlay;
 import com.tpi.pokemon.game.domain.value.CardInstanceId;
 import com.tpi.pokemon.game.domain.value.PlayerId;
+import com.tpi.pokemon.game.engine.attack.EnergyCostValidator;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
 import com.tpi.pokemon.game.engine.effect.EffectCardZone;
 import com.tpi.pokemon.game.engine.effect.EffectTarget;
@@ -356,6 +358,89 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void basicEnergyCardsAreAuditedWithoutTextualEffects() {
+        assertThat(catalog.energyMappingForCard("xy1-132")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.cardName()).isEqualTo("Grass Energy");
+            assertThat(mapping.subtype()).isEqualTo(CardSubtype.BASIC_ENERGY);
+            assertThat(mapping.energyProfile().provides()).containsExactly(EnergyType.GRASS);
+            assertThat(mapping.playEffects()).isEmpty();
+            assertThat(mapping.continuousEffects()).isEmpty();
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED);
+        });
+
+        assertThat(catalog.energyMappingForCard("xy1-140")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.cardName()).isEqualTo("Fairy Energy");
+            assertThat(mapping.subtype()).isEqualTo(CardSubtype.BASIC_ENERGY);
+            assertThat(mapping.energyProfile().provides()).containsExactly(EnergyType.FAIRY);
+            assertThat(mapping.playEffects()).isEmpty();
+            assertThat(mapping.continuousEffects()).isEmpty();
+        });
+    }
+
+    @Test
+    void energyWithoutMappingOrTextualEffectReturnsEmptyEffects() {
+        assertThat(catalog.effectsForEnergy("xy1-132")).isEmpty();
+        assertThat(catalog.continuousEffectsForEnergy("xy1-132")).isEmpty();
+        assertThat(catalog.energyMappingForCard("xy1-999")).isEmpty();
+        assertThat(catalog.effectsForEnergy("xy1-999")).isEmpty();
+        assertThat(catalog.continuousEffectsForEnergy("xy1-999")).isEmpty();
+    }
+
+    @Test
+    void doubleColorlessEnergyProvidesTwoColorlessEnergy() {
+        assertThat(catalog.energyMappingForCard("xy1-130")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.cardName()).isEqualTo("Double Colorless Energy");
+            assertThat(mapping.subtype()).isEqualTo(CardSubtype.SPECIAL_ENERGY);
+            assertThat(mapping.energyProfile().provides()).containsExactly(EnergyType.COLORLESS, EnergyType.COLORLESS);
+            assertThat(mapping.playEffects()).isEmpty();
+            assertThat(mapping.continuousEffects()).isEmpty();
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+        });
+    }
+
+    @Test
+    void doubleColorlessEnergyPaysTwoColorlessCost() {
+        EnergyEffectMapping mapping = catalog.energyMappingForCard("xy1-130").orElseThrow();
+        PokemonInPlay attacker = pokemon("attacker")
+                .withAttachedEnergy(specialEnergy("dce", "Double Colorless Energy", mapping.energyProfile()));
+        AttackDefinition attack = new AttackDefinition("two-colorless", "Two Colorless", List.of(EnergyType.COLORLESS, EnergyType.COLORLESS), 20);
+
+        assertThat(new EnergyCostValidator().hasEnoughEnergy(attacker, attack)).isTrue();
+    }
+
+    @Test
+    void rainbowEnergyRemainsDocumentedGapUntilDynamicEnergyAndAttachTriggerExist() {
+        assertThat(catalog.energyMappingForCard("xy1-131")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.cardName()).isEqualTo("Rainbow Energy");
+            assertThat(mapping.subtype()).isEqualTo(CardSubtype.SPECIAL_ENERGY);
+            assertThat(mapping.energyProfile().provides()).containsExactly(EnergyType.COLORLESS);
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.tested()).isFalse();
+        });
+    }
+
+    @Test
+    void attachedEnergyConditionStillMatchesBasicFairyEnergyAfterEnergyMappings() {
+        var sweetVeil = catalog.continuousEffectsForPokemon("xy1-95").get(0);
+        EnergyEffectMapping fairyEnergy = catalog.energyMappingForCard("xy1-140").orElseThrow();
+        PokemonInPlay withFairyEnergy = pokemon("target-3")
+                .withAttachedEnergy(basicEnergy("xy1-140-instance", "Fairy Energy", fairyEnergy.energyProfile()));
+
+        assertThat(sweetVeil.condition().matches(withFairyEnergy)).isTrue();
+    }
+
+    @Test
+    void phase11E4AddsEnergyMappingsWithoutBreakingPreviousXy1Mappings() {
+        assertThat(catalog.effectsForAttack("xy1-1", "Poison Powder")).isNotEmpty();
+        assertThat(catalog.effectsForTrainer("xy1-125")).isNotEmpty();
+        assertThat(catalog.abilityMappingForName("xy1-114", "Fur Coat")).isPresent();
+        assertThat(catalog.energyMappingForCard("xy1-130")).isPresent();
+        assertThat(catalog.expectedCardCount()).isEqualTo(146);
+        assertThat(catalog.isCompleteAudit()).isFalse();
+    }
+
+    @Test
     void pendingTrainerMappingsDoNotClaimFullyTested() {
         assertThat(catalog.auditEntriesForCard("xy1-127")).singleElement().satisfies(entry -> {
             assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
@@ -414,6 +499,31 @@ class Xy1EffectCatalogTest {
                 List.of(),
                 List.of(),
                 EnergyProfile.basic(type));
+        return new CardInstance(new CardInstanceId(id), definition, new PlayerId("p1"));
+    }
+
+    private static CardInstance basicEnergy(String id, String name, EnergyProfile profile) {
+        return energyCard(id, name, CardSubtype.BASIC_ENERGY, profile);
+    }
+
+    private static CardInstance specialEnergy(String id, String name, EnergyProfile profile) {
+        return energyCard(id, name, CardSubtype.SPECIAL_ENERGY, profile);
+    }
+
+    private static CardInstance energyCard(String id, String name, CardSubtype subtype, EnergyProfile profile) {
+        CardDefinitionRef definition = new CardDefinitionRef(
+                id + "-def",
+                name,
+                CardSupertype.ENERGY,
+                Set.of(subtype),
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                profile);
         return new CardInstance(new CardInstanceId(id), definition, new PlayerId("p1"));
     }
 }

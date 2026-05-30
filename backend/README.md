@@ -318,6 +318,7 @@ Componentes principales:
 - `AttackEffectMapping`: vínculo entre `cardId`, ataque real y `EffectDefinition`.
 - `TrainerEffectMapping`: vínculo entre `cardId`, carta Trainer real, efectos al jugarla y efectos continuos de Tool/Stadium cuando aplica.
 - `AbilityEffectMapping`: vínculo entre `cardId`, habilidad Pokémon real y efectos continuos/preventivos cuando aplica.
+- `EnergyEffectMapping`: vínculo entre `cardId`, carta Energy real, perfil de energía estructural y gaps de Energía Especial cuando aplica.
 - `Xy1AuditEntry`: metadata de auditoría para documentación y tests.
 - `Xy1AuditStatus`: estados como `DATA_IMPORTED`, `EFFECT_CLASSIFIED`, `EFFECT_MAPPED`, `FULLY_TESTED`, `REQUIRES_CUSTOM_HANDLER` y `NOT_IMPLEMENTED_YET`.
 - `Xy1EffectCategory`: categorías como `DAMAGE_ONLY`, `DAMAGE_PLUS_STATUS`, `DAMAGE_PLUS_HEAL`, `DRAW_CARDS`, `DISCARD_ENERGY`, `ABILITY_PASSIVE` y `CONTINUOUS_EFFECT`.
@@ -346,6 +347,12 @@ Fase 11E.3 agrega mapeo progresivo de habilidades Pokémon XY1 usando la infraes
 - `xy1-95 Slurpuff / Sweet Veil`: prevención parcial de nuevas condiciones especiales para Pokémon propios con Energía Fairy unida; falta remover condiciones existentes.
 - `xy1-14 Chesnaught / Spiky Shield`: queda documentada como gap porque requiere resolver reactivo al recibir daño de ataque y colocar contadores en el atacante.
 
+Fase 11E.4 audita y mapea Energías XY1:
+
+- `xy1-132` a `xy1-140`: Energías Básicas sin efecto textual; se tratan como datos estructurales mediante `EnergyProfile.basic(...)`.
+- `xy1-130 Double Colorless Energy`: Energía Especial mapeada como `EnergyProfile.of(COLORLESS, COLORLESS)` para pagar dos símbolos incoloros.
+- `xy1-131 Rainbow Energy`: queda pendiente para soporte completo porque requiere provisión dinámica de cualquier tipo como una sola Energía a la vez y un trigger al adjuntarse desde mano que pone 1 contador de daño.
+
 Esto no implica soporte completo de Trainers, Stadiums, Tools ni efectos continuos. La ejecución pública de Trainers que requieren selección desde mazo/mano, reveal, shuffle o privacidad de zonas ocultas sigue limitada porque no hay endpoints REST de partida, WebSocket, frontend ni vistas seguras por jugador.
 
 Gaps documentados:
@@ -357,6 +364,7 @@ Gaps documentados:
 - Stadium/Tool con efectos continuos condicionados por Energía unida: requieren mapping carta por carta, timing y tests.
 - `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva.
 - `xy1-95 Slurpuff / Sweet Veil`: falta cleanup continuo de condiciones existentes para soporte completo.
+- `xy1-131 Rainbow Energy`: falta energía dinámica one-at-a-time y trigger `on attach from hand`.
 
 Reglas de diseño de Fase 11:
 

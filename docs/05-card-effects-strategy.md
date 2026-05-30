@@ -242,12 +242,32 @@ Nuevo soporte estructural de 11E.3:
 
 Limitación honesta: una habilidad puede estar parcialmente modelada para una parte segura del texto y seguir marcada pendiente si falta cleanup, timing reactivo, selección, privacidad o integración pública.
 
+## Fase 11E.4 - Auditoría de Energías XY1
+
+Fase 11E.4 revisa las 11 cartas `Energy` oficiales de `xy1` verificadas contra `pokemontcg.io` v2:
+
+- Energías Especiales: `xy1-130 Double Colorless Energy` y `xy1-131 Rainbow Energy`.
+- Energías Básicas: `xy1-132` a `xy1-140` (`Grass`, `Fire`, `Water`, `Lightning`, `Psychic`, `Fighting`, `Darkness`, `Metal`, `Fairy`).
+
+Decisiones de mapping:
+
+- Las Energías Básicas no requieren `EffectDefinition` textual: su comportamiento es estructural mediante `EnergyProfile.basic(tipo)`, coste de ataque/retiro y validación de mazo.
+- `Double Colorless Energy` queda mapeada estructuralmente como `EnergyProfile.of(COLORLESS, COLORLESS)`. No requiere handler de efecto porque el `EnergyCostValidator` ya consume todos los símbolos provistos.
+- `Rainbow Energy` queda como gap documentado: no debe modelarse como lista de todos los tipos porque el modelo actual contaría múltiples símbolos simultáneos y violaría “provides only 1 Energy at a time”. Además falta un trigger `on attach from hand` para colocar 1 contador de daño.
+
+Criterio documental:
+
+- Una Energía Básica puede estar auditada/testeada como `BASIC_ENERGY` sin mapping textual.
+- Una Energía Especial solo queda completa si su provisión de energía y sus triggers están modelados/testeados sin simplificar reglas oficiales.
+- Las condiciones “Pokémon con Energía Fairy/Darkness unida” usadas por `Sweet Veil`, `Fairy Garden` o `Shadow Circle` dependen de detección de energía unida, pero eso no completa esas cartas automáticamente.
+
 Gaps documentados, no implementados como soporte completo:
 
 - `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
 - `xy1-127 Shauna`: requiere mezclar mano en mazo y robar 5; `DrawCardsEffectHandler` solo no alcanza.
 - `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva al recibir daño.
 - `xy1-95 Slurpuff / Sweet Veil`: prevención por Energía Fairy parcialmente mapeada; falta remover condiciones existentes.
+- `xy1-131 Rainbow Energy`: provisión dinámica de cualquier tipo, limitada a 1 Energía a la vez, y trigger al adjuntarse desde mano.
 
 ## Cómo agregar un nuevo mapping
 

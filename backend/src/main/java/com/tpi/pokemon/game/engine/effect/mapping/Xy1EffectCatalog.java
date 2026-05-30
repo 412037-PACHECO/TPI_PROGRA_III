@@ -3,6 +3,7 @@ package com.tpi.pokemon.game.engine.effect.mapping;
 import com.tpi.pokemon.game.domain.enums.CardSubtype;
 import com.tpi.pokemon.game.domain.enums.EnergyType;
 import com.tpi.pokemon.game.domain.enums.SpecialCondition;
+import com.tpi.pokemon.game.domain.model.EnergyProfile;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
 import com.tpi.pokemon.game.engine.effect.CardFilterSpec;
 import com.tpi.pokemon.game.engine.effect.EffectTarget;
@@ -34,26 +35,32 @@ public final class Xy1EffectCatalog {
     private final Map<String, TrainerEffectMapping> trainerMappingsByCardId;
     private final Map<CardAttackKey, AbilityEffectMapping> abilityMappings;
     private final Map<String, List<AbilityEffectMapping>> abilityMappingsByCardId;
+    private final Map<String, EnergyEffectMapping> energyMappingsByCardId;
     private final Map<String, List<Xy1AuditEntry>> auditEntriesByCardId;
 
     public Xy1EffectCatalog() {
-        this(defaultAttackMappings(), defaultTrainerMappings(), defaultAbilityMappings(), defaultAuditEntries());
+        this(defaultAttackMappings(), defaultTrainerMappings(), defaultAbilityMappings(), defaultEnergyMappings(), defaultAuditEntries());
     }
 
     public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<Xy1AuditEntry> auditEntries) {
-        this(attackMappings, List.of(), List.of(), auditEntries);
+        this(attackMappings, List.of(), List.of(), List.of(), auditEntries);
     }
 
     public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<TrainerEffectMapping> trainerMappings, List<Xy1AuditEntry> auditEntries) {
-        this(attackMappings, trainerMappings, List.of(), auditEntries);
+        this(attackMappings, trainerMappings, List.of(), List.of(), auditEntries);
     }
 
     public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<TrainerEffectMapping> trainerMappings, List<AbilityEffectMapping> abilityMappings, List<Xy1AuditEntry> auditEntries) {
+        this(attackMappings, trainerMappings, abilityMappings, List.of(), auditEntries);
+    }
+
+    public Xy1EffectCatalog(List<AttackEffectMapping> attackMappings, List<TrainerEffectMapping> trainerMappings, List<AbilityEffectMapping> abilityMappings, List<EnergyEffectMapping> energyMappings, List<Xy1AuditEntry> auditEntries) {
         this.attackMappings = indexAttackMappings(attackMappings);
         this.mappingsByCardId = indexMappingsByCardId(attackMappings);
         this.trainerMappingsByCardId = indexTrainerMappingsByCardId(trainerMappings);
         this.abilityMappings = indexAbilityMappings(abilityMappings);
         this.abilityMappingsByCardId = indexAbilityMappingsByCardId(abilityMappings);
+        this.energyMappingsByCardId = indexEnergyMappingsByCardId(energyMappings);
         this.auditEntriesByCardId = indexAuditEntriesByCardId(auditEntries);
     }
 
@@ -129,6 +136,25 @@ public final class Xy1EffectCatalog {
                 .toList();
     }
 
+    public Optional<EnergyEffectMapping> energyMappingForCard(String cardId) {
+        if (isBlank(cardId)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(energyMappingsByCardId.get(cardId.trim().toLowerCase(java.util.Locale.ROOT)));
+    }
+
+    public List<EffectDefinition> effectsForEnergy(String cardId) {
+        return energyMappingForCard(cardId)
+                .map(EnergyEffectMapping::playEffects)
+                .orElse(List.of());
+    }
+
+    public List<CardEffectDefinition> continuousEffectsForEnergy(String cardId) {
+        return energyMappingForCard(cardId)
+                .map(EnergyEffectMapping::continuousEffects)
+                .orElse(List.of());
+    }
+
     public List<Xy1AuditEntry> auditEntriesForCard(String cardId) {
         if (isBlank(cardId)) {
             return List.of();
@@ -188,6 +214,14 @@ public final class Xy1EffectCatalog {
             indexed.computeIfAbsent(mapping.cardId().toLowerCase(java.util.Locale.ROOT), ignored -> new ArrayList<>()).add(mapping);
         }
         return copyListMap(indexed);
+    }
+
+    private static Map<String, EnergyEffectMapping> indexEnergyMappingsByCardId(List<EnergyEffectMapping> mappings) {
+        Map<String, EnergyEffectMapping> indexed = new LinkedHashMap<>();
+        for (EnergyEffectMapping mapping : mappings) {
+            indexed.put(mapping.cardId().toLowerCase(java.util.Locale.ROOT), mapping);
+        }
+        return Map.copyOf(indexed);
     }
 
     private static Map<String, List<Xy1AuditEntry>> indexAuditEntriesByCardId(List<Xy1AuditEntry> entries) {
@@ -407,6 +441,51 @@ public final class Xy1EffectCatalog {
                         "Requires a reactive on-damaged-by-attack resolver that can place 3 damage counters on the attacker, even if Chesnaught is Knocked Out."));
     }
 
+    private static List<EnergyEffectMapping> defaultEnergyMappings() {
+        return List.of(
+                specialEnergy("xy1-130", "Double Colorless Energy", "Double Colorless Energy provides ColorlessColorless Energy.",
+                        categories(Xy1EffectCategory.SPECIAL_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW,
+                        EnergyProfile.of(EnergyType.COLORLESS, EnergyType.COLORLESS),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED),
+                        true,
+                        "Structured as two Colorless symbols in EnergyProfile; no EffectDefinition is required."),
+                specialEnergy("xy1-131", "Rainbow Energy", "This card provides Colorless Energy. While in play, this card provides every type of Energy but provides only 1 Energy at a time. When you attach this card from your hand to 1 of your Pokémon, put 1 damage counter on that Pokémon.",
+                        categories(Xy1EffectCategory.SPECIAL_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY, Xy1EffectCategory.ATTACH_TRIGGER, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH,
+                        EnergyProfile.of(EnergyType.COLORLESS),
+                        statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET),
+                        false,
+                        "Static COLORLESS fallback is documented only; full support needs dynamic one-at-a-time typed energy and an on-attach-from-hand damage-counter trigger."),
+                basicEnergy("xy1-132", "Grass Energy", EnergyType.GRASS),
+                basicEnergy("xy1-133", "Fire Energy", EnergyType.FIRE),
+                basicEnergy("xy1-134", "Water Energy", EnergyType.WATER),
+                basicEnergy("xy1-135", "Lightning Energy", EnergyType.LIGHTNING),
+                basicEnergy("xy1-136", "Psychic Energy", EnergyType.PSYCHIC),
+                basicEnergy("xy1-137", "Fighting Energy", EnergyType.FIGHTING),
+                basicEnergy("xy1-138", "Darkness Energy", EnergyType.DARKNESS),
+                basicEnergy("xy1-139", "Metal Energy", EnergyType.METAL),
+                basicEnergy("xy1-140", "Fairy Energy", EnergyType.FAIRY));
+    }
+
+    private static EnergyEffectMapping basicEnergy(String cardId, String cardName, EnergyType type) {
+        return new EnergyEffectMapping(
+                cardId,
+                cardName,
+                CardSubtype.BASIC_ENERGY,
+                "",
+                categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY),
+                Xy1EffectComplexity.LOW,
+                EnergyProfile.basic(type),
+                List.of(),
+                List.of(),
+                statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED),
+                true,
+                "Basic Energy has no textual effect mapping; behavior is structural through EnergyProfile.");
+    }
+
+    private static EnergyEffectMapping specialEnergy(String cardId, String cardName, String ruleText, Set<Xy1EffectCategory> categories, Xy1EffectComplexity complexity, EnergyProfile energyProfile, Set<Xy1AuditStatus> statuses, boolean tested, String notes) {
+        return new EnergyEffectMapping(cardId, cardName, CardSubtype.SPECIAL_ENERGY, ruleText, categories, complexity, energyProfile, List.of(), List.of(), statuses, tested, notes);
+    }
+
     private static AbilityEffectMapping ability(String cardId, String cardName, String abilityId, String abilityName, String effectText, Set<Xy1EffectCategory> categories, Xy1EffectComplexity complexity, List<CardEffectDefinition> continuousEffects, Set<Xy1AuditStatus> statuses, boolean tested, String notes) {
         return new AbilityEffectMapping(cardId, cardName, abilityId, abilityName, effectText, categories, complexity, continuousEffects, statuses, tested, notes);
     }
@@ -472,7 +551,18 @@ public final class Xy1EffectCatalog {
                 audit("xy1-129", "Team Flare Grunt", "Trainer", "Supporter", "none", "none", "Supporter", "Discard an Energy attached to your opponent's Active Pokémon.", categories(Xy1EffectCategory.DISCARD_ENERGY), Xy1EffectComplexity.LOW, true, "DiscardAttachedEnergyEffectHandler", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Phase 11E.2 maps attached Energy discard from opponent Active."),
                 audit("xy1-14", "Chesnaught", "Pokémon", "Stage 2", "Touchdown", "Spiky Shield", "none", "Spiky Shield reacts when damaged by an opponent's attack; Touchdown heals 20 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.DAMAGE_PLUS_HEAL, Xy1EffectCategory.CONTINUOUS_EFFECT), Xy1EffectComplexity.HIGH, true, "HealDamageEffectHandler partial for Touchdown only; reactive ability resolver pending", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Touchdown mapped/tested in Phase 11E.1; Spiky Shield ability mapping remains pending because ON_DAMAGE_RECEIVED reactive resolution is not implemented."),
                 audit("xy1-95", "Slurpuff", "Pokémon", "Stage 1", "Draining Kiss", "Sweet Veil", "none", "Sweet Veil prevents/removes Special Conditions for own Pokémon with Fairy Energy; Draining Kiss heals 30 from this Pokémon.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.DAMAGE_PLUS_HEAL), Xy1EffectComplexity.HIGH, true, "ModifierResolver PREVENT_SPECIAL_CONDITION partial; HealDamageEffectHandler partial", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Sweet Veil prevention of new Special Conditions is mapped/tested for Fairy Energy targets; removing existing Special Conditions remains pending."),
-                audit("xy1-114", "Furfrou", "Pokémon", "Basic", "Energy Cutoff", "Fur Coat", "none", "Fur Coat reduces damage done to this Pokémon by attacks by 20 after Weakness and Resistance.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM, true, "ModifierResolver", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Fur Coat continuous self damage reduction mapped/tested in Phase 11E.3; Energy Cutoff attack remains outside this ability mapping.")
+                audit("xy1-114", "Furfrou", "Pokémon", "Basic", "Energy Cutoff", "Fur Coat", "none", "Fur Coat reduces damage done to this Pokémon by attacks by 20 after Weakness and Resistance.", categories(Xy1EffectCategory.ABILITY_PASSIVE, Xy1EffectCategory.CONTINUOUS_EFFECT, Xy1EffectCategory.MODIFY_DAMAGE), Xy1EffectComplexity.MEDIUM, true, "ModifierResolver", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Fur Coat continuous self damage reduction mapped/tested in Phase 11E.3; Energy Cutoff attack remains outside this ability mapping."),
+                audit("xy1-130", "Double Colorless Energy", "Energy", "Special", "none", "none", "Double Colorless Energy provides ColorlessColorless Energy.", "Provides two Colorless Energy while attached.", categories(Xy1EffectCategory.SPECIAL_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED), true, "Mapped structurally as EnergyProfile.of(COLORLESS, COLORLESS); no EffectDefinition is needed."),
+                audit("xy1-131", "Rainbow Energy", "Energy", "Special", "none", "none", "Provides Colorless; while in play provides every type but only 1 Energy at a time; when attached from hand put 1 damage counter on that Pokémon.", "Dynamic one-at-a-time typed energy plus attach-from-hand damage counter trigger.", categories(Xy1EffectCategory.SPECIAL_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY, Xy1EffectCategory.ATTACH_TRIGGER, Xy1EffectCategory.CUSTOM_REQUIRED), Xy1EffectComplexity.HIGH, false, "EnergyProfile partial only", true, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET), false, "Do not model as all EnergyTypes in EnergyProfile; current static profile cannot express one-at-a-time dynamic choice or on-attach trigger."),
+                audit("xy1-132", "Grass Energy", "Energy", "Basic", "none", "none", "none", "Basic Grass Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides GRASS structurally."),
+                audit("xy1-133", "Fire Energy", "Energy", "Basic", "none", "none", "none", "Basic Fire Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides FIRE structurally."),
+                audit("xy1-134", "Water Energy", "Energy", "Basic", "none", "none", "none", "Basic Water Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides WATER structurally."),
+                audit("xy1-135", "Lightning Energy", "Energy", "Basic", "none", "none", "none", "Basic Lightning Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides LIGHTNING structurally."),
+                audit("xy1-136", "Psychic Energy", "Energy", "Basic", "none", "none", "none", "Basic Psychic Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides PSYCHIC structurally."),
+                audit("xy1-137", "Fighting Energy", "Energy", "Basic", "none", "none", "none", "Basic Fighting Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides FIGHTING structurally."),
+                audit("xy1-138", "Darkness Energy", "Energy", "Basic", "none", "none", "none", "Basic Darkness Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides DARKNESS structurally; does not complete Shadow Circle by itself."),
+                audit("xy1-139", "Metal Energy", "Energy", "Basic", "none", "none", "none", "Basic Metal Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides METAL structurally."),
+                audit("xy1-140", "Fairy Energy", "Energy", "Basic", "none", "none", "none", "Basic Fairy Energy.", categories(Xy1EffectCategory.BASIC_ENERGY, Xy1EffectCategory.PROVIDES_ENERGY), Xy1EffectComplexity.LOW, true, "EnergyProfile", false, statuses(Xy1AuditStatus.DATA_IMPORTED, Xy1AuditStatus.EFFECT_CLASSIFIED, Xy1AuditStatus.EFFECT_SUPPORTED_BY_GENERIC_HANDLER, Xy1AuditStatus.FULLY_TESTED), true, "No textual mapping needed; provides FAIRY structurally and can satisfy attached-energy conditions such as Sweet Veil.")
         );
     }
 
