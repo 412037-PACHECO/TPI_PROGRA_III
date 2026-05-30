@@ -85,6 +85,13 @@ Una carta no debe marcarse `FULLY_TESTED` solo porque exista un handler genéric
 - `ApplySpecialConditionEffectHandler`
 - `DrawCardsEffectHandler`
 - `DiscardAttachedEnergyEffectHandler`
+- `SearchDeckEffectHandler`
+- `ShuffleDeckEffectHandler`
+- `DiscardCardsEffectHandler`
+- `AttachEnergyEffectHandler`
+- `MoveEnergyEffectHandler`
+- `SwitchActiveEffectHandler`
+- `PlaceDamageCountersEffectHandler`
 - `CoinFlipEffectHandler`
 - `CompositeEffectHandler`
 
@@ -100,8 +107,8 @@ La tabla siguiente sigue siendo el subset explícitamente mapeado/documentado. P
 | xy1-10 | Pansage | Pokémon | Basic | Vine Whip; Leech Seed | none | none | Vine Whip: daño base sin texto. Leech Seed: `Heal 10 damage from this Pokémon.` | DAMAGE_ONLY; DAMAGE_PLUS_HEAL | LOW | yes | AttackService; HealDamageEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | `Vine Whip` devuelve lista vacía de efectos por ser daño puro; `Leech Seed` mapea curación. |
 | xy1-16 | Spewpa | Pokémon | Stage 1 | Bug Bite; Stun Spore | none | none | Stun Spore: `Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed.` | DAMAGE_ONLY; DAMAGE_PLUS_COIN_FLIP; DAMAGE_PLUS_STATUS | MEDIUM | yes | CoinFlipEffectHandler; ApplySpecialConditionEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Mapping creado con rama heads Paralyzed y tails sin efecto secundario. |
 | xy1-68 | Sableye | Pokémon | Basic | Filch; Rip Claw | none | none | Filch: `Draw a card.` Rip Claw: `Flip a coin. If heads, discard an Energy attached to your opponent's Active Pokémon.` | DRAW_CARDS; DAMAGE_PLUS_COIN_FLIP; DISCARD_ENERGY | MEDIUM | yes | DrawCardsEffectHandler; CoinFlipEffectHandler; DiscardAttachedEnergyEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Mapping creado para robo y descarte condicional de energía. |
-| xy1-123 | Professor's Letter | Trainer | Item | none | none | Item | `Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.` | SEARCH_DECK | MEDIUM | no | none | no/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | Requiere `SearchDeckEffect`, reveal, shuffle y tratamiento de zona oculta. |
-| xy1-127 | Shauna | Trainer | Supporter | none | none | Supporter rule | `Shuffle your hand into your deck. Then, draw 5 cards.` | DRAW_CARDS; DISCARD_CARD; CUSTOM_REQUIRED | MEDIUM | no | DrawCardsEffectHandler partial only | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | No alcanza con robar 5: primero debe mezclar mano en mazo y barajar. |
+| xy1-123 | Professor's Letter | Trainer | Item | none | none | Item | `Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.` | SEARCH_DECK | MEDIUM | partial | SearchDeckEffectHandler; ShuffleDeckEffectHandler | no/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | Handler genérico disponible, pero falta mapping carta por carta y contrato público de selección/reveal. |
+| xy1-127 | Shauna | Trainer | Supporter | none | none | Supporter rule | `Shuffle your hand into your deck. Then, draw 5 cards.` | DRAW_CARDS; DISCARD_CARD; CUSTOM_REQUIRED | MEDIUM | partial | DiscardCardsEffectHandler; ShuffleDeckEffectHandler; DrawCardsEffectHandler | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | Los handlers base existen parcialmente; falta composición/mapping y modelar mover mano completa al mazo. |
 | xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Gap representativo: habilidad reactiva `on damaged by attack` no soportada por timing actual. |
 | xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Gap representativo de efecto continuo/preventivo condicionado por energía unida. |
 
@@ -115,15 +122,18 @@ La tabla siguiente sigue siendo el subset explícitamente mapeado/documentado. P
 
 ## Gaps detectables por la herramienta
 
-Handlers/infraestructura faltante para completar XY1:
+Handlers/infraestructura que deja de ser gap base en Fase 11C, aunque todavía requiere mappings y tests por carta:
 
-- `SearchDeckEffectHandler` y reveal de cartas buscadas.
+- `SearchDeckEffectHandler`.
 - `ShuffleDeckEffectHandler`.
-- `DiscardCardsEffectHandler` para mano/mazo no energía.
+- `DiscardCardsEffectHandler`.
 - `AttachEnergyEffectHandler`.
 - `MoveEnergyEffectHandler`.
 - `SwitchActiveEffectHandler`.
 - `PlaceDamageCountersEffectHandler`.
+
+Gaps todavía pendientes para completar XY1:
+
 - `DamageModifierEffectHandler`.
 - `PreventDamageEffectHandler`.
 - `RetreatCostModifierEffectHandler`.

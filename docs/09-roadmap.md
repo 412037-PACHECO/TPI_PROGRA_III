@@ -196,6 +196,15 @@ Decisiones fase 11:
 - La subfase `feature/xy1-full-audit` no implementa handlers faltantes; clasifica efectos desde cache local y genera reporte con `importedCardCount`, conteos por complejidad y gaps.
 - Si no hay `backend/data`/cache importado, no se puede afirmar auditoría factual de las 146 cartas en ese entorno; debe importarse `xy1` antes de ejecutar el reporte completo.
 
+### Fase 11C - Primera tanda de handlers faltantes
+
+- Estado: implementada como handlers genéricos puros Java, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: desbloquear categorías directas detectadas en auditoría XY1 sin mapear todavía las 146 cartas completas.
+- Entregables: `SearchDeckEffectHandler`, `ShuffleDeckEffectHandler`, `DiscardCardsEffectHandler`, `AttachEnergyEffectHandler`, `MoveEnergyEffectHandler`, `SwitchActiveEffectHandler`, `PlaceDamageCountersEffectHandler`, eventos mínimos y tests unitarios.
+- Fuera de alcance: habilidades pasivas/reactivas/continuas, efectos persistentes de Tool/Stadium, prevent/damage/retreat modifiers globales, WebSocket, frontend, persistencia, endpoints de juego y parser automático de texto.
+- Riesgos: confundir handler disponible con carta soportada, filtrar información de zonas ocultas, resolver selección futura sin contrato público y duplicar lógica de KO.
+- Criterio: handlers testeados aisladamente, selección pendiente modelada, categorías documentadas y matriz sin afirmar cobertura completa.
+
 ## Fase 12 - Persistencia de snapshots/logs
 
 - Objetivo: guardar/reconstruir partida.

@@ -240,13 +240,20 @@ Componentes principales:
 - `EffectExecutionService`: ejecuta efectos simples o compuestos en orden.
 - Matriz `docs/11-xy1-audit-matrix.md`: registra qué cartas/efectos XY1 están clasificados, implementados y testeados.
 
-Handlers genéricos iniciales:
+Handlers genéricos disponibles hasta Fase 11C:
 
 - `DealDamageEffectHandler`.
 - `HealDamageEffectHandler`.
 - `ApplySpecialConditionEffectHandler`.
 - `DrawCardsEffectHandler`.
 - `DiscardAttachedEnergyEffectHandler`.
+- `SearchDeckEffectHandler`.
+- `ShuffleDeckEffectHandler`.
+- `DiscardCardsEffectHandler`.
+- `AttachEnergyEffectHandler`.
+- `MoveEnergyEffectHandler`.
+- `SwitchActiveEffectHandler`.
+- `PlaceDamageCountersEffectHandler`.
 - `CoinFlipEffectHandler`.
 - `CompositeEffectHandler`.
 
@@ -264,6 +271,27 @@ Limitaciones honestas de Fase 10:
 - No todas las cartas XY1 están mapeadas.
 - No hay ejecución completa de habilidades, Trainers, Estadios, Herramientas ni Energías Especiales.
 - No hay persistencia de partidas, WebSocket ni vistas seguras por jugador.
+
+### Fase 11C - Primera tanda de handlers faltantes
+
+La Fase 11C desbloquea categorías genéricas frecuentes detectadas por la auditoría XY1, sin mapear todavía las 146 cartas completas.
+
+Categorías desbloqueadas:
+
+- `SEARCH_DECK`: búsqueda estructurada en mazo con filtro simple y selección explícita.
+- `SHUFFLE_DECK`: barajado por efecto mediante `DeckShuffler` inyectable.
+- `DISCARD_CARDS`: descarte desde mano o mazo.
+- `ATTACH_ENERGY`: adjuntar Energía por efecto desde mano, descarte o mazo.
+- `MOVE_ENERGY`: mover Energía entre Pokémon propios.
+- `SWITCH_ACTIVE`: cambiar Activo por Pokémon de Banca cuando la selección ya está resuelta.
+- `PLACE_DAMAGE_COUNTERS`: colocar contadores directamente, distinto del daño de ataque.
+
+Limitaciones:
+
+- La selección pendiente queda modelada en `EffectResult` y eventos internos; no hay contrato público de API/frontend todavía.
+- `PlaceDamageCountersEffectHandler` integra KO/premios/victoria para Activo; distribución compleja y KOs de Banca quedan para fases futuras.
+- No se implementan habilidades pasivas/reactivas/continuas, prevent damage completo, modificadores globales de daño ni modificadores de retreat cost.
+- No hay WebSocket, frontend, persistencia de partida ni endpoints REST de juego.
 
 ## Auditoría y mapping XY1
 

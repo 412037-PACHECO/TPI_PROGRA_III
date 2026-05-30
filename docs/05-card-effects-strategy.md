@@ -60,20 +60,24 @@ Los handlers no deben depender de Spring, JPA, WebSocket ni API externa.
 - `DiscardAttachedEnergyEffect`
 - `CoinFlipEffect`
 - `CompositeEffect`
-
-Pendientes o futuros:
-
-- `NoOpEffect` para ataques cuyo único efecto actual sea daño base ya cubierto por `AttackService`.
-- `PlaceDamageCountersEffect`
 - `SearchDeckEffect`
 - `ShuffleDeckEffect`
 - `DiscardCardsEffect`
 - `AttachEnergyEffect`
+- `MoveEnergyEffect`
 - `SwitchActiveEffect`
+- `PlaceDamageCountersEffect`
+
+Pendientes o futuros:
+
+- `NoOpEffect` para ataques cuyo único efecto actual sea daño base ya cubierto por `AttackService`.
 - `RetreatCostModifierEffect`
 - `DamageModifierEffect`
 - `PreventDamageEffect`
 - `PersistentEffect`
+- Habilidades activadas/pasivas/reactivas completas.
+- Efectos continuos complejos de Tool/Stadium.
+- Contrato público de selección/reveal para frontend/API futura.
 
 Prioridad recomendada para XY1:
 
@@ -82,6 +86,25 @@ Prioridad recomendada para XY1:
 3. Curación y contadores de daño directos.
 4. Búsqueda en mazo, cambio de Activo y manipulación de Energía.
 5. Efectos persistentes de Stadium/Tool/Habilidad.
+
+## Fase 11C - Handlers directos
+
+La Fase 11C agrega una primera tanda de handlers genéricos para desbloquear más categorías XY1, sin mapear todavía las 146 cartas completas:
+
+- `SearchDeckEffectHandler`: mueve cartas seleccionadas del mazo a la mano, valida filtro simple y emite evidencia de búsqueda/reveal/shuffle requerido.
+- `ShuffleDeckEffectHandler`: baraja mazo usando `DeckShuffler` inyectable.
+- `DiscardCardsEffectHandler`: descarta cartas seleccionadas desde mano o mazo.
+- `AttachEnergyEffectHandler`: adjunta Energía desde mano, descarte o mazo sin consumir la unión manual del turno.
+- `MoveEnergyEffectHandler`: mueve Energía entre Pokémon propios seleccionados.
+- `SwitchActiveEffectHandler`: cambia Activo por Banca cuando el target está resuelto; si falta selección, devuelve `PendingEffectSelection`.
+- `PlaceDamageCountersEffectHandler`: coloca contadores directamente, separados del daño de ataque; integra KO/premios/victoria para Activo.
+
+Limitaciones de Fase 11C:
+
+- La selección pendiente queda modelada en `EffectResult`, no expuesta por API pública.
+- No hay WebSocket, frontend, persistencia de partida ni endpoints REST de juego.
+- No se implementan habilidades pasivas/reactivas/continuas ni modificadores globales de daño/retiro/prevent.
+- `PlaceDamageCountersEffectHandler` resuelve KO del Activo; KOs complejos/distribuidos a Banca quedan para fases futuras.
 
 ## Handlers custom
 

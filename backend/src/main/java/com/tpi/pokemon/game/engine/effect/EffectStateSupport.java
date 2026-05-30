@@ -1,6 +1,7 @@
 package com.tpi.pokemon.game.engine.effect;
 
 import com.tpi.pokemon.game.domain.model.ActivePokemon;
+import com.tpi.pokemon.game.domain.model.Bench;
 import com.tpi.pokemon.game.domain.model.BoardState;
 import com.tpi.pokemon.game.domain.model.CardInstance;
 import com.tpi.pokemon.game.domain.model.DeckZone;
@@ -46,7 +47,37 @@ final class EffectStateSupport {
         return new PlayerGameState(player.getPlayerId(), deck, hand, player.getPrizeCards(), player.getDiscardPile(), player.getBoard(), player.getTurnsTaken());
     }
 
+    static PlayerGameState withDeckHandAndDiscard(PlayerGameState player, DeckZone deck, HandZone hand, DiscardPile discardPile) {
+        return new PlayerGameState(player.getPlayerId(), deck, hand, player.getPrizeCards(), discardPile, player.getBoard(), player.getTurnsTaken());
+    }
+
     static PlayerGameState withDiscardAndBoard(PlayerGameState player, DiscardPile discardPile, BoardState board) {
         return new PlayerGameState(player.getPlayerId(), player.getDeck(), player.getHand(), player.getPrizeCards(), discardPile, board, player.getTurnsTaken());
+    }
+
+    static PlayerGameState withDeckHandDiscardAndBoard(PlayerGameState player, DeckZone deck, HandZone hand, DiscardPile discardPile, BoardState board) {
+        return new PlayerGameState(player.getPlayerId(), deck, hand, player.getPrizeCards(), discardPile, board, player.getTurnsTaken());
+    }
+
+    static PokemonInPlay pokemonByBenchIndexOrActive(PlayerGameState player, int benchIndex) {
+        if (benchIndex < 0) {
+            return player.getBoard().getActivePokemon().map(ActivePokemon::getPokemon).orElseThrow(() -> new EffectException("Target player has no active Pokemon"));
+        }
+        if (benchIndex >= player.getBoard().getBench().getPokemon().size()) {
+            throw new EffectException("bench index out of range: " + benchIndex);
+        }
+        return player.getBoard().getBench().getPokemon().get(benchIndex);
+    }
+
+    static BoardState withPokemonAtBenchIndexOrActive(BoardState board, PokemonInPlay pokemon, int benchIndex) {
+        if (benchIndex < 0) {
+            return new BoardState(new ActivePokemon(pokemon), board.getBench(), board.getActiveStadium().orElse(null));
+        }
+        java.util.List<PokemonInPlay> bench = new java.util.ArrayList<>(board.getBench().getPokemon());
+        if (benchIndex >= bench.size()) {
+            throw new EffectException("bench index out of range: " + benchIndex);
+        }
+        bench.set(benchIndex, pokemon);
+        return new BoardState(board.getActivePokemon().orElse(null), new Bench(bench), board.getActiveStadium().orElse(null));
     }
 }

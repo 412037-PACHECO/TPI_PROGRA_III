@@ -22,6 +22,13 @@ public final class EffectRegistry {
                 new ApplySpecialConditionEffectHandler(),
                 new DrawCardsEffectHandler(),
                 new DiscardAttachedEnergyEffectHandler(),
+                new SearchDeckEffectHandler(),
+                new ShuffleDeckEffectHandler(),
+                new DiscardCardsEffectHandler(),
+                new AttachEnergyEffectHandler(),
+                new MoveEnergyEffectHandler(),
+                new SwitchActiveEffectHandler(),
+                new PlaceDamageCountersEffectHandler(),
                 new CoinFlipEffectHandler(),
                 new CompositeEffectHandler()
         ));

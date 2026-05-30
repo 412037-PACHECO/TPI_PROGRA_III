@@ -26,6 +26,9 @@ public final class EffectExecutionService {
         for (EffectDefinition definition : definitions) {
             EffectResult result = execute(definition, current);
             state = result.state();
+            if (result.pendingSelectionOptional().isPresent()) {
+                return result;
+            }
             current = current.withState(state);
         }
         return new EffectResult(state);
