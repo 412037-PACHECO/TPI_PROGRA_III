@@ -533,21 +533,30 @@ class Xy1EffectCatalogTest {
             assertThat(effect.amount()).isEqualTo(5);
         });
         assertThat(catalog.effectsForTrainer("xy1-120")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.PUT_DISCARD_POKEMON_ON_TOP_DECK));
-        for (String cardId : List.of("xy1-120", "xy1-122", "xy1-123", "xy1-124", "xy1-127")) {
+        for (String cardId : List.of("xy1-120", "xy1-122", "xy1-124", "xy1-127")) {
             assertThat(catalog.auditEntriesForCard(cardId)).singleElement().satisfies(entry -> {
                 assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
                 assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.NOT_IMPLEMENTED_YET, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER);
                 assertThat(entry.tested()).isTrue();
             });
         }
+        assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement().satisfies(entry -> {
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.tested()).isFalse();
+        });
     }
 
     @Test
     void phase11G1CriticalEffectAuditEntriesClaimTestedOnlyForClosedCards() {
+        assertThat(catalog.abilityMappingForName("xy1-95", "Sweet Veil")).hasValueSatisfying(mapping -> {
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.tested()).isTrue();
+        });
         assertThat(catalog.auditEntriesForCard("xy1-95")).singleElement().satisfies(entry -> {
-            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
-            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.NOT_IMPLEMENTED_YET);
-            assertThat(entry.tested()).isTrue();
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.tested()).isFalse();
         });
         assertThat(catalog.auditEntriesForCard("xy1-126")).singleElement().satisfies(entry -> {
             assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
@@ -566,6 +575,34 @@ class Xy1EffectCatalogTest {
         assertThat(catalog.expectedCardCount()).isEqualTo(146);
         assertThat(catalog.auditedCardCount()).isLessThan(catalog.expectedCardCount());
         assertThat(catalog.isCompleteAudit()).isFalse();
+    }
+
+    @Test
+    void phase11G4KnownPartialCardsAreNotMarkedFullyTested() {
+        for (String cardId : List.of("xy1-5", "xy1-8", "xy1-18", "xy1-21", "xy1-27", "xy1-29", "xy1-32", "xy1-95", "xy1-114", "xy1-115", "xy1-116", "xy1-118", "xy1-123", "xy1-128")) {
+            assertThat(catalog.auditEntriesForCard(cardId)).singleElement().satisfies(entry -> {
+                assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+                assertThat(entry.tested()).isFalse();
+            });
+        }
+    }
+
+    @Test
+    void phase11G4ClosedCriticalMappingsExistWithoutClaimingFullXy1Completion() {
+        assertThat(catalog.effectsForTrainer("xy1-115")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.RETURN_POKEMON_TO_DECK));
+        assertThat(catalog.effectsForTrainer("xy1-116")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.EVOSODA_EVOLVE));
+        assertThat(catalog.effectsForTrainer("xy1-118")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.GREAT_BALL_SEARCH));
+        assertThat(catalog.effectsForTrainer("xy1-128")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.SUPER_POTION));
+        assertThat(catalog.isCompleteAudit()).isFalse();
+    }
+
+    @Test
+    void phase11G4CriticalCategoriesHaveRepresentativeMappings() {
+        assertThat(catalog.effectsForAttack("xy1-1", "Poison Powder")).isNotEmpty();
+        assertThat(catalog.effectsForTrainer("xy1-122")).isNotEmpty();
+        assertThat(catalog.abilityMappingForName("xy1-14", "Spiky Shield")).isPresent();
+        assertThat(catalog.energyMappingForCard("xy1-131")).isPresent();
+        assertThat(catalog.effectsForAttack("xy1-21", "Magma Mantle")).isEmpty();
     }
 
     @Test

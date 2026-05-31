@@ -224,6 +224,8 @@ Fase 11E.2 extiende `Xy1EffectCatalog` con mappings progresivos de cartas Traine
 
 Trainers pendientes históricos: `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`. Fase 11G.3 cierra `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y el alcance interno de `Professor's Letter`. Fase 11G.3B agrega handlers internos para `Cassius`, `Evosoda`, `Great Ball` y `Super Potion`; quedan pendientes los contratos públicos UI/API de selección/reveal/privacidad y la ejecución local completa de tests antes de marcarlos `FULLY_TESTED`.
 
+Fase 11G.4 verifica carta por carta los 146 IDs oficiales de `xy1` contra fuente oficial descargada. Resultado honesto: existen 146 cartas oficiales, pero solo 47 tienen fila detallada previa en la matriz de auditoría y 99 requieren clasificación fina en 11G.5. Esta fase además corrige marcas demasiado optimistas: `Professor's Letter`, `Slurpuff/Sweet Veil` como carta completa y `Furfrou/Fur Coat` como carta completa no deben marcarse `FULLY_TESTED` mientras dependan de selección pública futura o tengan ataques de la misma carta sin mapear/testear.
+
 Para Trainers, `EFFECT_MAPPED` no equivale automáticamente a “jugable desde UI/API”. Puede existir mapping engine-interno testeado mientras siga pendiente el contrato público de selección, reveal, privacidad o sincronización.
 
 ## Fase 11E.3 - Mapeo progresivo de habilidades Pokémon XY1
@@ -326,6 +328,17 @@ Gaps documentados, no implementados como soporte completo:
 - `xy1-128 Super Potion`: `SuperPotionEffectHandler` elige Pokémon propio, cura hasta 60 y descarta exactamente una Energía unida.
 
 Límite explícito: estos handlers devuelven `PendingEffectSelection` y metadata interna; todavía no definen vistas públicas seguras para UI/API/WebSocket.
+
+## Fase 11G.4 - Verificación carta por carta
+
+11G.4 no agrega funcionalidades grandes. Su objetivo es evitar una falsa afirmación de completitud:
+
+- Fuente oficial verificada: 146 cartas `xy1`.
+- Matriz de trazabilidad 146: `docs/12-xy1-card-by-card-verification.md`.
+- Filas detalladas existentes: 47.
+- Filas pendientes de clasificación detallada: 99.
+- Gaps mayores detectados para 11G.5: daño variable por monedas, efectos de duración `next turn`, daño/contadores a Banca o múltiples objetivos, habilidades activadas, búsqueda/selección de zonas ocultas con privacidad pública, y ataques con cambio/reemplazo coordinado.
+- Regla de calidad: `FULLY_TESTED` solo aplica cuando la carta o el alcance declarado están mapeados y testeados; handler genérico disponible no equivale a carta completa soportada.
 
 ## Cómo agregar un nuevo mapping
 

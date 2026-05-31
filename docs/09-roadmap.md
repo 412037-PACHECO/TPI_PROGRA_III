@@ -253,6 +253,14 @@ Decisiones fase 11:
 - `Great Ball`: handler interno para inspección top-7, elección opcional de Pokémon, reveal y shuffle.
 - `Super Potion`: handler interno para curar hasta 60 y descartar una Energía unida.
 - Pendiente: ejecutar suite local y diseñar contrato UI/API/WebSocket de selección segura antes de considerar cobertura pública completa.
+
+### Fase 11G.4 - Verificación carta por carta XY1
+
+- Verifica los 146 IDs oficiales del set `xy1` contra fuente oficial descargada de `pokemontcg.io` v2.
+- Agrega matriz de trazabilidad completa en `docs/12-xy1-card-by-card-verification.md`.
+- Resultado actual: 47 cartas tienen fila detallada previa y 99 quedan con `PENDING_ROW_CREATION` para 11G.5.
+- Corrige criterios de completitud: no marcar `FULLY_TESTED` si la carta completa depende de UI/API futura, selección pública segura o tiene ataques/abilities pendientes.
+- 11F queda bloqueada por 11G.5 si el equipo necesita reporte final real de cumplimiento XY1 completo.
 - Criterio: no se elige automáticamente cuando hay elección del jugador; pending selections conservan metadata; hand-to-deck shuffle no revela manos; mappings cerrados tienen tests y gaps restantes quedan explícitos.
 
 ### Fase 11F - Reporte final de cumplimiento XY1

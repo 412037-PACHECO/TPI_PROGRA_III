@@ -45,6 +45,7 @@ Incluye:
 - `Shadow Circle` como Estadio continuo que elimina Weakness de Pokémon con Energía Darkness-providing.
 - Infraestructura reactiva acotada para `Spiky Shield`: cuando Chesnaught Activo recibe daño positivo de ataque rival, coloca 3 contadores de daño sobre el atacante original e integra cualquier KO resultante con premios/victoria.
 - Handlers internos para Trainers complejos cerrados en 11G.3/11G.3B: descarte de mano + robo, mezclar mano en mazo + robo, mover Pokémon del descarte al tope del mazo, top-7 de Great Ball, evolución directa de Evosoda, Super Potion y retorno a mazo de Cassius con selección pendiente.
+- Verificación documental 11G.4 carta por carta contra fuente oficial `xy1`: 146 cartas oficiales, 47 con fila detallada previa y 99 pendientes de clasificación fina en `docs/12-xy1-card-by-card-verification.md`.
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 
 ## Modelo Game State
@@ -374,18 +375,13 @@ Fase 11G.2 agrega infraestructura reactiva acotada:
 - `xy1-14 Chesnaught / Spiky Shield` coloca 3 contadores en el atacante original cuando Chesnaught Activo recibe daño positivo de un ataque rival.
 - Si esos contadores dejan KO al atacante, se reutilizan KO/premios/victoria existentes; si ambos Activos quedan KO y ambos cumplen condición de victoria, se representa Muerte Súbita.
 
-Gaps documentados:
+Gaps documentados actualizados en 11G.4:
 
-- `xy1-123 Professor's Letter`: búsqueda en mazo + reveal + shuffle.
-- `xy1-127 Shauna`: mezclar mano en mazo + robar.
-- Trainers con búsqueda desde mazo: falta contrato público de selección, reveal, shuffle y privacidad.
-- Trainers que mezclan mano/mazo y luego roban: requieren composición completa y eventos seguros.
-- Stadium/Tool con efectos continuos condicionados por Energía unida: requieren mapping carta por carta, timing y tests.
-- `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva.
-- `xy1-95 Slurpuff / Sweet Veil`: falta cleanup continuo de condiciones existentes para soporte completo.
-- `xy1-126 Shadow Circle`: falta supresión continua de Weakness condicionada por Energía Darkness.
-- `xy1-131 Rainbow Energy`: falta integrar KO/premios si el contador por adjuntar desde mano causa KO.
-- Trainers complejos como `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`: cuentan con handlers internos para el alcance engine actual; todavía requieren contrato público de selección/privacidad/top-N/mano completa antes de exponerlos por API/UI/WebSocket.
+- La trazabilidad oficial tiene 146 cartas, pero solo 47 tienen fila detallada previa; 99 requieren clasificación fina en 11G.5.
+- Trainers complejos como `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion` cuentan con handlers internos para el alcance engine actual; todavía requieren contrato público de selección/privacidad/top-N/mano completa antes de exponerlos por API/UI/WebSocket.
+- `Professor's Letter` queda como mapping interno, no `FULLY_TESTED`, porque depende de selección/reveal seguro desde zona oculta para soporte público.
+- `Sweet Veil`, `Spiky Shield`, `Fur Coat`, `Shadow Circle` y `Rainbow Energy` tienen alcances internos cerrados/testeados, pero una carta completa no debe marcarse completa si otro ataque/ability de esa misma carta sigue sin mapear.
+- Gaps engine mayores para 11G.5: daño variable por monedas, efectos con duración `next turn`, daño/contadores a Banca o múltiples objetivos, habilidades activadas con límites de uso, ataques con switch/reemplazo coordinado y más búsquedas/selecciones de zonas ocultas.
 
 Reglas de diseño de Fase 11:
 
