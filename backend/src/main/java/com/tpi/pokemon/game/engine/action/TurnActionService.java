@@ -33,6 +33,7 @@ import com.tpi.pokemon.game.engine.event.SpecialConditionAppliedEvent;
 import com.tpi.pokemon.game.engine.event.SpecialConditionPreventedEvent;
 import com.tpi.pokemon.game.engine.event.StadiumReplacedEvent;
 import com.tpi.pokemon.game.engine.event.TrainerPlayedEvent;
+import com.tpi.pokemon.game.engine.knockout.PostAttackResolutionService;
 import com.tpi.pokemon.game.engine.special.ApplySpecialConditionCommand;
 import com.tpi.pokemon.game.engine.special.SpecialConditionApplication;
 import com.tpi.pokemon.game.engine.special.StatusEffectManager;
@@ -45,14 +46,20 @@ import java.util.Set;
 public final class TurnActionService {
     private final StatusEffectManager statusEffectManager;
     private final ModifierResolver modifierResolver;
+    private final PostAttackResolutionService postAttackResolutionService;
 
     public TurnActionService() {
-        this(new StatusEffectManager(), new DefaultModifierResolver());
+        this(new StatusEffectManager(), new DefaultModifierResolver(), new PostAttackResolutionService());
     }
 
     public TurnActionService(StatusEffectManager statusEffectManager, ModifierResolver modifierResolver) {
+        this(statusEffectManager, modifierResolver, new PostAttackResolutionService());
+    }
+
+    public TurnActionService(StatusEffectManager statusEffectManager, ModifierResolver modifierResolver, PostAttackResolutionService postAttackResolutionService) {
         this.statusEffectManager = Objects.requireNonNull(statusEffectManager, "statusEffectManager must not be null");
         this.modifierResolver = Objects.requireNonNull(modifierResolver, "modifierResolver must not be null");
+        this.postAttackResolutionService = Objects.requireNonNull(postAttackResolutionService, "postAttackResolutionService must not be null");
     }
 
     public GameState putBasicPokemonOnBench(GameState state, PutBasicPokemonOnBenchCommand command) {
@@ -87,7 +94,17 @@ public final class TurnActionService {
         if (energy.definition().energyProfile().attachDamageCountersFromHand() > 0) {
             events.add(new DamageCountersPlacedEvent(context.state().getGameId(), command.playerId(), target.updatedPokemon().getTopCard().id(), energy.definition().energyProfile().attachDamageCountersFromHand(), target.updatedPokemon().getDamageCounters(), energy.definition().cardId()));
         }
-        return replacePlayer(context.state(), updatedPlayer, context.turnState().withEnergyAttached(), context.state().getActiveStadium().orElse(null), events);
+        GameState attachedState = replacePlayer(context.state(), updatedPlayer, context.turnState().withEnergyAttached(), context.state().getActiveStadium().orElse(null), events);
+        List<GameEvent> reconciledEvents = new ArrayList<>(attachedState.getEvents());
+        GameState reconciledState = statusEffectManager.reconcilePreventedConditions(attachedState, modifierResolver, reconciledEvents);
+        if (energy.definition().energyProfile().attachDamageCountersFromHand() == 0) {
+            return reconciledState;
+        }
+        PlayerId prizeTaker = opponentId(reconciledState, command.playerId());
+        if (command.target().zone() == PokemonTargetZone.ACTIVE) {
+            return postAttackResolutionService.resolveActiveKnockout(reconciledState, command.playerId(), prizeTaker, reconciledEvents);
+        }
+        return postAttackResolutionService.resolveBenchKnockout(reconciledState, command.playerId(), command.target().benchIndex(), prizeTaker, reconciledEvents);
     }
 
     public GameState evolvePokemon(GameState state, EvolvePokemonCommand command) {
@@ -338,6 +355,16 @@ public final class TurnActionService {
         }
         if (state.getPlayerTwoState().getPlayerId().equals(playerId)) {
             return state.getPlayerTwoState();
+        }
+        throw new ActionException("Player is not part of this game");
+    }
+
+    private PlayerId opponentId(GameState state, PlayerId playerId) {
+        if (state.getPlayerOneState().getPlayerId().equals(playerId)) {
+            return state.getPlayerTwoState().getPlayerId();
+        }
+        if (state.getPlayerTwoState().getPlayerId().equals(playerId)) {
+            return state.getPlayerOneState().getPlayerId();
         }
         throw new ActionException("Player is not part of this game");
     }

@@ -38,6 +38,11 @@ Incluye:
 - Integración de efectos simples posteriores al daño dentro de ataques.
 - Auditoría XY1 progresiva con estados/categorías explícitas.
 - Mappings representativos de cartas reales XY1 a `EffectDefinition` mediante `Xy1EffectCatalog`.
+- Efectos continuos/modificadores para daño, retiro, prevención de condiciones especiales y prevención de Weakness.
+- Energías especiales XY1 representadas estructuralmente: `Double Colorless Energy` como dos símbolos y `Rainbow Energy` como un símbolo flexible con contador al adjuntarse desde mano.
+- Resolución KO/premios/victoria reutilizada para contadores de efectos críticos, incluyendo Rainbow Energy sobre Pokémon propio Activo o en Banca.
+- Cleanup continuo de condiciones especiales prevenidas, usado por `Sweet Veil`.
+- `Shadow Circle` como Estadio continuo que elimina Weakness de Pokémon con Energía Darkness-providing.
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 
 ## Modelo Game State

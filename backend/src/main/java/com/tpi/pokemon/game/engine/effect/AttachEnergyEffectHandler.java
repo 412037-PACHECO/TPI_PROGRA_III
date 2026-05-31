@@ -9,13 +9,35 @@ import com.tpi.pokemon.game.domain.model.HandZone;
 import com.tpi.pokemon.game.domain.model.PlayerGameState;
 import com.tpi.pokemon.game.domain.model.PokemonInPlay;
 import com.tpi.pokemon.game.domain.value.PlayerId;
+import com.tpi.pokemon.game.engine.effect.modifier.DefaultModifierResolver;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierResolver;
 import com.tpi.pokemon.game.engine.event.DamageCountersPlacedEvent;
 import com.tpi.pokemon.game.engine.event.EffectResolvedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
 import com.tpi.pokemon.game.engine.event.PendingSelectionRequiredEvent;
+import com.tpi.pokemon.game.engine.knockout.KnockoutResolver;
+import com.tpi.pokemon.game.engine.knockout.PostAttackResolutionService;
+import com.tpi.pokemon.game.engine.special.StatusEffectManager;
 import java.util.List;
+import java.util.Objects;
 
 public final class AttachEnergyEffectHandler implements EffectHandler {
+    private final StatusEffectManager statusEffectManager;
+    private final ModifierResolver modifierResolver;
+    private final KnockoutResolver knockoutResolver;
+    private final PostAttackResolutionService postAttackResolutionService;
+
+    public AttachEnergyEffectHandler() {
+        this(new StatusEffectManager(), new DefaultModifierResolver(), new KnockoutResolver(), new PostAttackResolutionService());
+    }
+
+    public AttachEnergyEffectHandler(StatusEffectManager statusEffectManager, ModifierResolver modifierResolver, KnockoutResolver knockoutResolver, PostAttackResolutionService postAttackResolutionService) {
+        this.statusEffectManager = Objects.requireNonNull(statusEffectManager, "statusEffectManager must not be null");
+        this.modifierResolver = Objects.requireNonNull(modifierResolver, "modifierResolver must not be null");
+        this.knockoutResolver = Objects.requireNonNull(knockoutResolver, "knockoutResolver must not be null");
+        this.postAttackResolutionService = Objects.requireNonNull(postAttackResolutionService, "postAttackResolutionService must not be null");
+    }
+
     @Override public EffectType type() { return EffectType.ATTACH_ENERGY; }
 
     @Override
@@ -34,11 +56,13 @@ public final class AttachEnergyEffectHandler implements EffectHandler {
         }
         PokemonInPlay target = EffectStateSupport.pokemonByBenchIndexOrActive(owner, definition.targetBenchIndex());
         PokemonInPlay updatedPokemon = target;
+        boolean placedAttachDamageCounters = false;
         for (CardInstance energy : selected) {
             updatedPokemon = updatedPokemon.withAttachedEnergy(energy);
             if (definition.sourceZone() == EffectCardZone.HAND && energy.definition().energyProfile().attachDamageCountersFromHand() > 0) {
                 int counters = energy.definition().energyProfile().attachDamageCountersFromHand();
                 updatedPokemon = updatedPokemon.withDamageCounters(updatedPokemon.getDamageCounters() + counters);
+                placedAttachDamageCounters = true;
                 context.events().add(new DamageCountersPlacedEvent(context.state().getGameId(), ownerId, target.getTopCard().id(), counters, updatedPokemon.getDamageCounters(), energy.definition().cardId()));
             }
         }
@@ -60,7 +84,17 @@ public final class AttachEnergyEffectHandler implements EffectHandler {
             context.events().add(new EnergyAttachedEvent(context.state().getGameId(), ownerId, energy.id(), target.getTopCard().id()));
         }
         context.events().add(new EffectResolvedEvent(context.state().getGameId(), context.actingPlayerId(), definition.type(), context.sourceId()));
-        return new EffectResult(EffectStateSupport.withPlayer(context.state(), updatedOwner));
+        var updatedState = EffectStateSupport.withPlayer(context.state(), updatedOwner);
+        updatedState = statusEffectManager.reconcilePreventedConditions(updatedState, modifierResolver, context.events());
+        if (placedAttachDamageCounters && knockoutResolver.isKnockedOut(updatedPokemon)) {
+            PlayerId prizeTaker = ownerId.equals(context.actingPlayerId()) ? context.defendingPlayerId() : context.actingPlayerId();
+            if (definition.targetBenchIndex() < 0) {
+                updatedState = postAttackResolutionService.resolveActiveKnockout(updatedState, ownerId, prizeTaker, context.events());
+            } else {
+                updatedState = postAttackResolutionService.resolveBenchKnockout(updatedState, ownerId, definition.targetBenchIndex(), prizeTaker, context.events());
+            }
+        }
+        return new EffectResult(updatedState);
     }
 
     private List<CardInstance> sourceCards(PlayerGameState owner, EffectCardZone sourceZone) {

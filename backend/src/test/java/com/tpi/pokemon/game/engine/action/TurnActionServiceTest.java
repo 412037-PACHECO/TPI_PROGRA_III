@@ -31,9 +31,13 @@ import com.tpi.pokemon.game.engine.event.ActivePokemonRetreatedEvent;
 import com.tpi.pokemon.game.engine.event.BasicPokemonBenchedEvent;
 import com.tpi.pokemon.game.engine.event.DamageCountersPlacedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
+import com.tpi.pokemon.game.engine.event.GameFinishedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
+import com.tpi.pokemon.game.engine.event.PokemonKnockedOutEvent;
+import com.tpi.pokemon.game.engine.event.PrizeCardsTakenEvent;
 import com.tpi.pokemon.game.engine.event.PokemonEvolvedEvent;
 import com.tpi.pokemon.game.engine.event.RetreatCostModifiedEvent;
+import com.tpi.pokemon.game.engine.event.SpecialConditionRemovedEvent;
 import com.tpi.pokemon.game.engine.event.StadiumReplacedEvent;
 import com.tpi.pokemon.game.engine.event.TrainerPlayedEvent;
 import com.tpi.pokemon.game.engine.event.SpecialConditionAppliedEvent;
@@ -139,6 +143,71 @@ class TurnActionServiceTest {
             assertThat(event.countersPlaced()).isEqualTo(1);
             assertThat(event.sourceId()).isEqualTo("rainbow-energy");
         });
+    }
+
+    @Test
+    void attachRainbowEnergyFromHandCanKnockOutOwnActiveAwardPrizeAndFinishGame() {
+        CardDefinitionRef rainbowDefinition = energyDefinition("rainbow-energy", "Rainbow Energy", CardSubtype.SPECIAL_ENERGY, EnergyProfile.rainbow());
+        CardInstance rainbow = card("rainbow-ko-active", rainbowDefinition, PLAYER_ONE);
+        CardInstance prize = card("opponent-prize", ITEM, PLAYER_TWO);
+        PokemonInPlay fragileActive = PokemonInPlay.withoutAttachments(card("fragile-active", pokemonWithHp("fragile", 10), PLAYER_ONE));
+        GameState state = activeMainState(
+                playerWithBoard(PLAYER_ONE, List.of(rainbow), fragileActive, List.of(), 1),
+                playerWithPrizes(PLAYER_TWO, List.of(prize)),
+                mainTurn());
+
+        GameState updated = service.attachEnergy(state, new AttachEnergyCommand(PLAYER_ONE, rainbow.id(), PokemonTarget.active()));
+
+        assertThat(updated.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(updated.getPlayerOneState().getBoard().getActivePokemon()).isEmpty();
+        assertThat(updated.getPlayerOneState().getDiscardPile().getCards()).contains(fragileActive.getTopCard(), rainbow);
+        assertThat(updated.getPlayerTwoState().getHand().getCards()).contains(prize);
+        assertThat(updated.getPlayerTwoState().getPrizeCards().isEmpty()).isTrue();
+        assertThat(eventsOfType(updated, PokemonKnockedOutEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, PrizeCardsTakenEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, GameFinishedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void attachRainbowEnergyFromHandCanKnockOutOwnBenchWithoutRequestingActiveReplacement() {
+        CardDefinitionRef rainbowDefinition = energyDefinition("rainbow-energy", "Rainbow Energy", CardSubtype.SPECIAL_ENERGY, EnergyProfile.rainbow());
+        CardInstance rainbow = card("rainbow-ko-bench", rainbowDefinition, PLAYER_ONE);
+        CardInstance prizeOne = card("opponent-prize-1", ITEM, PLAYER_TWO);
+        CardInstance prizeTwo = card("opponent-prize-2", SUPPORTER, PLAYER_TWO);
+        PokemonInPlay active = active("safe-active", PLAYER_ONE);
+        PokemonInPlay fragileBench = PokemonInPlay.withoutAttachments(card("fragile-bench", pokemonWithHp("fragile-bench-def", 10), PLAYER_ONE));
+        GameState state = activeMainState(
+                playerWithBoard(PLAYER_ONE, List.of(rainbow), active, List.of(fragileBench), 1),
+                playerWithPrizes(PLAYER_TWO, List.of(prizeOne, prizeTwo)),
+                mainTurn());
+
+        GameState updated = service.attachEnergy(state, new AttachEnergyCommand(PLAYER_ONE, rainbow.id(), PokemonTarget.bench(0)));
+
+        assertThat(updated.getStatus()).isEqualTo(GameStatus.ACTIVE);
+        assertThat(activePokemon(updated, PLAYER_ONE).getTopCard()).isEqualTo(active.getTopCard());
+        assertThat(updated.getPendingActiveReplacement()).isEmpty();
+        assertThat(updated.getPlayerOneState().getBoard().getBench().getPokemon()).isEmpty();
+        assertThat(updated.getPlayerOneState().getDiscardPile().getCards()).contains(fragileBench.getTopCard(), rainbow);
+        assertThat(updated.getPlayerTwoState().getHand().getCards()).contains(prizeOne);
+        assertThat(updated.getPlayerTwoState().getPrizeCards().remainingCount()).isEqualTo(1);
+        assertThat(eventsOfType(updated, PokemonKnockedOutEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, PrizeCardsTakenEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void attachingFairyProvidingEnergyRemovesExistingSpecialConditionsProtectedBySweetVeil() {
+        CardDefinitionRef rainbowDefinition = energyDefinition("rainbow-energy", "Rainbow Energy", CardSubtype.SPECIAL_ENERGY, EnergyProfile.rainbow());
+        CardInstance rainbow = card("rainbow-sweet-veil", rainbowDefinition, PLAYER_ONE);
+        CardDefinitionRef sweetVeilPokemon = definitionWithEffects("sweet-veil-basic", "Slurpuff", CardSupertype.POKEMON, Set.of(CardSubtype.BASIC), null, 1, List.of(continuousModifier("sweet-veil", ModifierType.PREVENT_SPECIAL_CONDITION, ModifierOperation.PREVENT, 0, ModifierLayer.PREVENTION, EffectScope.OWN_POKEMON, EffectCondition.targetHasAttachedEnergyProviding(com.tpi.pokemon.game.domain.enums.EnergyType.FAIRY))));
+        PokemonInPlay active = PokemonInPlay.withoutAttachments(card("sweet-active", sweetVeilPokemon, PLAYER_ONE))
+                .applySpecialCondition(SpecialCondition.POISONED)
+                .applySpecialCondition(SpecialCondition.ASLEEP);
+        GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(rainbow), active, List.of(), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        GameState updated = service.attachEnergy(state, new AttachEnergyCommand(PLAYER_ONE, rainbow.id(), PokemonTarget.active()));
+
+        assertThat(activePokemon(updated, PLAYER_ONE).getSpecialConditions().hasAny()).isFalse();
+        assertThat(eventsOfType(updated, SpecialConditionRemovedEvent.class)).hasSize(2);
     }
 
     @Test
@@ -363,6 +432,10 @@ class TurnActionServiceTest {
         return new PlayerGameState(playerId, DeckZone.empty(), new HandZone(hand), PrizeCards.empty(), DiscardPile.empty(), new BoardState(new ActivePokemon(active), new Bench(bench)), turnsTaken);
     }
 
+    private PlayerGameState playerWithPrizes(PlayerId playerId, List<CardInstance> prizes) {
+        return new PlayerGameState(playerId, DeckZone.empty(), HandZone.empty(), new PrizeCards(prizes), DiscardPile.empty(), new BoardState(new ActivePokemon(active(playerId.value() + "-active", playerId)), Bench.empty()), 1);
+    }
+
     private PlayerGameState emptyPlayer(PlayerId playerId) {
         return PlayerGameState.empty(playerId);
     }
@@ -393,15 +466,23 @@ class TurnActionServiceTest {
         return new CardDefinitionRef(id, name, CardSupertype.ENERGY, Set.of(subtype), null, null, null, List.of(), List.of(), List.of(), List.of(), profile);
     }
 
+    private CardDefinitionRef pokemonWithHp(String id, int hp) {
+        return new CardDefinitionRef(id, "Pokemon " + id, CardSupertype.POKEMON, Set.of(CardSubtype.BASIC), null, 1, hp, List.of(), List.of(), List.of(), List.of(), EnergyProfile.none());
+    }
+
     private CardEffectDefinition continuousModifier(String effectId, ModifierType type, ModifierOperation operation, int amount, ModifierLayer layer) {
+        return continuousModifier(effectId, type, operation, amount, layer, EffectScope.SELF, EffectCondition.always());
+    }
+
+    private CardEffectDefinition continuousModifier(String effectId, ModifierType type, ModifierOperation operation, int amount, ModifierLayer layer, EffectScope scope, EffectCondition condition) {
         return new CardEffectDefinition(
                 effectId,
                 "Continuous modifier",
                 EffectSourceKind.POKEMON_ABILITY,
                 EffectActivationKind.CONTINUOUS,
                 EffectTiming.CONTINUOUS,
-                EffectScope.SELF,
-                EffectCondition.always(),
+                scope,
+                condition,
                 List.of(new ModifierDefinition(type, operation, layer, amount, ModifierTargetRole.DEFAULT_TARGET))
         );
     }

@@ -73,8 +73,14 @@ Una carta no debe marcarse `FULLY_TESTED` solo porque exista un handler genéric
 - `ABILITY_PASSIVE`
 - `CONTINUOUS_EFFECT`
 - `PREVENT_DAMAGE`
+- `PREVENT_WEAKNESS`
 - `MODIFY_DAMAGE`
 - `MODIFY_RETREAT_COST`
+- `SHUFFLE_DECK`
+- `BASIC_ENERGY`
+- `SPECIAL_ENERGY`
+- `PROVIDES_ENERGY`
+- `ATTACH_TRIGGER`
 - `CUSTOM_REQUIRED`
 - `UNSUPPORTED_YET`
 
@@ -99,7 +105,7 @@ Infraestructura genérica disponible desde Fase 11D, todavía no equivalente a m
 
 - `CardEffectDefinition` para abilities/effects declarados por carta.
 - `EffectSourceCollector` para Pokémon en juego, Tools y Stadium.
-- `ModifierResolver` para `MODIFY_DAMAGE`, `PREVENT_DAMAGE`, `MODIFY_RETREAT_COST` y `PREVENT_SPECIAL_CONDITION`.
+- `ModifierResolver` para `MODIFY_DAMAGE`, `PREVENT_DAMAGE`, `MODIFY_RETREAT_COST`, `PREVENT_SPECIAL_CONDITION` y `PREVENT_WEAKNESS`.
 
 La existencia de un handler no implica cobertura completa de carta. La lógica base de daño sigue en `AttackService`; los mappings solo agregan efectos secundarios estructurados.
 
@@ -115,7 +121,7 @@ Fase 11E.3 agrega mappings progresivos de habilidades Pokémon XY1 (`Fur Coat`, 
 
 Fase 11E.4 audita Energías XY1: `Double Colorless Energy`, `Rainbow Energy` y las 9 Energías Básicas. Las Energías Básicas no requieren `EffectDefinition` textual; `Double Colorless Energy` se representa como dos símbolos `COLORLESS`.
 
-Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` como Energía flexible de un solo símbolo + trigger al adjuntarse desde mano, `Fairy Garden` como modificador continuo de retiro, y metadata ampliada de pending selection. Los casos con zonas ocultas/top-N/mano completa, `Shadow Circle` y `Spiky Shield` siguen pendientes.
+Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` como Energía flexible de un solo símbolo + trigger al adjuntarse desde mano, `Fairy Garden` como modificador continuo de retiro, y metadata ampliada de pending selection. Fase 11G.1 completa los gaps críticos de `Rainbow Energy` KO/premios/victoria, cleanup completo de `Sweet Veil` y `Shadow Circle` como prevención continua de Weakness. Los casos con zonas ocultas/top-N/mano completa y `Spiky Shield` siguen pendientes.
 
 | cardId | name | supertype | subtypes | attacks | abilities | rules | effectText | effectCategory | complexity | supportedByCurrentEngine | genericHandlers | customHandlerRequired | implementationStatus | tested | notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -148,15 +154,15 @@ Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` c
 | xy1-123 | Professor's Letter | Trainer | Item | none | none | Item | `Search your deck for up to 2 basic Energy cards, reveal them, and put them into your hand. Shuffle your deck afterward.` | SEARCH_DECK; SHUFFLE_DECK | MEDIUM | partial | SearchDeckEffectHandler; ShuffleDeckEffectHandler | no/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; NOT_IMPLEMENTED_YET | no | Mapping estructural agregado; falta contrato público de selección/reveal/privacidad para considerarla completa. |
 | xy1-124 | Red Card | Trainer | Item | none | none | Item | Oponente mezcla su mano en mazo y roba 4. | SHUFFLE_DECK; DRAW_CARDS; CUSTOM_REQUIRED | HIGH | partial | DrawCardsEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Requiere mover mano oculta del rival al mazo, barajar y robar sin filtrar información privada. |
 | xy1-125 | Roller Skates | Trainer | Item | none | none | Item | `Flip a coin. If heads, draw 3 cards.` | DRAW_CARDS; DAMAGE_PLUS_COIN_FLIP | LOW | yes | CoinFlipEffectHandler; DrawCardsEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.2 mapea moneda + robo. |
-| xy1-126 | Shadow Circle | Trainer | Stadium | none | none | Stadium | Pokémon con Energía Darkness no tienen Debilidad. | STADIUM_EFFECT; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | HIGH | no | none | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Falta supresión continua de Debilidad condicionada por Energía Darkness. |
+| xy1-126 | Shadow Circle | Trainer | Stadium | none | none | Stadium | Pokémon con Energía Darkness no tienen Debilidad. | STADIUM_EFFECT; CONTINUOUS_EFFECT; PREVENT_WEAKNESS | MEDIUM | yes | ModifierResolver; DamageCalculator contextual | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11G.1 mapea/testea prevención de Weakness para Pokémon con Energía Darkness-providing unida; Resistance sigue aplicando. |
 | xy1-127 | Shauna | Trainer | Supporter | none | none | Supporter rule | `Shuffle your hand into your deck. Then, draw 5 cards.` | DRAW_CARDS; DISCARD_CARD; CUSTOM_REQUIRED | MEDIUM | partial | DrawCardsEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | No se mapea como robo simple porque falta mezclar la mano completa en el mazo antes de robar. |
 | xy1-128 | Super Potion | Trainer | Item | none | none | Item | Cura 60 de 1 Pokémon propio; si cura, descarta una Energía unida a ese Pokémon. | HEAL_DAMAGE; DISCARD_ENERGY; CUSTOM_REQUIRED | MEDIUM | partial | HealDamageEffectHandler; DiscardAttachedEnergyEffectHandler partial | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Requiere seleccionar Pokémon propio y condicionar el descarte a que haya curación. |
 | xy1-129 | Team Flare Grunt | Trainer | Supporter | none | none | Supporter rule | `Discard an Energy attached to your opponent's Active Pokémon.` | DISCARD_ENERGY | LOW | yes | DiscardAttachedEnergyEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.2 mapea descarte de Energía del Activo rival. |
 | xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; reactive infra pendiente | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_MAPPED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Touchdown mapeado/testeado; Spiky Shield queda pendiente. |
-| xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; ModifierResolver PREVENT_SPECIAL_CONDITION partial | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; NOT_IMPLEMENTED_YET | no | Fase 11E.3 mapea prevención de nuevas condiciones si el target tiene Energía Fairy unida; falta remover condiciones existentes para completar Sweet Veil. |
+| xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | yes | HealDamageEffectHandler; ModifierResolver PREVENT_SPECIAL_CONDITION; StatusEffectManager cleanup | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11G.1 completa Sweet Veil para prevenir nuevas condiciones y remover existentes en Pokémon propios con Energía Fairy-providing, incluyendo Rainbow. |
 | xy1-114 | Furfrou | Pokémon | Basic | Energy Cutoff | Fur Coat | none | Ability: daño hecho a este Pokémon por ataques se reduce 20 después de Debilidad/Resistencia. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; MODIFY_DAMAGE | MEDIUM | yes | CardEffectDefinition; ModifierResolver | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.3 mapea Fur Coat como modificador continuo self/defender después de Debilidad/Resistencia. Energy Cutoff no queda cubierto por este mapping de habilidad. |
 | xy1-130 | Double Colorless Energy | Energy | Special | none | none | Special Energy rule | Provee dos Energías Colorless mientras está unida. | SPECIAL_ENERGY; PROVIDES_ENERGY | LOW | yes | EnergyProfile; EnergyCostValidator | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.4 mapea estructuralmente `EnergyProfile.of(COLORLESS, COLORLESS)`. |
-| xy1-131 | Rainbow Energy | Energy | Special | none | none | Special Energy rule | Provee cualquier tipo mientras está unida, solo 1 Energía a la vez; al adjuntarse desde mano pone 1 contador de daño. | SPECIAL_ENERGY; PROVIDES_ENERGY; ATTACH_TRIGGER | HIGH | partial | EnergyProfile dynamic single-symbol; TurnActionService attach trigger | no/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; NOT_IMPLEMENTED_YET | no | Fase 11E.5 mapea/testea el pago flexible y el contador al adjuntarse desde mano; falta resolver KO/premios si ese contador deja KO al Pokémon. |
+| xy1-131 | Rainbow Energy | Energy | Special | none | none | Special Energy rule | Provee cualquier tipo mientras está unida, solo 1 Energía a la vez; al adjuntarse desde mano pone 1 contador de daño. | SPECIAL_ENERGY; PROVIDES_ENERGY; ATTACH_TRIGGER | HIGH | yes | EnergyProfile dynamic single-symbol; TurnActionService attach trigger; PostAttackResolutionService | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11G.1 testea pago flexible, contador desde mano y resolución KO/premios/victoria si el contador deja KO a Pokémon propio Activo o de Banca. |
 | xy1-132 | Grass Energy | Energy | Basic | none | none | none | Energía Básica Grass. | BASIC_ENERGY; PROVIDES_ENERGY | LOW | yes | EnergyProfile; EnergyCostValidator | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; FULLY_TESTED | yes | No requiere mapping textual; provee GRASS estructuralmente. |
 | xy1-133 | Fire Energy | Energy | Basic | none | none | none | Energía Básica Fire. | BASIC_ENERGY; PROVIDES_ENERGY | LOW | yes | EnergyProfile; EnergyCostValidator | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; FULLY_TESTED | yes | No requiere mapping textual; provee FIRE estructuralmente. |
 | xy1-134 | Water Energy | Energy | Basic | none | none | none | Energía Básica Water. | BASIC_ENERGY; PROVIDES_ENERGY | LOW | yes | EnergyProfile; EnergyCostValidator | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; FULLY_TESTED | yes | No requiere mapping textual; provee WATER estructuralmente. |
@@ -206,7 +212,7 @@ Infraestructura/mappings agregados en Fase 11E.4:
 - `EnergyEffectMapping` para trazar cartas Energy reales separadas de ataques, Trainers y habilidades.
 - `Double Colorless Energy` mapeada/testeada como dos símbolos `COLORLESS` en `EnergyProfile`.
 - Energías Básicas `xy1-132` a `xy1-140` auditadas como comportamiento estructural sin `EffectDefinition` textual.
-- `Rainbow Energy` fue documentada en 11E.4 como gap por energía dinámica one-at-a-time y trigger al adjuntar desde mano; 11E.5 cierra ese subgap con `EnergyProfile.rainbow()` y trigger básico desde mano, pero mantiene pendiente la resolución KO/premios si el contador causa KO.
+- `Rainbow Energy` fue documentada en 11E.4 como gap por energía dinámica one-at-a-time y trigger al adjuntar desde mano; 11E.5 cierra ese subgap con `EnergyProfile.rainbow()` y trigger básico desde mano; 11G.1 integra KO/premios/victoria si el contador causa KO.
 
 Infraestructura/mappings agregados en Fase 11E.5:
 
@@ -214,6 +220,12 @@ Infraestructura/mappings agregados en Fase 11E.5:
 - Trigger básico de contador de daño al adjuntar desde mano para perfiles de Energía que lo declaren.
 - `Fairy Garden` mapeada/testeada como modificador continuo de coste de retirada condicionado por Energía Fairy.
 - `PendingEffectSelection` conserva metadata interna de reveal, shuffle y efecto de continuación.
+
+Infraestructura/mappings agregados en Fase 11G.1:
+
+- `Rainbow Energy` usa los servicios existentes de KO/premios/victoria cuando el contador de attach-from-hand noquea al Pokémon propio Activo o en Banca.
+- `Sweet Veil` remueve condiciones especiales existentes además de prevenir nuevas condiciones para Pokémon propios con Energía Fairy-providing.
+- `Shadow Circle` se modela como `PREVENT_WEAKNESS` continuo condicionado por Energía Darkness-providing; no altera Resistance.
 
 Gaps todavía pendientes para completar XY1:
 

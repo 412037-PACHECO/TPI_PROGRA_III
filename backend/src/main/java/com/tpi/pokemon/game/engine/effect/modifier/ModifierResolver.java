@@ -6,4 +6,6 @@ public interface ModifierResolver {
     ModifierResolutionResult resolveRetreatCost(RetreatCostModifierContext context);
 
     ModifierResolutionResult resolveSpecialConditionPrevention(SpecialConditionModifierContext context);
+
+    ModifierResolutionResult resolveWeaknessPrevention(DamageModifierContext context);
 }

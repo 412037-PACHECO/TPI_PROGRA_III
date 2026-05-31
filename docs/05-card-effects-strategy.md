@@ -4,7 +4,7 @@
 
 Soportar efectos reales de cartas XY1 sin convertir el motor en una colección desordenada de `if cardId == ...`.
 
-Estado Fase 11E.3: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales e infraestructura de efectos continuos/modificadores. Además existe un catálogo explícito de mappings XY1 progresivos (`Xy1EffectCatalog`) para ataques, Trainers y primeras habilidades Pokémon. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
+Estado Fase 11G.1: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales e infraestructura de efectos continuos/modificadores. Además existe un catálogo explícito de mappings XY1 progresivos (`Xy1EffectCatalog`) para ataques, Trainers, habilidades Pokémon y Energías. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
 
 ## CardDefinition vs CardInstance
 
@@ -68,7 +68,7 @@ Los handlers no deben depender de Spring, JPA, WebSocket ni API externa.
 - `MoveEnergyEffect`
 - `SwitchActiveEffect`
 - `PlaceDamageCountersEffect`
-- Infraestructura para `DamageModifierEffect`, `PreventDamageEffect`, `RetreatCostModifierEffect` y prevención de condiciones especiales mediante efectos continuos.
+- Infraestructura para `DamageModifierEffect`, `PreventDamageEffect`, `RetreatCostModifierEffect`, prevención de condiciones especiales y prevención de Weakness mediante efectos continuos.
 
 Pendientes o futuros:
 
@@ -125,7 +125,7 @@ Orden documentado para daño contextual:
 6. prevención;
 7. clamp a `0` y múltiplos de 10.
 
-Decisión importante: infraestructura disponible no equivale a soporte completo de una carta. `xy1-14 Chesnaught / Spiky Shield` sigue requiriendo resolver reactivo real antes de considerarse soportada. `xy1-95 Slurpuff / Sweet Veil` tiene prevención de nuevas condiciones modelada parcialmente, pero no se considera completa hasta remover condiciones existentes de forma continua.
+Decisión importante: infraestructura disponible no equivale a soporte completo de una carta. `xy1-14 Chesnaught / Spiky Shield` sigue requiriendo resolver reactivo real antes de considerarse soportada. Desde Fase 11G.1, `xy1-95 Slurpuff / Sweet Veil` sí queda completo para el alcance declarado: previene nuevas condiciones y remueve condiciones existentes cuando el Pokémon propio tiene Energía Fairy-providing.
 
 ## Handlers custom
 
@@ -211,7 +211,7 @@ Fase 11E.1 agrega 17 mappings de ataques Pokémon verificados contra datos ofici
 - DAMAGE_PLUS_COIN_FLIP: `Blastoise-EX / Splash Bomb`, `Cloyster / Clamp Crush`.
 - DISCARD_ENERGY: `Slugma / Flamethrower`, `Pansear / Fireworks`, más descarte condicional dentro de `Cloyster / Clamp Crush`.
 
-No se afirma cobertura completa de XY1: ataques como `Flash Needle`, `Lead`, `Magma Mantle`, `Rapid Spin`, `Spike Cannon`, `Spiky Shield` y `Sweet Veil` siguen marcados como pendientes cuando requieren selección, daño variable, prevención futura, habilidades reactivas o custom handlers.
+No se afirma cobertura completa de XY1: ataques como `Flash Needle`, `Lead`, `Magma Mantle`, `Rapid Spin`, `Spike Cannon` y `Spiky Shield` siguen marcados como pendientes cuando requieren selección, daño variable, prevención futura, habilidades reactivas o custom handlers. `Sweet Veil` se cerró después en 11G.1 para el alcance declarado.
 
 ## Fase 11E.2 - Mapeo progresivo de Trainers XY1
 
@@ -220,9 +220,9 @@ Fase 11E.2 extiende `Xy1EffectCatalog` con mappings progresivos de cartas Traine
 - Items mapeados: `Roller Skates` como moneda + robo; `Professor's Letter` como búsqueda/reveal/shuffle estructural pendiente de contrato público de selección y privacidad.
 - Supporters mapeados: `Team Flare Grunt` como descarte de Energía unida al Activo rival.
 - Tools mapeadas: `Hard Charm` y `Muscle Band` como `CardEffectDefinition` continuos sobre el pipeline de modificadores de daño.
-- Stadiums revisados pero no mapeados como completos: `Fairy Garden` y `Shadow Circle` requieren condiciones por Energía unida y modificación continua de retreat/weakness todavía no cerrada carta por carta.
+- Stadiums mapeados progresivamente: `Fairy Garden` queda completo en 11E.5 como modificador de retiro; `Shadow Circle` queda completo en 11G.1 como prevención continua de Weakness condicionada por Energía Darkness-providing.
 
-Trainers pendientes documentados: `Cassius`, `Evosoda`, `Fairy Garden`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shadow Circle`, `Shauna` y `Super Potion`. Los motivos principales son selección desde zonas ocultas, reveal, shuffle con privacidad, mover mano completa al mazo, evolución directa, condiciones por Energía unida o lógica custom.
+Trainers pendientes documentados: `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`. Los motivos principales son selección desde zonas ocultas, reveal, shuffle con privacidad, mover mano completa al mazo, evolución directa o lógica custom.
 
 Para Trainers, `EFFECT_MAPPED` no equivale automáticamente a “jugable desde UI/API”. Puede existir mapping engine-interno testeado mientras siga pendiente el contrato público de selección, reveal, privacidad o sincronización.
 
@@ -231,7 +231,7 @@ Para Trainers, `EFFECT_MAPPED` no equivale automáticamente a “jugable desde U
 Fase 11E.3 agrega `AbilityEffectMapping` y APIs de catálogo para habilidades reales de Pokémon XY1 sin activar parser automático ni afirmar cobertura total:
 
 - `xy1-114 Furfrou / Fur Coat`: mapeada como habilidad continua `POKEMON_ABILITY` con `ModifierType.DAMAGE`, resta 20 después de Debilidad/Resistencia al propio Furfrou cuando es defensor. Esta parte queda `FULLY_TESTED` para el alcance declarado.
-- `xy1-95 Slurpuff / Sweet Veil`: mapeada parcialmente como prevención continua de nuevas condiciones especiales para Pokémon propios que tengan Energía Fairy unida. La condición por Energía Fairy queda explícita en `EffectCondition`. No queda `FULLY_TESTED` como carta completa porque todavía falta remover condiciones especiales existentes como pide el texto oficial.
+- `xy1-95 Slurpuff / Sweet Veil`: desde 11G.1 queda completa para el alcance declarado: previene nuevas condiciones especiales y remueve condiciones existentes para Pokémon propios que tengan Energía Fairy-providing unida. La condición por Energía Fairy queda explícita en `EffectCondition` y Rainbow puede satisfacerla mientras está unida.
 - `xy1-14 Chesnaught / Spiky Shield`: queda documentada como gap; requiere resolver reactivo `on damaged by opponent's attack` y colocar 3 contadores en el atacante incluso si Chesnaught queda KO.
 
 Nuevo soporte estructural de 11E.3:
@@ -253,7 +253,7 @@ Decisiones de mapping:
 
 - Las Energías Básicas no requieren `EffectDefinition` textual: su comportamiento es estructural mediante `EnergyProfile.basic(tipo)`, coste de ataque/retiro y validación de mazo.
 - `Double Colorless Energy` queda mapeada estructuralmente como `EnergyProfile.of(COLORLESS, COLORLESS)`. No requiere handler de efecto porque el `EnergyCostValidator` ya consume todos los símbolos provistos.
-- `Rainbow Energy` queda mapeada mediante un perfil dinámico de un solo símbolo flexible mientras está unida y un trigger básico al adjuntarse desde mano que coloca 1 contador de daño. No se modela como lista de todos los tipos simultáneamente.
+- `Rainbow Energy` queda mapeada mediante un perfil dinámico de un solo símbolo flexible mientras está unida y un trigger al adjuntarse desde mano que coloca 1 contador de daño. Desde 11G.1 ese contador integra KO/premios/victoria mediante los servicios existentes. No se modela como lista de todos los tipos simultáneamente.
 
 Criterio documental:
 
@@ -265,24 +265,28 @@ Criterio documental:
 
 Fase 11E.5 cierra solo los gaps que podían resolverse con infraestructura mínima y sin acoplar el Game Engine:
 
-- `xy1-131 Rainbow Energy`: `EnergyProfile.rainbow()` representa una Energía flexible que paga exactamente 1 símbolo de cualquier tipo mientras está unida. `TurnActionService.attachEnergy` y `AttachEnergyEffectHandler` aplican el contador de daño solo cuando la energía se adjunta desde mano. La carta sigue parcial hasta resolver KO/premios si ese contador causa KO.
+- `xy1-131 Rainbow Energy`: `EnergyProfile.rainbow()` representa una Energía flexible que paga exactamente 1 símbolo de cualquier tipo mientras está unida. `TurnActionService.attachEnergy` y `AttachEnergyEffectHandler` aplican el contador de daño solo cuando la energía se adjunta desde mano. Desde 11G.1, si ese contador causa KO, se resuelven descarte, premios y victoria con los servicios existentes.
 - `xy1-117 Fairy Garden`: se mapea como Estadio continuo con `RETREAT_COST SET 0` para Pokémon que tengan Energía Fairy-providing unida.
 - `PendingEffectSelection` ahora conserva metadata interna de reveal, shuffle y efecto de continuación para búsquedas/selecciones pendientes.
 
 Siguen pendientes para 11F:
 
-- `xy1-126 Shadow Circle`: requiere supresión de Weakness condicionada por Energía Darkness, todavía sin hook dedicado en `DamageCalculator`.
 - `xy1-14 Chesnaught / Spiky Shield`: requiere resolver reactivo después de daño de ataque rival y antes de KO/premios.
 - Trainers con zonas ocultas/mano completa/top-N (`Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna`, `Super Potion`) requieren contratos de selección/reveal/privacidad o handlers custom de carta completa.
+
+## Fase 11G.1 - Gaps críticos cerrados
+
+Fase 11G.1 cierra tres gaps críticos sin ampliar alcance a UI/API/persistencia:
+
+- `xy1-95 Slurpuff / Sweet Veil`: `StatusEffectManager.reconcilePreventedConditions(...)` remueve condiciones existentes cuando un efecto continuo de prevención aplica, además de mantener la prevención de nuevas condiciones.
+- `xy1-126 Shadow Circle`: `ModifierType.PREVENT_WEAKNESS` permite que `DamageCalculator` saltee Weakness para Pokémon con Energía Darkness-providing, manteniendo Resistance y el resto del pipeline.
+- `xy1-131 Rainbow Energy`: el contador al adjuntarse desde mano puede disparar KO propio de Activo o Banca, con premios para el oponente y victoria si corresponde.
 
 Gaps documentados, no implementados como soporte completo:
 
 - `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
 - `xy1-127 Shauna`: requiere mezclar mano en mazo y robar 5; `DrawCardsEffectHandler` solo no alcanza.
 - `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva al recibir daño.
-- `xy1-95 Slurpuff / Sweet Veil`: prevención por Energía Fairy parcialmente mapeada; falta remover condiciones existentes.
-- `xy1-126 Shadow Circle`: supresión continua de Weakness condicionada por Energía Darkness.
-- `xy1-131 Rainbow Energy`: resolución KO/premios si el contador al adjuntarse desde mano deja KO al Pokémon.
 
 ## Cómo agregar un nuevo mapping
 

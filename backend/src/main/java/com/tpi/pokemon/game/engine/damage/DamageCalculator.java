@@ -66,11 +66,15 @@ public final class DamageCalculator {
         modifiers.addAll(beforeWeakness.appliedModifiers());
 
         boolean weaknessApplied = false;
-        for (Weakness weakness : defenderDefinition.weaknesses()) {
-            if (attackerTypes.contains(weakness.type())) {
-                damage *= weakness.multiplier();
-                weaknessApplied = true;
-                break;
+        ModifierResolutionResult weaknessPrevention = modifierResolver.resolveWeaknessPrevention(context);
+        modifiers.addAll(weaknessPrevention.appliedModifiers());
+        if (!weaknessPrevention.prevented()) {
+            for (Weakness weakness : defenderDefinition.weaknesses()) {
+                if (attackerTypes.contains(weakness.type())) {
+                    damage *= weakness.multiplier();
+                    weaknessApplied = true;
+                    break;
+                }
             }
         }
 

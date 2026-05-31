@@ -310,6 +310,23 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void shadowCircleContinuousMappingBuildsExpectedWeaknessPrevention() {
+        assertThat(catalog.continuousEffectsForTrainer("xy1-126")).singleElement().satisfies(effect -> {
+            assertThat(effect.effectId()).isEqualTo("shadow-circle-no-weakness");
+            assertThat(effect.sourceKind()).isEqualTo(EffectSourceKind.STADIUM);
+            assertThat(effect.scope()).isEqualTo(EffectScope.ANY);
+            assertThat(effect.condition().type()).isEqualTo(EffectConditionType.TARGET_HAS_ATTACHED_ENERGY_PROVIDING);
+            assertThat(effect.condition().energyType()).isEqualTo(EnergyType.DARKNESS);
+            assertThat(effect.modifiers()).singleElement().satisfies(modifier -> {
+                assertThat(modifier.type()).isEqualTo(ModifierType.PREVENT_WEAKNESS);
+                assertThat(modifier.operation()).isEqualTo(ModifierOperation.PREVENT);
+                assertThat(modifier.layer()).isEqualTo(ModifierLayer.PREVENTION);
+                assertThat(modifier.targetRole()).isEqualTo(ModifierTargetRole.DEFENDER);
+            });
+        });
+    }
+
+    @Test
     void abilityMappingLookupFindsFurCoatByCardIdAndAbilityName() {
         assertThat(catalog.abilityMappingForName("xy1-114", "Fur Coat")).hasValueSatisfying(mapping -> {
             assertThat(mapping.cardName()).isEqualTo("Furfrou");
@@ -339,8 +356,8 @@ class Xy1EffectCatalogTest {
     @Test
     void sweetVeilAbilityKeepsFairyEnergyConditionExplicit() {
         assertThat(catalog.abilityMappingForName("xy1-95", "Sweet Veil")).hasValueSatisfying(mapping -> {
-            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
-            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.NOT_IMPLEMENTED_YET);
             assertThat(mapping.continuousEffects()).singleElement().satisfies(effect -> {
                 assertThat(effect.scope()).isEqualTo(EffectScope.OWN_POKEMON);
                 assertThat(effect.condition().type()).isEqualTo(EffectConditionType.TARGET_HAS_ATTACHED_ENERGY_PROVIDING);
@@ -432,10 +449,20 @@ class Xy1EffectCatalogTest {
             assertThat(mapping.energyProfile().provides()).containsExactly(EnergyType.COLORLESS);
             assertThat(mapping.energyProfile().providesAnyTypeWhileAttached()).isTrue();
             assertThat(mapping.energyProfile().attachDamageCountersFromHand()).isEqualTo(1);
-            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
-            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
-            assertThat(mapping.tested()).isFalse();
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(mapping.tested()).isTrue();
         });
+    }
+
+    @Test
+    void rainbowEnergyCanSatisfyAttachedDarknessAndFairyEnergyConditions() {
+        EnergyEffectMapping rainbow = catalog.energyMappingForCard("xy1-131").orElseThrow();
+        PokemonInPlay withRainbow = pokemon("rainbow-target")
+                .withAttachedEnergy(specialEnergy("rainbow-instance", "Rainbow Energy", rainbow.energyProfile()));
+
+        assertThat(catalog.continuousEffectsForPokemon("xy1-95").get(0).condition().matches(withRainbow)).isTrue();
+        assertThat(catalog.continuousEffectsForTrainer("xy1-126").get(0).condition().matches(withRainbow)).isTrue();
     }
 
     @Test
@@ -470,10 +497,24 @@ class Xy1EffectCatalogTest {
             assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
             assertThat(entry.tested()).isFalse();
         });
+    }
+
+    @Test
+    void phase11G1CriticalEffectAuditEntriesClaimTestedOnlyForClosedCards() {
+        assertThat(catalog.auditEntriesForCard("xy1-95")).singleElement().satisfies(entry -> {
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.tested()).isTrue();
+        });
         assertThat(catalog.auditEntriesForCard("xy1-126")).singleElement().satisfies(entry -> {
-            assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
-            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
-            assertThat(entry.tested()).isFalse();
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.tested()).isTrue();
+        });
+        assertThat(catalog.auditEntriesForCard("xy1-131")).singleElement().satisfies(entry -> {
+            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(entry.tested()).isTrue();
         });
     }
 
@@ -487,8 +528,6 @@ class Xy1EffectCatalogTest {
     @Test
     void unsupportedTrainerAndAbilityGapsRemainDocumented() {
         assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement()
-                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
-        assertThat(catalog.auditEntriesForCard("xy1-95")).singleElement()
                 .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
         assertThat(catalog.auditEntriesForCard("xy1-14")).singleElement()
                 .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET));

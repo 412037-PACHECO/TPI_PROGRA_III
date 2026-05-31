@@ -45,6 +45,12 @@ public final class PostAttackResolutionService {
                 .orElse(state);
     }
 
+    public GameState resolveBenchKnockout(GameState state, PlayerId knockedOutOwnerId, int benchIndex, PlayerId prizeTakerId, List<GameEvent> events) {
+        return knockoutResolver.resolveBenchKnockout(state, knockedOutOwnerId, benchIndex, events)
+                .map(resolution -> resolveKnockoutConsequencesWithoutActiveReplacement(resolution.state(), resolution.knockout(), prizeTakerId, knockedOutOwnerId, events))
+                .orElse(state);
+    }
+
     private GameState resolveKnockoutConsequences(GameState state, KnockoutResult knockout, PlayerId prizeTakerId, PlayerId knockedOutOwnerId, List<GameEvent> events) {
         PrizeResolver.PrizeResolution prizeResolution = prizeResolver.takePrizes(state, prizeTakerId, knockout.prizeValue(), events);
         GameState afterPrizes = prizeResolution.state();
@@ -65,6 +71,21 @@ public final class PostAttackResolutionService {
             return new GameState(afterPrizes.getGameId(), GameStatus.ACTIVE, afterPrizes.getPlayerOneState(), afterPrizes.getPlayerTwoState(), afterPrizes.getTurnState(), afterPrizes.getActiveStadium().orElse(null), null, pending, events);
         }
 
+        return afterPrizes;
+    }
+
+    private GameState resolveKnockoutConsequencesWithoutActiveReplacement(GameState state, KnockoutResult knockout, PlayerId prizeTakerId, PlayerId knockedOutOwnerId, List<GameEvent> events) {
+        PrizeResolver.PrizeResolution prizeResolution = prizeResolver.takePrizes(state, prizeTakerId, knockout.prizeValue(), events);
+        GameState afterPrizes = prizeResolution.state();
+
+        java.util.Optional<GameFinishResult> finishResult = victoryConditionChecker.checkAfterKnockout(afterPrizes, prizeTakerId, knockedOutOwnerId);
+        if (finishResult.isPresent()) {
+            GameFinishResult result = finishResult.get();
+            FinishReason primaryReason = result.reasons().get(0);
+            events.add(new VictoryDetectedEvent(afterPrizes.getGameId(), prizeTakerId, knockedOutOwnerId, primaryReason));
+            events.add(new GameFinishedEvent(afterPrizes.getGameId(), prizeTakerId, knockedOutOwnerId, primaryReason));
+            return new GameState(afterPrizes.getGameId(), GameStatus.FINISHED, afterPrizes.getPlayerOneState(), afterPrizes.getPlayerTwoState(), afterPrizes.getTurnState(), afterPrizes.getActiveStadium().orElse(null), result, null, events);
+        }
         return afterPrizes;
     }
 

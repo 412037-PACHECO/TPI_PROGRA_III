@@ -144,6 +144,21 @@ class EffectDirectHandlersTest {
     }
 
     @Test
+    void attachRainbowEnergyEffectOnlyPlacesCounterWhenSourceZoneIsHand() {
+        CardInstance rainbow = energy("rainbow-discard", PLAYER_ONE, EnergyProfile.rainbow());
+        PokemonInPlay active = active("p1-active", PLAYER_ONE, 60);
+        GameState state = game(player(PLAYER_ONE, active, List.of(), List.of(), List.of(rainbow), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        List<GameEvent> events = new ArrayList<>();
+
+        GameState result = new EffectExecutionService().execute(EffectDefinition.attachEnergy(EffectTarget.ACTING_PLAYER, EffectCardZone.DISCARD, List.of(rainbow.id()), -1, EffectTiming.AFTER_ATTACK), context(state, events)).state();
+
+        assertThat(activePokemon(result.getPlayerOneState()).getAttachedCards().getEnergies()).extracting(CardInstance::id).containsExactly(rainbow.id());
+        assertThat(activePokemon(result.getPlayerOneState()).getDamageCounters()).isZero();
+        assertThat(eventsOfType(events, DamageCountersPlacedEvent.class)).isEmpty();
+        assertThat(eventsOfType(events, EnergyAttachedEvent.class)).hasSize(1);
+    }
+
+    @Test
     void moveEnergyMovesOwnAttachedEnergyBetweenOwnPokemon() {
         CardInstance energy = energy("attached-energy", PLAYER_ONE);
         PokemonInPlay active = new PokemonInPlay(pokemonCard("p1-active", PLAYER_ONE, 60), new AttachedCards(List.of(energy)));
@@ -236,7 +251,11 @@ class EffectDirectHandlersTest {
     }
 
     private CardInstance energy(String id, PlayerId owner) {
-        return new CardInstance(new CardInstanceId(id), new CardDefinitionRef(id + "-def", "Water Energy", CardSupertype.ENERGY, Set.of(CardSubtype.BASIC_ENERGY), null, null, null, List.of(), List.of(), List.of(), List.of(), EnergyProfile.basic(EnergyType.WATER)), owner);
+        return energy(id, owner, EnergyProfile.basic(EnergyType.WATER));
+    }
+
+    private CardInstance energy(String id, PlayerId owner, EnergyProfile profile) {
+        return new CardInstance(new CardInstanceId(id), new CardDefinitionRef(id + "-def", "Energy " + id, CardSupertype.ENERGY, Set.of(CardSubtype.BASIC_ENERGY), null, null, null, List.of(), List.of(), List.of(), List.of(), profile), owner);
     }
 
     private List<CardInstance> prizes(PlayerId owner, int count) {

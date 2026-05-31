@@ -17,6 +17,7 @@ import com.tpi.pokemon.game.engine.effect.modifier.AppliedModifier;
 import com.tpi.pokemon.game.engine.effect.modifier.DamageModifierContext;
 import com.tpi.pokemon.game.engine.effect.modifier.DefaultModifierResolver;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierOperation;
+import com.tpi.pokemon.game.engine.effect.modifier.ModifierType;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierResolver;
 import com.tpi.pokemon.game.engine.event.AttackDeclaredEvent;
 import com.tpi.pokemon.game.engine.event.AttackResolvedEvent;
@@ -160,7 +161,7 @@ public final class AttackService {
 
     private void appendDamageModifierEvents(GameState state, PokemonInPlay defender, DamageCalculation damage, List<GameEvent> events) {
         for (AppliedModifier modifier : damage.appliedModifiers()) {
-            if (modifier.operation() == ModifierOperation.PREVENT) {
+            if (modifier.operation() == ModifierOperation.PREVENT && modifier.type() == ModifierType.DAMAGE) {
                 events.add(new DamagePreventedEvent(state.getGameId(), modifier.sourceCardId(), modifier.effectId(), defender.getTopCard().id()));
             } else {
                 events.add(new DamageModifiedEvent(state.getGameId(), modifier.sourceCardId(), modifier.effectId(), modifier.valueBefore(), modifier.valueAfter()));

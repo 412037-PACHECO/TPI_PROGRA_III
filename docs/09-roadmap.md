@@ -223,6 +223,14 @@ Decisiones fase 11:
 - Gaps derivados a 11F: `Shadow Circle`, `Spiky Shield`, cleanup completo de `Sweet Veil`, Trainers con zonas ocultas/top-N/mano completa y handlers custom de carta completa.
 - Criterio: gaps cerrados tienen mapping y tests; gaps restantes tienen motivo técnico explícito y no se marcan `FULLY_TESTED`.
 
+### Fase 11G.1 - Cierre de gaps críticos XY1
+
+- Estado: implementada en engine puro Java; pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: cerrar tres gaps críticos sin tocar frontend, WebSocket, persistencia, endpoints REST de juego ni parser automático: `Rainbow Energy` KO/premios/victoria, cleanup completo de `Sweet Veil` y `Shadow Circle` como prevención de Weakness.
+- Entregables: `PREVENT_WEAKNESS` en `ModifierResolver`, integración de KO de Banca en `PostAttackResolutionService`, reconciliación de condiciones prevenidas en `StatusEffectManager`, mapping de `xy1-126 Shadow Circle`, actualización de estados para `xy1-95` y `xy1-131`, tests de acción/daño/catálogo.
+- Fuera de alcance: `Spiky Shield`, Trainers complejos con zonas ocultas/top-N/mano completa, UI/API pública de selección/reveal, auditoría real completa de 146 cartas sin cache local.
+- Criterio: Rainbow desde mano puede noquear Pokémon propio Activo o de Banca usando servicios existentes de KO/premios/victoria; Sweet Veil previene y remueve condiciones para Pokémon propios con Energía Fairy-providing; Shadow Circle suprime Weakness solo para Pokémon con Energía Darkness-providing y mantiene Resistance.
+
 ### Fase 11F - Reporte final de cumplimiento XY1
 
 - Objetivo: consolidar reporte final de cumplimiento/gaps del set XY1 y priorizar custom handlers o contratos públicos faltantes.

@@ -41,6 +41,12 @@ public final class DefaultModifierResolver implements ModifierResolver {
         return resolve(context.state(), ModifierType.PREVENT_SPECIAL_CONDITION, 0, ModifierLayer.PREVENTION, context.target(), context.targetPlayerId(), null, null);
     }
 
+    @Override
+    public ModifierResolutionResult resolveWeaknessPrevention(DamageModifierContext context) {
+        Objects.requireNonNull(context, "context must not be null");
+        return resolve(context.state(), ModifierType.PREVENT_WEAKNESS, 1, ModifierLayer.PREVENTION, context.defender(), context.defenderPlayerId(), context.attacker(), context.attackerPlayerId());
+    }
+
     private ModifierResolutionResult resolve(GameState state, ModifierType type, int initialValue, ModifierLayer layer, PokemonInPlay defaultTarget, PlayerId defaultTargetOwner, PokemonInPlay attacker, PlayerId attackerOwner) {
         int value = initialValue;
         boolean prevented = false;

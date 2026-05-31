@@ -53,6 +53,38 @@ public final class KnockoutResolver {
         return Optional.of(new KnockoutResolution(updatedState, new KnockoutResult(ownerId, knockedOut, discardedCards, knockedOut.getTopCard().definition().prizeValue())));
     }
 
+    public Optional<KnockoutResolution> resolveBenchKnockout(GameState state, PlayerId ownerId, int benchIndex, List<GameEvent> events) {
+        PlayerGameState owner = playerState(state, ownerId);
+        List<PokemonInPlay> bench = owner.getBoard().getBench().getPokemon();
+        if (benchIndex < 0 || benchIndex >= bench.size()) {
+            throw new KnockoutException("Bench index is invalid");
+        }
+        PokemonInPlay knockedOut = bench.get(benchIndex);
+        if (!isKnockedOut(knockedOut)) {
+            return Optional.empty();
+        }
+
+        List<CardInstance> discardedCards = new ArrayList<>(knockedOut.getEvolutionStack());
+        discardedCards.addAll(knockedOut.getAttachedCards().getCards());
+        List<PokemonInPlay> updatedBench = new ArrayList<>(bench);
+        updatedBench.remove(benchIndex);
+        BoardState boardWithoutBenchPokemon = new BoardState(owner.getBoard().getActivePokemon().orElse(null), new com.tpi.pokemon.game.domain.model.Bench(updatedBench));
+        PlayerGameState updatedOwner = new PlayerGameState(
+                owner.getPlayerId(),
+                owner.getDeck(),
+                owner.getHand(),
+                owner.getPrizeCards(),
+                owner.getDiscardPile().withCardsAdded(discardedCards),
+                boardWithoutBenchPokemon,
+                owner.getTurnsTaken()
+        );
+        GameState updatedState = withPlayer(state, updatedOwner, events);
+        Integer hp = knockedOut.getTopCard().definition().hp();
+        events.add(new PokemonKnockedOutEvent(state.getGameId(), ownerId, knockedOut.getTopCard().id(), knockedOut.getDamageCounters(), hp == null ? 0 : hp));
+        events.add(new CardsDiscardedEvent(state.getGameId(), ownerId, discardedCards.stream().map(CardInstance::id).toList(), "KNOCKOUT"));
+        return Optional.of(new KnockoutResolution(updatedState, new KnockoutResult(ownerId, knockedOut, discardedCards, knockedOut.getTopCard().definition().prizeValue())));
+    }
+
     private PlayerGameState playerState(GameState state, PlayerId playerId) {
         if (state.getPlayerOneState().getPlayerId().equals(playerId)) {
             return state.getPlayerOneState();

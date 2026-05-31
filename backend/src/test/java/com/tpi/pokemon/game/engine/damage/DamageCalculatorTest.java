@@ -23,6 +23,7 @@ import com.tpi.pokemon.game.domain.model.PlayerGameState;
 import com.tpi.pokemon.game.domain.model.PokemonInPlay;
 import com.tpi.pokemon.game.domain.model.PrizeCards;
 import com.tpi.pokemon.game.domain.model.Resistance;
+import com.tpi.pokemon.game.domain.model.StadiumInPlay;
 import com.tpi.pokemon.game.domain.model.TurnState;
 import com.tpi.pokemon.game.domain.model.Weakness;
 import com.tpi.pokemon.game.domain.value.CardInstanceId;
@@ -148,6 +149,43 @@ class DamageCalculatorTest {
         assertThat(damage.appliedModifiers()).hasSize(1);
     }
 
+    @Test
+    void shadowCirclePreventsWeaknessForDefenderWithDarknessProvidingEnergy() {
+        PokemonInPlay attacker = attacker(PokemonType.FIRE);
+        PokemonInPlay defender = defender(
+                List.of(new Weakness(PokemonType.FIRE, 2)),
+                List.of(new Resistance(PokemonType.FIRE, 20)))
+                .withAttachedEnergy(energy("darkness", EnergyType.DARKNESS));
+        GameState state = activeState(attacker, defender, stadiumWithEffect("shadow-circle", shadowCircleEffect()));
+
+        DamageCalculation damage = calculator.calculate(new DamageModifierContext(state, ATTACKER, DEFENDER, attacker, defender, HIT_30), new DefaultModifierResolver());
+
+        assertThat(damage.finalDamage()).isEqualTo(10);
+        assertThat(damage.weaknessApplied()).isFalse();
+        assertThat(damage.resistanceApplied()).isTrue();
+        assertThat(damage.appliedModifiers()).singleElement().satisfies(modifier -> {
+            assertThat(modifier.type()).isEqualTo(ModifierType.PREVENT_WEAKNESS);
+            assertThat(modifier.operation()).isEqualTo(ModifierOperation.PREVENT);
+        });
+    }
+
+    @Test
+    void shadowCircleDoesNotPreventWeaknessWithoutDarknessProvidingEnergy() {
+        PokemonInPlay attacker = attacker(PokemonType.FIRE);
+        PokemonInPlay defender = defender(
+                List.of(new Weakness(PokemonType.FIRE, 2)),
+                List.of(new Resistance(PokemonType.FIRE, 20)))
+                .withAttachedEnergy(energy("water", EnergyType.WATER));
+        GameState state = activeState(attacker, defender, stadiumWithEffect("shadow-circle", shadowCircleEffect()));
+
+        DamageCalculation damage = calculator.calculate(new DamageModifierContext(state, ATTACKER, DEFENDER, attacker, defender, HIT_30), new DefaultModifierResolver());
+
+        assertThat(damage.finalDamage()).isEqualTo(40);
+        assertThat(damage.weaknessApplied()).isTrue();
+        assertThat(damage.resistanceApplied()).isTrue();
+        assertThat(damage.appliedModifiers()).isEmpty();
+    }
+
     private PokemonInPlay attacker(PokemonType type) {
         return PokemonInPlay.withoutAttachments(card("attacker-card", ATTACKER, pokemonDefinition("attacker-def", type, List.of(HIT_30, HIT_10), List.of(), List.of())));
     }
@@ -195,13 +233,31 @@ class DamageCalculatorTest {
         );
     }
 
+    private CardEffectDefinition shadowCircleEffect() {
+        return new CardEffectDefinition(
+                "shadow-circle-no-weakness",
+                "Shadow Circle",
+                EffectSourceKind.STADIUM,
+                EffectActivationKind.CONTINUOUS,
+                EffectTiming.CONTINUOUS,
+                EffectScope.ANY,
+                EffectCondition.targetHasAttachedEnergyProviding(EnergyType.DARKNESS),
+                List.of(new ModifierDefinition(ModifierType.PREVENT_WEAKNESS, ModifierOperation.PREVENT, ModifierLayer.PREVENTION, 0, ModifierTargetRole.DEFENDER))
+        );
+    }
+
     private GameState activeState(PokemonInPlay attacker, PokemonInPlay defender) {
+        return activeState(attacker, defender, null);
+    }
+
+    private GameState activeState(PokemonInPlay attacker, PokemonInPlay defender, StadiumInPlay stadium) {
         return new GameState(
                 GAME_ID,
                 GameStatus.ACTIVE,
                 player(ATTACKER, attacker),
                 player(DEFENDER, defender),
                 new TurnState(ATTACKER, ATTACKER, 2, TurnPhase.MAIN, false, false, false, false, false),
+                stadium,
                 List.of()
         );
     }
@@ -212,5 +268,15 @@ class DamageCalculatorTest {
 
     private CardInstance card(String id, PlayerId owner, CardDefinitionRef definition) {
         return new CardInstance(new CardInstanceId(id), definition, owner);
+    }
+
+    private CardInstance energy(String id, EnergyType type) {
+        CardDefinitionRef definition = new CardDefinitionRef(id + "-def", type + " Energy", CardSupertype.ENERGY, Set.of(CardSubtype.BASIC_ENERGY), null, null, null, List.of(), List.of(), List.of(), List.of(), EnergyProfile.basic(type));
+        return card(id, DEFENDER, definition);
+    }
+
+    private StadiumInPlay stadiumWithEffect(String id, CardEffectDefinition effect) {
+        CardDefinitionRef definition = new CardDefinitionRef(id + "-def", "Shadow Circle", CardSupertype.TRAINER, Set.of(CardSubtype.STADIUM), null, null, null, List.of(), List.of(), List.of(), List.of(), EnergyProfile.none(), List.of(effect));
+        return new StadiumInPlay(card(id, ATTACKER, definition), ATTACKER, 2);
     }
 }
