@@ -222,7 +222,7 @@ Fase 11E.2 extiende `Xy1EffectCatalog` con mappings progresivos de cartas Traine
 - Tools mapeadas: `Hard Charm` y `Muscle Band` como `CardEffectDefinition` continuos sobre el pipeline de modificadores de daño.
 - Stadiums mapeados progresivamente: `Fairy Garden` queda completo en 11E.5 como modificador de retiro; `Shadow Circle` queda completo en 11G.1 como prevención continua de Weakness condicionada por Energía Darkness-providing.
 
-Trainers pendientes históricos: `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`. Fase 11G.3 cierra `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y el alcance interno de `Professor's Letter`; siguen pendientes `Cassius`, `Evosoda`, `Great Ball` y `Super Potion` por selección de tablero/top-N/evolución directa/energía unida.
+Trainers pendientes históricos: `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`. Fase 11G.3 cierra `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y el alcance interno de `Professor's Letter`. Fase 11G.3B agrega handlers internos para `Cassius`, `Evosoda`, `Great Ball` y `Super Potion`; quedan pendientes los contratos públicos UI/API de selección/reveal/privacidad y la ejecución local completa de tests antes de marcarlos `FULLY_TESTED`.
 
 Para Trainers, `EFFECT_MAPPED` no equivale automáticamente a “jugable desde UI/API”. Puede existir mapping engine-interno testeado mientras siga pendiente el contrato público de selección, reveal, privacidad o sincronización.
 
@@ -271,7 +271,7 @@ Fase 11E.5 cierra solo los gaps que podían resolverse con infraestructura míni
 
 Siguen pendientes para 11F:
 
-- Trainers con zonas ocultas/mano completa/top-N siguen siendo backlog salvo los cerrados en 11G.3: `Cassius`, `Evosoda`, `Great Ball` y `Super Potion` requieren contratos de selección o handlers custom adicionales.
+- Trainers con zonas ocultas/mano completa/top-N tienen cobertura interna para los casos cerrados en 11G.3/11G.3B, pero siguen requiriendo contratos públicos de selección segura antes de exponerlos por API/UI.
 
 ## Fase 11G.1 - Gaps críticos cerrados
 
@@ -316,10 +316,16 @@ Decisiones de privacidad:
 
 Gaps documentados, no implementados como soporte completo:
 
-- `xy1-115 Cassius`: requiere devolver Pokémon propio en juego con evolución/attachments al mazo y resolver tablero/Activo.
-- `xy1-116 Evosoda`: requiere evolución directa desde mazo validando restricciones de evolución.
-- `xy1-118 Great Ball`: requiere inspección privada top-7, elección opcional, reveal y manejo seguro del resto.
-- `xy1-128 Super Potion`: requiere elegir Pokémon propio y Energía unida; el descarte depende de que haya curación válida.
+### Fase 11G.3B - Trainers restantes de selección compleja
+
+11G.3B agrega handlers internos para los cuatro Trainers que 11G.3 dejó fuera:
+
+- `xy1-115 Cassius`: `ReturnPokemonToDeckEffectHandler` selecciona un Pokémon propio, devuelve stack de evolución + attachments al mazo, baraja y deja reemplazo activo pendiente si corresponde.
+- `xy1-116 Evosoda`: `EvosodaEvolveEffectHandler` busca evolución en mazo, valida `evolvesFrom`, evoluciona preservando daño/attachments y baraja.
+- `xy1-118 Great Ball`: `GreatBallSearchEffectHandler` inspecciona top 7, limita candidatos a Pokémon, revela el elegido opcional y baraja el mazo restante.
+- `xy1-128 Super Potion`: `SuperPotionEffectHandler` elige Pokémon propio, cura hasta 60 y descarta exactamente una Energía unida.
+
+Límite explícito: estos handlers devuelven `PendingEffectSelection` y metadata interna; todavía no definen vistas públicas seguras para UI/API/WebSocket.
 
 ## Cómo agregar un nuevo mapping
 

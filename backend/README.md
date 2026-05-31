@@ -44,7 +44,7 @@ Incluye:
 - Cleanup continuo de condiciones especiales prevenidas, usado por `Sweet Veil`.
 - `Shadow Circle` como Estadio continuo que elimina Weakness de Pokémon con Energía Darkness-providing.
 - Infraestructura reactiva acotada para `Spiky Shield`: cuando Chesnaught Activo recibe daño positivo de ataque rival, coloca 3 contadores de daño sobre el atacante original e integra cualquier KO resultante con premios/victoria.
-- Handlers internos para Trainers complejos cerrados en 11G.3: descarte de mano + robo, mezclar mano en mazo + robo, y mover Pokémon del descarte al tope del mazo con selección pendiente.
+- Handlers internos para Trainers complejos cerrados en 11G.3/11G.3B: descarte de mano + robo, mezclar mano en mazo + robo, mover Pokémon del descarte al tope del mazo, top-7 de Great Ball, evolución directa de Evosoda, Super Potion y retorno a mazo de Cassius con selección pendiente.
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 
 ## Modelo Game State
@@ -385,7 +385,7 @@ Gaps documentados:
 - `xy1-95 Slurpuff / Sweet Veil`: falta cleanup continuo de condiciones existentes para soporte completo.
 - `xy1-126 Shadow Circle`: falta supresión continua de Weakness condicionada por Energía Darkness.
 - `xy1-131 Rainbow Energy`: falta integrar KO/premios si el contador por adjuntar desde mano causa KO.
-- Trainers complejos como `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`: requieren selección/privacidad/top-N/mano completa o handlers custom de carta completa.
+- Trainers complejos como `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`: cuentan con handlers internos para el alcance engine actual; todavía requieren contrato público de selección/privacidad/top-N/mano completa antes de exponerlos por API/UI/WebSocket.
 
 Reglas de diseño de Fase 11:
 

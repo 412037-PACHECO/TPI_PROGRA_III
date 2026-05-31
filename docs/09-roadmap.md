@@ -191,7 +191,7 @@ Decisiones fase 11:
 - `Xy1EffectCatalog` devuelve lista vacía para cartas/ataques sin mapping explícito; eso no significa que la carta no tenga efecto real.
 - La auditoría completa de XY1 se declara `false` hasta revisar y testear el set completo.
 - Se mapearon efectos representativos con handlers existentes: condición especial, curación, robo, moneda y descarte de energía.
-- Trainers como `Professor's Letter` y `Shauna` fueron gaps históricos por búsqueda/shuffle/manipulación de mano o mazo; 11G.3 cierra los que podían resolverse internamente sin UI/API pública.
+- Trainers como `Professor's Letter` y `Shauna` fueron gaps históricos por búsqueda/shuffle/manipulación de mano o mazo; 11G.3 cierra los que podían resolverse internamente sin UI/API pública. 11G.3B agrega handlers internos para `Cassius`, `Evosoda`, `Great Ball` y `Super Potion`, manteniendo pendiente la exposición pública segura.
 - Habilidades pasivas/continuas/reactivas se cierran de forma incremental: `Sweet Veil` queda completo en 11G.1 y `Spiky Shield` queda completo para su trigger acotado en 11G.2; eso no implica cobertura total de todas las habilidades XY1.
 - La subfase `feature/xy1-full-audit` no implementa handlers faltantes; clasifica efectos desde cache local y genera reporte con `importedCardCount`, conteos por complejidad y gaps.
 - Si no hay `backend/data`/cache importado, no se puede afirmar auditoría factual de las 146 cartas en ese entorno; debe importarse `xy1` antes de ejecutar el reporte completo.
@@ -244,7 +244,15 @@ Decisiones fase 11:
 - Estado: implementada parcialmente en engine puro Java; pendiente de ejecución local final de Maven por restricción de entorno.
 - Objetivo: cerrar Trainers XY1 complejos que pueden resolverse de forma segura sin frontend, WebSocket, persistencia, endpoints REST ni parser automático.
 - Entregables: `DiscardHandDrawEffectHandler`, `ShuffleHandIntoDeckDrawEffectHandler`, `PutDiscardPokemonOnTopDeckEffectHandler`, eventos de shuffle/move top-deck, mappings para `Professor Sycamore`, `Shauna`, `Red Card`, `Max Revive` y cierre interno de `Professor's Letter`.
-- Fuera de alcance: `Cassius`, `Evosoda`, `Great Ball`, `Super Potion` completos, contratos públicos de selección/reveal/privacidad y vistas seguras por jugador.
+- Fuera de alcance: contratos públicos de selección/reveal/privacidad y vistas seguras por jugador.
+
+### Fase 11G.3B - Trainers restantes con selección compleja
+
+- `Cassius`: handler interno para devolver Pokémon propio + cartas unidas al mazo y generar reemplazo activo pendiente si corresponde.
+- `Evosoda`: handler interno para evolución directa desde mazo con validación `evolvesFrom` y shuffle.
+- `Great Ball`: handler interno para inspección top-7, elección opcional de Pokémon, reveal y shuffle.
+- `Super Potion`: handler interno para curar hasta 60 y descartar una Energía unida.
+- Pendiente: ejecutar suite local y diseñar contrato UI/API/WebSocket de selección segura antes de considerar cobertura pública completa.
 - Criterio: no se elige automáticamente cuando hay elección del jugador; pending selections conservan metadata; hand-to-deck shuffle no revela manos; mappings cerrados tienen tests y gaps restantes quedan explícitos.
 
 ### Fase 11F - Reporte final de cumplimiento XY1

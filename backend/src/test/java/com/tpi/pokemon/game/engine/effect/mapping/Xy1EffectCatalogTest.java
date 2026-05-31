@@ -259,6 +259,30 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void phase11G3BTrainerMappingsUseCustomEffectTypes() {
+        assertThat(catalog.effectsForTrainer("xy1-115")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.RETURN_POKEMON_TO_DECK);
+            assertThat(effect.targetBenchIndex()).isEqualTo(-2);
+            assertThat(effect.requiresShuffle()).isTrue();
+        });
+        assertThat(catalog.effectsForTrainer("xy1-116")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.EVOSODA_EVOLVE);
+            assertThat(effect.sourceZone()).isEqualTo(EffectCardZone.DECK);
+            assertThat(effect.requiresShuffle()).isTrue();
+        });
+        assertThat(catalog.effectsForTrainer("xy1-118")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.GREAT_BALL_SEARCH);
+            assertThat(effect.amount()).isEqualTo(7);
+            assertThat(effect.revealSelectedCards()).isTrue();
+        });
+        assertThat(catalog.effectsForTrainer("xy1-128")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.SUPER_POTION);
+            assertThat(effect.amount()).isEqualTo(60);
+            assertThat(effect.targetBenchIndex()).isEqualTo(-2);
+        });
+    }
+
+    @Test
     void supporterDiscardEnergyMappingUsesExistingAttachedEnergyHandler() {
         assertThat(catalog.effectsForTrainer("xy1-129")).singleElement().satisfies(effect -> {
             assertThat(effect.type()).isEqualTo(EffectType.DISCARD_ATTACHED_ENERGY);

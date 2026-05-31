@@ -91,6 +91,34 @@ public record EffectDefinition(
         return new EffectDefinition(EffectType.PUT_DISCARD_POKEMON_ON_TOP_DECK, timing, target, selectedCardIds == null || selectedCardIds.isEmpty() ? 1 : selectedCardIds.size(), null, List.of(), null, null, selectedCardIds, EffectCardZone.DISCARD, EffectCardZone.DECK, CardFilterSpec.supertype(com.tpi.pokemon.game.domain.enums.CardSupertype.POKEMON), -1, -1, -1, false, false);
     }
 
+    public static EffectDefinition greatBallSearch(List<CardInstanceId> selectedCardIds, EffectTiming timing) {
+        return new EffectDefinition(EffectType.GREAT_BALL_SEARCH, timing, EffectTarget.ACTING_PLAYER, 7, null, List.of(), null, null, selectedCardIds, EffectCardZone.DECK, EffectCardZone.HAND, CardFilterSpec.supertype(com.tpi.pokemon.game.domain.enums.CardSupertype.POKEMON), -1, -1, -1, true, true);
+    }
+
+    public static EffectDefinition evosodaEvolve(List<CardInstanceId> selectedCardIds, int targetBenchIndex, EffectTiming timing) {
+        return new EffectDefinition(EffectType.EVOSODA_EVOLVE, timing, EffectTarget.ACTING_PLAYER, 1, null, List.of(), null, null, selectedCardIds, EffectCardZone.DECK, EffectCardZone.ATTACHED, CardFilterSpec.supertype(com.tpi.pokemon.game.domain.enums.CardSupertype.POKEMON), targetBenchIndex, -1, -1, false, true);
+    }
+
+    public static EffectDefinition evosodaEvolve(EffectTiming timing) {
+        return evosodaEvolve(List.of(), -2, timing);
+    }
+
+    public static EffectDefinition superPotion(List<CardInstanceId> selectedEnergyIds, int targetBenchIndex, EffectTiming timing) {
+        return new EffectDefinition(EffectType.SUPER_POTION, timing, EffectTarget.ACTING_PLAYER, 60, null, List.of(), null, null, selectedEnergyIds, EffectCardZone.ATTACHED, EffectCardZone.DISCARD, CardFilterSpec.supertype(com.tpi.pokemon.game.domain.enums.CardSupertype.ENERGY), targetBenchIndex, -1, -1, false, false);
+    }
+
+    public static EffectDefinition superPotion(EffectTiming timing) {
+        return superPotion(List.of(), -2, timing);
+    }
+
+    public static EffectDefinition returnPokemonToDeck(int targetBenchIndex, EffectTiming timing) {
+        return new EffectDefinition(EffectType.RETURN_POKEMON_TO_DECK, timing, EffectTarget.ACTING_PLAYER, 1, null, List.of(), null, null, List.of(), EffectCardZone.IN_PLAY, EffectCardZone.DECK, CardFilterSpec.any(), targetBenchIndex, -1, -1, false, true);
+    }
+
+    public static EffectDefinition returnPokemonToDeck(EffectTiming timing) {
+        return returnPokemonToDeck(-2, timing);
+    }
+
     public static EffectDefinition attachEnergy(EffectTarget target, EffectCardZone sourceZone, List<CardInstanceId> selectedEnergyIds, int targetBenchIndex, EffectTiming timing) {
         return new EffectDefinition(EffectType.ATTACH_ENERGY, timing, target, selectedEnergyIds == null || selectedEnergyIds.isEmpty() ? 1 : selectedEnergyIds.size(), null, List.of(), null, null, selectedEnergyIds, sourceZone, EffectCardZone.ATTACHED, CardFilterSpec.supertype(com.tpi.pokemon.game.domain.enums.CardSupertype.ENERGY), targetBenchIndex, -1, -1, false, false);
     }

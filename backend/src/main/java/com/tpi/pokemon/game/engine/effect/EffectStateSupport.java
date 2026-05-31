@@ -11,6 +11,7 @@ import com.tpi.pokemon.game.domain.model.HandZone;
 import com.tpi.pokemon.game.domain.model.PlayerGameState;
 import com.tpi.pokemon.game.domain.model.PokemonInPlay;
 import com.tpi.pokemon.game.domain.value.PlayerId;
+import com.tpi.pokemon.game.engine.knockout.PendingActiveReplacement;
 
 final class EffectStateSupport {
     private EffectStateSupport() {}
@@ -41,6 +42,12 @@ final class EffectStateSupport {
         PlayerGameState playerOne = state.getPlayerOneState().getPlayerId().equals(updatedPlayer.getPlayerId()) ? updatedPlayer : state.getPlayerOneState();
         PlayerGameState playerTwo = state.getPlayerTwoState().getPlayerId().equals(updatedPlayer.getPlayerId()) ? updatedPlayer : state.getPlayerTwoState();
         return new GameState(state.getGameId(), state.getStatus(), playerOne, playerTwo, state.getTurnState(), state.getActiveStadium().orElse(null), state.getFinishResult().orElse(null), state.getPendingActiveReplacement().orElse(null), state.getEvents());
+    }
+
+    static GameState withPlayerAndPendingActiveReplacement(GameState state, PlayerGameState updatedPlayer, PendingActiveReplacement pendingActiveReplacement) {
+        PlayerGameState playerOne = state.getPlayerOneState().getPlayerId().equals(updatedPlayer.getPlayerId()) ? updatedPlayer : state.getPlayerOneState();
+        PlayerGameState playerTwo = state.getPlayerTwoState().getPlayerId().equals(updatedPlayer.getPlayerId()) ? updatedPlayer : state.getPlayerTwoState();
+        return new GameState(state.getGameId(), state.getStatus(), playerOne, playerTwo, state.getTurnState(), state.getActiveStadium().orElse(null), state.getFinishResult().orElse(null), pendingActiveReplacement, state.getEvents());
     }
 
     static PlayerGameState withDeckAndHand(PlayerGameState player, DeckZone deck, HandZone hand) {

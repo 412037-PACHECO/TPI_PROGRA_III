@@ -60,6 +60,10 @@ class EffectDirectHandlersTest {
         assertThat(registry.findHandler(EffectType.DISCARD_HAND_DRAW)).isPresent();
         assertThat(registry.findHandler(EffectType.SHUFFLE_HAND_INTO_DECK_DRAW)).isPresent();
         assertThat(registry.findHandler(EffectType.PUT_DISCARD_POKEMON_ON_TOP_DECK)).isPresent();
+        assertThat(registry.findHandler(EffectType.GREAT_BALL_SEARCH)).isPresent();
+        assertThat(registry.findHandler(EffectType.EVOSODA_EVOLVE)).isPresent();
+        assertThat(registry.findHandler(EffectType.SUPER_POTION)).isPresent();
+        assertThat(registry.findHandler(EffectType.RETURN_POKEMON_TO_DECK)).isPresent();
         assertThat(registry.findHandler(EffectType.ATTACH_ENERGY)).isPresent();
         assertThat(registry.findHandler(EffectType.MOVE_ENERGY)).isPresent();
         assertThat(registry.findHandler(EffectType.SWITCH_ACTIVE)).isPresent();
@@ -198,6 +202,87 @@ class EffectDirectHandlersTest {
     }
 
     @Test
+    void greatBallOnlyAllowsTopSevenPokemonAndMovesSelectedToHand() {
+        CardInstance pokemon = pokemonCard("top-pokemon", PLAYER_ONE, 60);
+        CardInstance energy = energy("top-energy", PLAYER_ONE);
+        CardInstance eighth = pokemonCard("eighth-pokemon", PLAYER_ONE, 60);
+        List<CardInstance> deck = new ArrayList<>();
+        deck.add(energy);
+        deck.add(pokemon);
+        for (int i = 0; i < 5; i++) deck.add(energy("filler-" + i, PLAYER_ONE));
+        deck.add(eighth);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), deck, List.of(), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        EffectExecutionService service = new EffectExecutionService(new EffectRegistry(List.of(new GreatBallSearchEffectHandler(cards -> cards))));
+        List<GameEvent> events = new ArrayList<>();
+
+        EffectResult pending = service.execute(EffectDefinition.greatBallSearch(List.of(), EffectTiming.ON_PLAY_TRAINER), context(state, new ArrayList<>()));
+        assertThat(pending.pendingSelectionOptional()).hasValueSatisfying(selection -> assertThat(selection.candidateCardIds()).containsExactly(pokemon.id()));
+
+        GameState result = service.execute(EffectDefinition.greatBallSearch(List.of(pokemon.id()), EffectTiming.ON_PLAY_TRAINER), context(state, events)).state();
+
+        assertThat(result.getPlayerOneState().getHand().getCards()).extracting(CardInstance::id).containsExactly(pokemon.id());
+        assertThat(result.getPlayerOneState().getDeck().getCards()).extracting(CardInstance::id).doesNotContain(pokemon.id()).contains(eighth.id());
+        assertThat(eventsOfType(events, DeckSearchedEvent.class)).singleElement().satisfies(event -> assertThat(event.revealSelectedCards()).isTrue());
+    }
+
+    @Test
+    void evosodaEvolvesSelectedPokemonFromDeckAndShuffles() {
+        PokemonInPlay active = active("p1-active", PLAYER_ONE, 60).withDamageCounters(2);
+        CardInstance evolution = evolutionCard("stage-one", PLAYER_ONE, active.getTopCard().definition().name(), 90);
+        GameState state = game(player(PLAYER_ONE, active, List.of(evolution), List.of(), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        EffectExecutionService service = new EffectExecutionService(new EffectRegistry(List.of(new EvosodaEvolveEffectHandler(cards -> cards))));
+        List<GameEvent> events = new ArrayList<>();
+
+        EffectResult pending = service.execute(EffectDefinition.evosodaEvolve(EffectTiming.ON_PLAY_TRAINER), context(state, new ArrayList<>()));
+        assertThat(pending.pendingSelectionOptional()).hasValueSatisfying(selection -> assertThat(selection.candidateCardIds()).containsExactly(evolution.id()));
+
+        GameState result = service.execute(EffectDefinition.evosodaEvolve(List.of(evolution.id()), -1, EffectTiming.ON_PLAY_TRAINER), context(state, events)).state();
+
+        PokemonInPlay evolved = activePokemon(result.getPlayerOneState());
+        assertThat(evolved.getEvolutionStack()).extracting(CardInstance::id).containsExactly(active.getTopCard().id(), evolution.id());
+        assertThat(evolved.getDamageCounters()).isEqualTo(2);
+        assertThat(result.getPlayerOneState().getDeck().getCards()).isEmpty();
+        assertThat(eventsOfType(events, DeckShuffledEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void superPotionHealsAndDiscardsSelectedAttachedEnergy() {
+        CardInstance firstEnergy = energy("first-energy", PLAYER_ONE);
+        CardInstance secondEnergy = energy("second-energy", PLAYER_ONE);
+        PokemonInPlay damaged = new PokemonInPlay(pokemonCard("p1-active", PLAYER_ONE, 100), new AttachedCards(List.of(firstEnergy, secondEnergy))).withDamageCounters(8);
+        GameState state = game(player(PLAYER_ONE, damaged, List.of(), List.of(), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        List<GameEvent> events = new ArrayList<>();
+
+        EffectResult pending = new EffectExecutionService().execute(EffectDefinition.superPotion(List.of(), -1, EffectTiming.ON_PLAY_TRAINER), context(state, new ArrayList<>()));
+        assertThat(pending.pendingSelectionOptional()).hasValueSatisfying(selection -> assertThat(selection.candidateCardIds()).containsExactly(firstEnergy.id(), secondEnergy.id()));
+
+        GameState result = new EffectExecutionService().execute(EffectDefinition.superPotion(List.of(secondEnergy.id()), -1, EffectTiming.ON_PLAY_TRAINER), context(state, events)).state();
+
+        assertThat(activePokemon(result.getPlayerOneState()).getDamageCounters()).isEqualTo(2);
+        assertThat(activePokemon(result.getPlayerOneState()).getAttachedCards().getEnergies()).extracting(CardInstance::id).containsExactly(firstEnergy.id());
+        assertThat(result.getPlayerOneState().getDiscardPile().getCards()).extracting(CardInstance::id).containsExactly(secondEnergy.id());
+    }
+
+    @Test
+    void cassiusReturnsBenchPokemonStackAndAttachmentsToDeck() {
+        CardInstance energy = energy("bench-energy", PLAYER_ONE);
+        PokemonInPlay bench = new PokemonInPlay(pokemonCard("p1-bench", PLAYER_ONE, 60), new AttachedCards(List.of(energy)));
+        CardInstance deckCard = pokemonCard("deck-card", PLAYER_ONE, 60);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(deckCard), List.of(), List.of(), List.of(bench)), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        EffectExecutionService service = new EffectExecutionService(new EffectRegistry(List.of(new ReturnPokemonToDeckEffectHandler(cards -> cards))));
+        List<GameEvent> events = new ArrayList<>();
+
+        EffectResult pending = service.execute(EffectDefinition.returnPokemonToDeck(EffectTiming.ON_PLAY_TRAINER), context(state, new ArrayList<>()));
+        assertThat(pending.pendingSelectionOptional()).hasValueSatisfying(selection -> assertThat(selection.candidateCardIds()).containsExactly(activePokemon(state.getPlayerOneState()).getTopCard().id(), bench.getTopCard().id()));
+
+        GameState result = service.execute(EffectDefinition.returnPokemonToDeck(0, EffectTiming.ON_PLAY_TRAINER), context(state, events)).state();
+
+        assertThat(result.getPlayerOneState().getBoard().getBench().getPokemon()).isEmpty();
+        assertThat(result.getPlayerOneState().getDeck().getCards()).extracting(CardInstance::id).containsExactly(deckCard.id(), bench.getTopCard().id(), energy.id());
+        assertThat(eventsOfType(events, CardsShuffledIntoDeckEvent.class)).singleElement().satisfies(event -> assertThat(event.cardIds()).containsExactly(bench.getTopCard().id(), energy.id()));
+    }
+
+    @Test
     void attachEnergyFromHandAttachesToOwnActivePokemon() {
         CardInstance energy = energy("hand-energy", PLAYER_ONE);
         GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(), List.of(energy), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
@@ -315,6 +400,10 @@ class EffectDirectHandlersTest {
 
     private CardInstance pokemonCard(String id, PlayerId owner, int hp) {
         return new CardInstance(new CardInstanceId(id), new CardDefinitionRef(id + "-def", "Pokemon " + id, CardSupertype.POKEMON, Set.of(CardSubtype.BASIC), null, 1, hp, List.of(), List.of(), List.of(), List.of(), EnergyProfile.none()), owner);
+    }
+
+    private CardInstance evolutionCard(String id, PlayerId owner, String evolvesFrom, int hp) {
+        return new CardInstance(new CardInstanceId(id), new CardDefinitionRef(id + "-def", "Pokemon " + id, CardSupertype.POKEMON, Set.of(CardSubtype.STAGE_1), evolvesFrom, 1, hp, List.of(), List.of(), List.of(), List.of(), EnergyProfile.none()), owner);
     }
 
     private CardInstance energy(String id, PlayerId owner) {

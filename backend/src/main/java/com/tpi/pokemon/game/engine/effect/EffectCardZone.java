@@ -4,5 +4,6 @@ public enum EffectCardZone {
     DECK,
     HAND,
     DISCARD,
-    ATTACHED
+    ATTACHED,
+    IN_PLAY
 }
