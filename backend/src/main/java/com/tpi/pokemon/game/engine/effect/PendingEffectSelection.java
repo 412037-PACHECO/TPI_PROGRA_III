@@ -11,7 +11,10 @@ public record PendingEffectSelection(
         EffectTarget target,
         int minSelections,
         int maxSelections,
-        CardFilterSpec cardFilter
+        CardFilterSpec cardFilter,
+        boolean revealSelectedCards,
+        boolean requiresShuffle,
+        EffectDefinition continuationEffect
 ) {
     public PendingEffectSelection {
         Objects.requireNonNull(playerId, "playerId must not be null");
@@ -21,5 +24,9 @@ public record PendingEffectSelection(
         if (minSelections < 0 || maxSelections < minSelections) {
             throw new IllegalArgumentException("selection bounds are invalid");
         }
+    }
+
+    public PendingEffectSelection(PlayerId playerId, EffectType effectType, String sourceId, EffectCardZone sourceZone, EffectTarget target, int minSelections, int maxSelections, CardFilterSpec cardFilter) {
+        this(playerId, effectType, sourceId, sourceZone, target, minSelections, maxSelections, cardFilter, false, false, null);
     }
 }

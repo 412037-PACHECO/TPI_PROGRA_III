@@ -294,6 +294,22 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void fairyGardenContinuousMappingBuildsExpectedRetreatModifier() {
+        assertThat(catalog.continuousEffectsForTrainer("xy1-117")).singleElement().satisfies(effect -> {
+            assertThat(effect.effectId()).isEqualTo("fairy-garden-free-retreat");
+            assertThat(effect.sourceKind()).isEqualTo(EffectSourceKind.STADIUM);
+            assertThat(effect.scope()).isEqualTo(EffectScope.ANY);
+            assertThat(effect.condition().type()).isEqualTo(EffectConditionType.TARGET_HAS_ATTACHED_ENERGY_PROVIDING);
+            assertThat(effect.condition().energyType()).isEqualTo(EnergyType.FAIRY);
+            assertThat(effect.modifiers()).singleElement().satisfies(modifier -> {
+                assertThat(modifier.type()).isEqualTo(ModifierType.RETREAT_COST);
+                assertThat(modifier.operation()).isEqualTo(ModifierOperation.SET);
+                assertThat(modifier.amount()).isZero();
+            });
+        });
+    }
+
+    @Test
     void abilityMappingLookupFindsFurCoatByCardIdAndAbilityName() {
         assertThat(catalog.abilityMappingForName("xy1-114", "Fur Coat")).hasValueSatisfying(mapping -> {
             assertThat(mapping.cardName()).isEqualTo("Furfrou");
@@ -409,12 +425,14 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
-    void rainbowEnergyRemainsDocumentedGapUntilDynamicEnergyAndAttachTriggerExist() {
+    void rainbowEnergyMapsDynamicSingleSymbolAndAttachTrigger() {
         assertThat(catalog.energyMappingForCard("xy1-131")).hasValueSatisfying(mapping -> {
             assertThat(mapping.cardName()).isEqualTo("Rainbow Energy");
             assertThat(mapping.subtype()).isEqualTo(CardSubtype.SPECIAL_ENERGY);
             assertThat(mapping.energyProfile().provides()).containsExactly(EnergyType.COLORLESS);
-            assertThat(mapping.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(mapping.energyProfile().providesAnyTypeWhileAttached()).isTrue();
+            assertThat(mapping.energyProfile().attachDamageCountersFromHand()).isEqualTo(1);
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
             assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
             assertThat(mapping.tested()).isFalse();
         });
@@ -452,7 +470,7 @@ class Xy1EffectCatalogTest {
             assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
             assertThat(entry.tested()).isFalse();
         });
-        assertThat(catalog.auditEntriesForCard("xy1-117")).singleElement().satisfies(entry -> {
+        assertThat(catalog.auditEntriesForCard("xy1-126")).singleElement().satisfies(entry -> {
             assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
             assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
             assertThat(entry.tested()).isFalse();

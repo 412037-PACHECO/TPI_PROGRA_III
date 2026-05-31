@@ -24,6 +24,7 @@ import com.tpi.pokemon.game.engine.effect.modifier.RetreatCostModifierContext;
 import com.tpi.pokemon.game.engine.effect.modifier.SpecialConditionModifierContext;
 import com.tpi.pokemon.game.engine.event.ActivePokemonRetreatedEvent;
 import com.tpi.pokemon.game.engine.event.BasicPokemonBenchedEvent;
+import com.tpi.pokemon.game.engine.event.DamageCountersPlacedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.event.PokemonEvolvedEvent;
@@ -79,9 +80,14 @@ public final class TurnActionService {
         if (!energy.definition().isEnergy()) {
             throw new ActionException("Card must be an Energy");
         }
-        TargetUpdate target = updateTarget(context.playerState().getBoard(), command.target(), pokemon -> pokemon.withAttachedEnergy(energy));
+        TargetUpdate target = updateTarget(context.playerState().getBoard(), command.target(), pokemon -> applyAttachFromHandEffects(pokemon.withAttachedEnergy(energy), energy));
         PlayerGameState updatedPlayer = rebuildPlayer(context.playerState(), new HandZone(removeFromHand(context.playerState(), energy.id())), context.playerState().getDiscardPile(), target.board(), context.playerState().getTurnsTaken());
-        return withEvent(context.state(), updatedPlayer, context.turnState().withEnergyAttached(), context.state().getActiveStadium().orElse(null), new EnergyAttachedEvent(context.state().getGameId(), command.playerId(), energy.id(), target.updatedPokemon().getTopCard().id()));
+        List<GameEvent> events = new ArrayList<>();
+        events.add(new EnergyAttachedEvent(context.state().getGameId(), command.playerId(), energy.id(), target.updatedPokemon().getTopCard().id()));
+        if (energy.definition().energyProfile().attachDamageCountersFromHand() > 0) {
+            events.add(new DamageCountersPlacedEvent(context.state().getGameId(), command.playerId(), target.updatedPokemon().getTopCard().id(), energy.definition().energyProfile().attachDamageCountersFromHand(), target.updatedPokemon().getDamageCounters(), energy.definition().cardId()));
+        }
+        return replacePlayer(context.state(), updatedPlayer, context.turnState().withEnergyAttached(), context.state().getActiveStadium().orElse(null), events);
     }
 
     public GameState evolvePokemon(GameState state, EvolvePokemonCommand command) {
@@ -284,6 +290,14 @@ public final class TurnActionService {
         updatedPokemon = updater.apply(bench.get(target.benchIndex()));
         bench.set(target.benchIndex(), updatedPokemon);
         return new TargetUpdate(new BoardState(board.getActivePokemon().orElse(null), new Bench(bench)), updatedPokemon);
+    }
+
+    private PokemonInPlay applyAttachFromHandEffects(PokemonInPlay pokemon, CardInstance energy) {
+        int counters = energy.definition().energyProfile().attachDamageCountersFromHand();
+        if (counters == 0) {
+            return pokemon;
+        }
+        return pokemon.withDamageCounters(pokemon.getDamageCounters() + counters);
     }
 
     private PlayerGameState rebuildPlayer(PlayerGameState player, HandZone hand, DiscardPile discardPile, BoardState board, int turnsTaken) {

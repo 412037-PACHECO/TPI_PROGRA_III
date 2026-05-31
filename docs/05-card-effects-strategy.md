@@ -253,7 +253,7 @@ Decisiones de mapping:
 
 - Las Energías Básicas no requieren `EffectDefinition` textual: su comportamiento es estructural mediante `EnergyProfile.basic(tipo)`, coste de ataque/retiro y validación de mazo.
 - `Double Colorless Energy` queda mapeada estructuralmente como `EnergyProfile.of(COLORLESS, COLORLESS)`. No requiere handler de efecto porque el `EnergyCostValidator` ya consume todos los símbolos provistos.
-- `Rainbow Energy` queda como gap documentado: no debe modelarse como lista de todos los tipos porque el modelo actual contaría múltiples símbolos simultáneos y violaría “provides only 1 Energy at a time”. Además falta un trigger `on attach from hand` para colocar 1 contador de daño.
+- `Rainbow Energy` queda mapeada mediante un perfil dinámico de un solo símbolo flexible mientras está unida y un trigger básico al adjuntarse desde mano que coloca 1 contador de daño. No se modela como lista de todos los tipos simultáneamente.
 
 Criterio documental:
 
@@ -261,13 +261,28 @@ Criterio documental:
 - Una Energía Especial solo queda completa si su provisión de energía y sus triggers están modelados/testeados sin simplificar reglas oficiales.
 - Las condiciones “Pokémon con Energía Fairy/Darkness unida” usadas por `Sweet Veil`, `Fairy Garden` o `Shadow Circle` dependen de detección de energía unida, pero eso no completa esas cartas automáticamente.
 
+## Fase 11E.5 - Casos complejos/custom restantes XY1
+
+Fase 11E.5 cierra solo los gaps que podían resolverse con infraestructura mínima y sin acoplar el Game Engine:
+
+- `xy1-131 Rainbow Energy`: `EnergyProfile.rainbow()` representa una Energía flexible que paga exactamente 1 símbolo de cualquier tipo mientras está unida. `TurnActionService.attachEnergy` y `AttachEnergyEffectHandler` aplican el contador de daño solo cuando la energía se adjunta desde mano. La carta sigue parcial hasta resolver KO/premios si ese contador causa KO.
+- `xy1-117 Fairy Garden`: se mapea como Estadio continuo con `RETREAT_COST SET 0` para Pokémon que tengan Energía Fairy-providing unida.
+- `PendingEffectSelection` ahora conserva metadata interna de reveal, shuffle y efecto de continuación para búsquedas/selecciones pendientes.
+
+Siguen pendientes para 11F:
+
+- `xy1-126 Shadow Circle`: requiere supresión de Weakness condicionada por Energía Darkness, todavía sin hook dedicado en `DamageCalculator`.
+- `xy1-14 Chesnaught / Spiky Shield`: requiere resolver reactivo después de daño de ataque rival y antes de KO/premios.
+- Trainers con zonas ocultas/mano completa/top-N (`Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna`, `Super Potion`) requieren contratos de selección/reveal/privacidad o handlers custom de carta completa.
+
 Gaps documentados, no implementados como soporte completo:
 
 - `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
 - `xy1-127 Shauna`: requiere mezclar mano en mazo y robar 5; `DrawCardsEffectHandler` solo no alcanza.
 - `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva al recibir daño.
 - `xy1-95 Slurpuff / Sweet Veil`: prevención por Energía Fairy parcialmente mapeada; falta remover condiciones existentes.
-- `xy1-131 Rainbow Energy`: provisión dinámica de cualquier tipo, limitada a 1 Energía a la vez, y trigger al adjuntarse desde mano.
+- `xy1-126 Shadow Circle`: supresión continua de Weakness condicionada por Energía Darkness.
+- `xy1-131 Rainbow Energy`: resolución KO/premios si el contador al adjuntarse desde mano deja KO al Pokémon.
 
 ## Cómo agregar un nuevo mapping
 

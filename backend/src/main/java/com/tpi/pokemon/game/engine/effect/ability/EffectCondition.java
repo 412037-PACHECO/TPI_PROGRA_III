@@ -35,7 +35,7 @@ public record EffectCondition(EffectConditionType type, SpecialCondition conditi
             case TARGET_HAS_SPECIAL_CONDITION -> target.hasSpecialCondition(condition);
             case TARGET_DOES_NOT_HAVE_SPECIAL_CONDITION -> !target.hasSpecialCondition(condition);
             case TARGET_HAS_ATTACHED_ENERGY_PROVIDING -> target.getAttachedCards().getEnergies().stream()
-                    .anyMatch(card -> card.definition().energyProfile().provides().contains(energyType));
+                    .anyMatch(card -> card.definition().energyProfile().canProvide(energyType));
         };
     }
 }

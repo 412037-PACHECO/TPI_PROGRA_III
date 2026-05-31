@@ -89,7 +89,15 @@ class EffectDirectHandlersTest {
                 context(state, events)
         );
 
-        assertThat(result.pendingSelectionOptional()).hasValueSatisfying(selection -> assertThat(selection.effectType()).isEqualTo(EffectType.SEARCH_DECK));
+        assertThat(result.pendingSelectionOptional()).hasValueSatisfying(selection -> {
+            assertThat(selection.effectType()).isEqualTo(EffectType.SEARCH_DECK);
+            assertThat(selection.sourceZone()).isEqualTo(EffectCardZone.DECK);
+            assertThat(selection.minSelections()).isZero();
+            assertThat(selection.maxSelections()).isEqualTo(2);
+            assertThat(selection.revealSelectedCards()).isTrue();
+            assertThat(selection.requiresShuffle()).isTrue();
+            assertThat(selection.continuationEffect()).isNotNull();
+        });
         assertThat(result.state().getPlayerOneState().getDeck().getCards()).extracting(CardInstance::id).containsExactly(energy.id());
         assertThat(eventsOfType(events, PendingSelectionRequiredEvent.class)).hasSize(1);
     }

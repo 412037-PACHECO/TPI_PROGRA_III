@@ -214,6 +214,22 @@ Decisiones fase 11:
 - Riesgos: confundir infraestructura con carta soportada, orden incorrecto de modificadores, stacking simultáneo de múltiples fuentes y semántica inicial simple de scopes/conditions.
 - Criterio: comportamiento no-op compatible con fases previas, daño/retiro/prevención testeados, sin dependencias Spring/JPA/API dentro del engine.
 
+### Fase 11E.5 - Casos complejos/custom restantes XY1
+
+- Estado: implementada parcialmente como cierre incremental honesto, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: cerrar gaps puntuales que podían resolverse con infraestructura mínima y documentar el backlog complejo restante sin afirmar cobertura total de XY1.
+- Entregables: `EnergyProfile.rainbow()`, pago de un único símbolo flexible para Rainbow Energy, trigger básico de contador al adjuntar desde mano, mapping/test de `Fairy Garden`, metadata ampliada en `PendingEffectSelection`, matriz/docs actualizadas.
+- Fuera de alcance: frontend, WebSocket, persistencia, endpoints REST de juego, parser automático, contratos públicos de selección/privacidad y cierre total de todas las cartas XY1.
+- Gaps derivados a 11F: `Shadow Circle`, `Spiky Shield`, cleanup completo de `Sweet Veil`, Trainers con zonas ocultas/top-N/mano completa y handlers custom de carta completa.
+- Criterio: gaps cerrados tienen mapping y tests; gaps restantes tienen motivo técnico explícito y no se marcan `FULLY_TESTED`.
+
+### Fase 11F - Reporte final de cumplimiento XY1
+
+- Objetivo: consolidar reporte final de cumplimiento/gaps del set XY1 y priorizar custom handlers o contratos públicos faltantes.
+- Entregables recomendados: reporte por carta/efecto, lista de gaps por dependencia técnica, criterios de demo académica, y plan de cierre para selección/reveal/shuffle, triggers reactivos, Weakness/retreat/stadium avanzados y efectos de Trainers complejos.
+- Dependencias: Fases 11E.1 a 11E.5 y cache local XY1 importado.
+- Criterio: no declarar 100% XY1 salvo que las 146 cartas estén auditadas, mapeadas cuando corresponda y testeadas con evidencia.
+
 ## Fase 12 - Persistencia de snapshots/logs
 
 - Objetivo: guardar/reconstruir partida.

@@ -3,6 +3,7 @@ package com.tpi.pokemon.game.engine.attack;
 import com.tpi.pokemon.game.domain.enums.EnergyType;
 import com.tpi.pokemon.game.domain.model.AttackDefinition;
 import com.tpi.pokemon.game.domain.model.CardInstance;
+import com.tpi.pokemon.game.domain.model.EnergyProfile;
 import com.tpi.pokemon.game.domain.model.PokemonInPlay;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,27 +14,43 @@ public final class EnergyCostValidator {
         Objects.requireNonNull(attacker, "attacker must not be null");
         Objects.requireNonNull(attack, "attack must not be null");
 
-        List<EnergyType> availableSymbols = availableSymbols(attacker);
+        AvailableEnergy available = availableEnergy(attacker);
+        List<EnergyType> availableSymbols = new ArrayList<>(available.fixedSymbols());
+        int flexibleSymbols = available.flexibleSymbolCount();
         for (EnergyType required : attack.cost()) {
             if (required == EnergyType.COLORLESS) {
                 continue;
             }
-            if (!availableSymbols.remove(required)) {
+            if (availableSymbols.remove(required)) {
+                continue;
+            }
+            if (flexibleSymbols > 0) {
+                flexibleSymbols--;
+                continue;
+            } else {
                 return false;
             }
         }
 
         long colorlessRequired = attack.cost().stream().filter(EnergyType.COLORLESS::equals).count();
-        return availableSymbols.size() >= colorlessRequired;
+        return availableSymbols.size() + flexibleSymbols >= colorlessRequired;
     }
 
-    private List<EnergyType> availableSymbols(PokemonInPlay attacker) {
+    private AvailableEnergy availableEnergy(PokemonInPlay attacker) {
         List<EnergyType> symbols = new ArrayList<>();
+        int flexible = 0;
         for (CardInstance energy : attacker.getAttachedCards().getEnergies()) {
             if (energy.definition().isEnergy()) {
-                symbols.addAll(energy.definition().energyProfile().provides());
+                EnergyProfile profile = energy.definition().energyProfile();
+                if (profile.providesAnyTypeWhileAttached()) {
+                    flexible++;
+                } else {
+                    symbols.addAll(profile.provides());
+                }
             }
         }
-        return symbols;
+        return new AvailableEnergy(symbols, flexible);
     }
+
+    private record AvailableEnergy(List<EnergyType> fixedSymbols, int flexibleSymbolCount) {}
 }

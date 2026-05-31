@@ -67,6 +67,21 @@ class EnergyCostValidatorTest {
         assertThat(validator.hasEnoughEnergy(attacker, FLAME_TAIL)).isFalse();
     }
 
+    @Test
+    void rainbowEnergyCanPayOneSpecificEnergyCost() {
+        PokemonInPlay attacker = pokemonWithEnergies(rainbowEnergy("rainbow-1"));
+
+        assertThat(validator.hasEnoughEnergy(attacker, EMBER)).isTrue();
+    }
+
+    @Test
+    void rainbowEnergyProvidesOnlyOneEnergySymbolAtATime() {
+        AttackDefinition fireWater = new AttackDefinition("fire-water", "Fire Water", List.of(EnergyType.FIRE, EnergyType.WATER), 40);
+
+        assertThat(validator.hasEnoughEnergy(pokemonWithEnergies(rainbowEnergy("rainbow-1")), fireWater)).isFalse();
+        assertThat(validator.hasEnoughEnergy(pokemonWithEnergies(rainbowEnergy("rainbow-1"), energy("water-1", EnergyType.WATER)), fireWater)).isTrue();
+    }
+
     private PokemonInPlay pokemonWithEnergies(CardInstance... energies) {
         return new PokemonInPlay(card("attacker", pokemonDefinition("attacker-def", List.of(EMBER, TACKLE, FLAME_TAIL))), new AttachedCards(List.of(energies)));
     }
@@ -102,6 +117,24 @@ class EnergyCostValidatorTest {
                 List.of(),
                 List.of(),
                 EnergyProfile.basic(type)
+        );
+        return card(id, definition);
+    }
+
+    private CardInstance rainbowEnergy(String id) {
+        CardDefinitionRef definition = new CardDefinitionRef(
+                id + "-def",
+                "Rainbow Energy",
+                CardSupertype.ENERGY,
+                Set.of(CardSubtype.SPECIAL_ENERGY),
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                EnergyProfile.rainbow()
         );
         return card(id, definition);
     }

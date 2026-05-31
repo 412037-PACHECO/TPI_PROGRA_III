@@ -17,7 +17,7 @@ public final class SearchDeckEffectHandler implements EffectHandler {
     public EffectResult execute(EffectDefinition definition, EffectExecutionContext context, EffectExecutionService executionService) {
         PlayerId ownerId = EffectStateSupport.ownerFor(context, definition.target());
         if (definition.selectedCardIds().isEmpty()) {
-            PendingEffectSelection pending = new PendingEffectSelection(ownerId, definition.type(), context.sourceId(), EffectCardZone.DECK, definition.target(), 0, definition.amount(), definition.cardFilter());
+            PendingEffectSelection pending = new PendingEffectSelection(ownerId, definition.type(), context.sourceId(), EffectCardZone.DECK, definition.target(), 0, definition.amount(), definition.cardFilter(), definition.revealSelectedCards(), definition.requiresShuffle(), definition);
             context.events().add(new PendingSelectionRequiredEvent(context.state().getGameId(), ownerId, definition.type(), context.sourceId(), EffectCardZone.DECK, definition.target(), 0, definition.amount()));
             return new EffectResult(context.state(), pending);
         }

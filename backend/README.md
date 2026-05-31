@@ -353,6 +353,12 @@ Fase 11E.4 audita y mapea Energías XY1:
 - `xy1-130 Double Colorless Energy`: Energía Especial mapeada como `EnergyProfile.of(COLORLESS, COLORLESS)` para pagar dos símbolos incoloros.
 - `xy1-131 Rainbow Energy`: queda pendiente para soporte completo porque requiere provisión dinámica de cualquier tipo como una sola Energía a la vez y un trigger al adjuntarse desde mano que pone 1 contador de daño.
 
+Fase 11E.5 cierra casos custom puntuales sin declarar cobertura total:
+
+- `xy1-131 Rainbow Energy`: ahora usa `EnergyProfile.rainbow()` para pagar exactamente 1 símbolo flexible mientras está unida y aplica 1 contador de daño al adjuntarse desde mano; sigue parcial hasta resolver KO/premios si ese contador causa KO.
+- `xy1-117 Fairy Garden`: Estadio continuo que deja en 0 el coste de retirada de Pokémon con Energía Fairy-providing unida.
+- `PendingEffectSelection`: conserva metadata interna de reveal, shuffle y continuación para selecciones pendientes.
+
 Esto no implica soporte completo de Trainers, Stadiums, Tools ni efectos continuos. La ejecución pública de Trainers que requieren selección desde mazo/mano, reveal, shuffle o privacidad de zonas ocultas sigue limitada porque no hay endpoints REST de partida, WebSocket, frontend ni vistas seguras por jugador.
 
 Gaps documentados:
@@ -364,7 +370,9 @@ Gaps documentados:
 - Stadium/Tool con efectos continuos condicionados por Energía unida: requieren mapping carta por carta, timing y tests.
 - `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva.
 - `xy1-95 Slurpuff / Sweet Veil`: falta cleanup continuo de condiciones existentes para soporte completo.
-- `xy1-131 Rainbow Energy`: falta energía dinámica one-at-a-time y trigger `on attach from hand`.
+- `xy1-126 Shadow Circle`: falta supresión continua de Weakness condicionada por Energía Darkness.
+- `xy1-131 Rainbow Energy`: falta integrar KO/premios si el contador por adjuntar desde mano causa KO.
+- Trainers complejos como `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`: requieren selección/privacidad/top-N/mano completa o handlers custom de carta completa.
 
 Reglas de diseño de Fase 11:
 

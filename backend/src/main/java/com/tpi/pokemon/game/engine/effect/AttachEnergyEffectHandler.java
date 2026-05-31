@@ -9,6 +9,7 @@ import com.tpi.pokemon.game.domain.model.HandZone;
 import com.tpi.pokemon.game.domain.model.PlayerGameState;
 import com.tpi.pokemon.game.domain.model.PokemonInPlay;
 import com.tpi.pokemon.game.domain.value.PlayerId;
+import com.tpi.pokemon.game.engine.event.DamageCountersPlacedEvent;
 import com.tpi.pokemon.game.engine.event.EffectResolvedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
 import com.tpi.pokemon.game.engine.event.PendingSelectionRequiredEvent;
@@ -35,6 +36,11 @@ public final class AttachEnergyEffectHandler implements EffectHandler {
         PokemonInPlay updatedPokemon = target;
         for (CardInstance energy : selected) {
             updatedPokemon = updatedPokemon.withAttachedEnergy(energy);
+            if (definition.sourceZone() == EffectCardZone.HAND && energy.definition().energyProfile().attachDamageCountersFromHand() > 0) {
+                int counters = energy.definition().energyProfile().attachDamageCountersFromHand();
+                updatedPokemon = updatedPokemon.withDamageCounters(updatedPokemon.getDamageCounters() + counters);
+                context.events().add(new DamageCountersPlacedEvent(context.state().getGameId(), ownerId, target.getTopCard().id(), counters, updatedPokemon.getDamageCounters(), energy.definition().cardId()));
+            }
         }
         DeckZone deck = owner.getDeck();
         HandZone hand = owner.getHand();

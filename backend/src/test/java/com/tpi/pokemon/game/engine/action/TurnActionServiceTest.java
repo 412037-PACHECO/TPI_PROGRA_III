@@ -16,6 +16,7 @@ import com.tpi.pokemon.game.domain.model.CardDefinitionRef;
 import com.tpi.pokemon.game.domain.model.CardInstance;
 import com.tpi.pokemon.game.domain.model.DeckZone;
 import com.tpi.pokemon.game.domain.model.DiscardPile;
+import com.tpi.pokemon.game.domain.model.EnergyProfile;
 import com.tpi.pokemon.game.domain.model.GameState;
 import com.tpi.pokemon.game.domain.model.HandZone;
 import com.tpi.pokemon.game.domain.model.PlayerGameState;
@@ -28,6 +29,7 @@ import com.tpi.pokemon.game.domain.value.GameId;
 import com.tpi.pokemon.game.domain.value.PlayerId;
 import com.tpi.pokemon.game.engine.event.ActivePokemonRetreatedEvent;
 import com.tpi.pokemon.game.engine.event.BasicPokemonBenchedEvent;
+import com.tpi.pokemon.game.engine.event.DamageCountersPlacedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyAttachedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.event.PokemonEvolvedEvent;
@@ -123,6 +125,23 @@ class TurnActionServiceTest {
     }
 
     @Test
+    void attachRainbowEnergyFromHandPlacesOneDamageCounterOnTargetPokemon() {
+        CardDefinitionRef rainbowDefinition = energyDefinition("rainbow-energy", "Rainbow Energy", CardSubtype.SPECIAL_ENERGY, EnergyProfile.rainbow());
+        CardInstance rainbow = card("rainbow-1", rainbowDefinition, PLAYER_ONE);
+        GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(rainbow), active("active", PLAYER_ONE), List.of(), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        GameState updated = service.attachEnergy(state, new AttachEnergyCommand(PLAYER_ONE, rainbow.id(), PokemonTarget.active()));
+
+        assertThat(activePokemon(updated, PLAYER_ONE).getAttachedCards().getEnergies()).containsExactly(rainbow);
+        assertThat(activePokemon(updated, PLAYER_ONE).getDamageCounters()).isEqualTo(1);
+        assertThat(eventsOfType(updated, EnergyAttachedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(updated, DamageCountersPlacedEvent.class)).singleElement().satisfies(event -> {
+            assertThat(event.countersPlaced()).isEqualTo(1);
+            assertThat(event.sourceId()).isEqualTo("rainbow-energy");
+        });
+    }
+
+    @Test
     void evolvePokemonKeepsAttachmentsAndRejectsFirstTurnFreshPokemonAndSecondEvolution() {
         CardInstance evolution = card("ivysaur-1", STAGE_1, PLAYER_ONE);
         CardInstance attachedEnergy = card("attached-energy", ENERGY, PLAYER_ONE);
@@ -203,6 +222,32 @@ class TurnActionServiceTest {
         PokemonInPlay active = PokemonInPlay.withoutAttachments(card("free-retreat-active", freeRetreatBasic, PLAYER_ONE));
         PokemonInPlay benched = PokemonInPlay.withoutAttachments(card("free-retreat-bench", OTHER_BASIC, PLAYER_ONE));
         GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), active, List.of(benched), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        GameState updated = service.retreatActivePokemon(state, new RetreatActivePokemonCommand(PLAYER_ONE, 0, List.of()));
+
+        assertThat(activePokemon(updated, PLAYER_ONE).getTopCard()).isEqualTo(benched.getTopCard());
+        assertThat(updated.getPlayerOneState().getDiscardPile().getCards()).isEmpty();
+        assertThat(eventsOfType(updated, RetreatCostModifiedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void fairyGardenMakesRetreatCostZeroForPokemonWithFairyEnergy() {
+        CardInstance fairyEnergy = card("fairy-energy", energyDefinition("fairy-energy-def", "Fairy Energy", CardSubtype.BASIC_ENERGY, EnergyProfile.basic(com.tpi.pokemon.game.domain.enums.EnergyType.FAIRY)), PLAYER_ONE);
+        PokemonInPlay active = new PokemonInPlay(List.of(card("fairy-active", BASIC, PLAYER_ONE)), new AttachedCards(List.of(fairyEnergy)), 1, null);
+        PokemonInPlay benched = PokemonInPlay.withoutAttachments(card("fairy-bench", OTHER_BASIC, PLAYER_ONE));
+        CardEffectDefinition fairyGardenEffect = new CardEffectDefinition(
+                "fairy-garden-free-retreat",
+                "Fairy Garden",
+                EffectSourceKind.STADIUM,
+                EffectActivationKind.CONTINUOUS,
+                EffectTiming.CONTINUOUS,
+                EffectScope.ANY,
+                EffectCondition.targetHasAttachedEnergyProviding(com.tpi.pokemon.game.domain.enums.EnergyType.FAIRY),
+                List.of(new ModifierDefinition(ModifierType.RETREAT_COST, ModifierOperation.SET, ModifierLayer.AFTER_WEAKNESS_RESISTANCE, 0, ModifierTargetRole.DEFAULT_TARGET))
+        );
+        CardDefinitionRef fairyGardenDefinition = definitionWithEffects("fairy-garden", "Fairy Garden", CardSupertype.TRAINER, Set.of(CardSubtype.STADIUM), null, null, List.of(fairyGardenEffect));
+        CardInstance fairyGarden = card("fairy-garden-card", fairyGardenDefinition, PLAYER_ONE);
+        GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(), active, List.of(benched), 1), emptyPlayer(PLAYER_TWO), mainTurn(), new StadiumInPlay(fairyGarden, PLAYER_ONE, 3));
 
         GameState updated = service.retreatActivePokemon(state, new RetreatActivePokemonCommand(PLAYER_ONE, 0, List.of()));
 
@@ -342,6 +387,10 @@ class TurnActionServiceTest {
 
     private CardDefinitionRef definitionWithEffects(String id, String name, CardSupertype supertype, Set<CardSubtype> subtypes, String evolvesFrom, Integer retreatCost, List<CardEffectDefinition> effects) {
         return new CardDefinitionRef(id, name, supertype, subtypes, evolvesFrom, retreatCost, null, List.of(), List.of(), List.of(), List.of(), com.tpi.pokemon.game.domain.model.EnergyProfile.none(), effects);
+    }
+
+    private CardDefinitionRef energyDefinition(String id, String name, CardSubtype subtype, EnergyProfile profile) {
+        return new CardDefinitionRef(id, name, CardSupertype.ENERGY, Set.of(subtype), null, null, null, List.of(), List.of(), List.of(), List.of(), profile);
     }
 
     private CardEffectDefinition continuousModifier(String effectId, ModifierType type, ModifierOperation operation, int amount, ModifierLayer layer) {
