@@ -40,15 +40,20 @@ import com.tpi.pokemon.game.engine.event.DamageAppliedEvent;
 import com.tpi.pokemon.game.engine.event.DamageCalculatedEvent;
 import com.tpi.pokemon.game.engine.event.EnergyCostValidatedEvent;
 import com.tpi.pokemon.game.engine.event.GameEvent;
+import com.tpi.pokemon.game.engine.event.DamageCountersPlacedEvent;
 import com.tpi.pokemon.game.engine.event.PokemonKnockedOutEvent;
 import com.tpi.pokemon.game.engine.event.PrizeCardsTakenEvent;
 import com.tpi.pokemon.game.engine.event.ConfusionCheckResolvedEvent;
+import com.tpi.pokemon.game.engine.event.ReactiveEffectTriggeredEvent;
 import com.tpi.pokemon.game.engine.event.SpecialConditionDamageAppliedEvent;
+import com.tpi.pokemon.game.engine.event.SuddenDeathRequiredEvent;
 import com.tpi.pokemon.game.engine.event.TurnEndedEvent;
+import com.tpi.pokemon.game.engine.effect.ability.CardEffectDefinition;
 import com.tpi.pokemon.game.engine.effect.EffectDefinition;
 import com.tpi.pokemon.game.engine.effect.EffectTarget;
 import com.tpi.pokemon.game.engine.effect.EffectTiming;
 import com.tpi.pokemon.game.engine.effect.mapping.Xy1EffectCatalog;
+import com.tpi.pokemon.game.engine.victory.GameFinishType;
 import com.tpi.pokemon.game.engine.random.CoinFlipResult;
 import com.tpi.pokemon.game.engine.special.StatusEffectManager;
 import com.tpi.pokemon.game.engine.knockout.ActivePokemonReplacementResolver;
@@ -342,6 +347,91 @@ class AttackServiceTest {
     }
 
     @Test
+    void spikyShieldPlacesThreeDamageCountersOnAttackerWhenDamagedByOpponentAttack() {
+        PokemonInPlay attacker = activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
+        PokemonInPlay chesnaught = activeSpikyShieldDefender(120);
+
+        GameState result = attackService.declareAttack(activeGame(attacker, chesnaught), command("scratch"));
+
+        assertThat(activePokemon(result.getPlayerTwoState()).getDamageCounters()).isEqualTo(3);
+        assertThat(activePokemon(result.getPlayerOneState()).getDamageCounters()).isEqualTo(3);
+        assertThat(eventsOfType(result, ReactiveEffectTriggeredEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, DamageCountersPlacedEvent.class)).singleElement().satisfies(event -> {
+            assertThat(event.pokemonId()).isEqualTo(attacker.getTopCard().id());
+            assertThat(event.countersPlaced()).isEqualTo(3);
+            assertThat(event.sourceId()).isEqualTo("spiky-shield-damage-counters");
+        });
+    }
+
+    @Test
+    void spikyShieldDoesNotTriggerFromConfusionSelfDamage() {
+        AttackService service = attackServiceWithCoin(CoinFlipResult.TAILS);
+        PokemonInPlay chesnaughtAttacker = activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)), spikyShieldEffects())
+                .applySpecialCondition(SpecialCondition.CONFUSED);
+
+        GameState result = service.declareAttack(activeGame(chesnaughtAttacker, activeDefender()), command("scratch"));
+
+        assertThat(eventsOfType(result, ReactiveEffectTriggeredEvent.class)).isEmpty();
+        assertThat(eventsOfType(result, DamageCountersPlacedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void spikyShieldDoesNotTriggerWhenFinalAttackDamageIsZero() {
+        AttackDefinition noDamage = new AttackDefinition("no-damage", "No Damage", List.of(EnergyType.COLORLESS), 0);
+        PokemonInPlay attacker = activeAttacker(List.of(noDamage), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
+
+        GameState result = attackService.declareAttack(activeGame(attacker, activeSpikyShieldDefender(120)), command("no-damage"));
+
+        assertThat(activePokemon(result.getPlayerTwoState()).getDamageCounters()).isZero();
+        assertThat(activePokemon(result.getPlayerOneState()).getDamageCounters()).isZero();
+        assertThat(eventsOfType(result, ReactiveEffectTriggeredEvent.class)).isEmpty();
+        assertThat(eventsOfType(result, DamageCountersPlacedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void spikyShieldCanKnockOutAttackerAndAwardPrizeToDefenderOwner() {
+        PokemonInPlay attacker = activeAttacker(List.of(SCRATCH), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))).withDamageCounters(3);
+        GameState state = activeGame(
+                playerWithActiveAndPrizes(PLAYER_ONE, attacker, prizes(PLAYER_ONE, 6)),
+                playerWithActiveAndPrizes(PLAYER_TWO, activeSpikyShieldDefender(120), prizes(PLAYER_TWO, 6)),
+                defaultTurn()
+        );
+
+        GameState result = attackService.declareAttack(state, command("scratch"));
+
+        assertThat(result.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(result.getPlayerOneState().getBoard().getActivePokemon()).isEmpty();
+        assertThat(result.getPlayerOneState().getDiscardPile().getCards()).extracting(CardInstance::id).contains(new CardInstanceId("p1-active"));
+        assertThat(result.getPlayerTwoState().getPrizeCards().remainingCount()).isEqualTo(5);
+        assertThat(eventsOfType(result, ReactiveEffectTriggeredEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, PokemonKnockedOutEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result, PrizeCardsTakenEvent.class)).hasSize(1);
+        assertThat(result.getFinishResult()).hasValueSatisfying(finish -> assertThat(finish.winnerId()).isEqualTo(PLAYER_TWO));
+    }
+
+    @Test
+    void spikyShieldResolvesBothKnockoutsAsSuddenDeathWhenBothPlayersMeetWinConditions() {
+        PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER))).withDamageCounters(3);
+        GameState state = activeGame(
+                playerWithActiveAndPrizes(PLAYER_ONE, attacker, prizes(PLAYER_ONE, 1)),
+                playerWithActiveAndPrizes(PLAYER_TWO, activeSpikyShieldDefender(60), prizes(PLAYER_TWO, 1)),
+                defaultTurn()
+        );
+
+        GameState result = attackService.declareAttack(state, command("knockout-hit"));
+
+        assertThat(result.getStatus()).isEqualTo(GameStatus.FINISHED);
+        assertThat(result.getPlayerOneState().getBoard().getActivePokemon()).isEmpty();
+        assertThat(result.getPlayerTwoState().getBoard().getActivePokemon()).isEmpty();
+        assertThat(result.getPlayerOneState().getPrizeCards().isEmpty()).isTrue();
+        assertThat(result.getPlayerTwoState().getPrizeCards().isEmpty()).isTrue();
+        assertThat(eventsOfType(result, PokemonKnockedOutEvent.class)).hasSize(2);
+        assertThat(eventsOfType(result, PrizeCardsTakenEvent.class)).hasSize(2);
+        assertThat(eventsOfType(result, SuddenDeathRequiredEvent.class)).hasSize(1);
+        assertThat(result.getFinishResult()).hasValueSatisfying(finish -> assertThat(finish.type()).isEqualTo(GameFinishType.SUDDEN_DEATH_REQUIRED));
+    }
+
+    @Test
     void attackThatKnocksOutDefenderDiscardsDefenderTakesPrizeAndRequiresReplacementWhenBenchExists() {
         PokemonInPlay attacker = activeAttacker(List.of(KNOCKOUT_HIT), List.of(energy("p1-water", PLAYER_ONE, EnergyType.WATER)));
         PokemonInPlay defender = activeDefender();
@@ -480,10 +570,24 @@ class AttackServiceTest {
     }
 
     private PokemonInPlay activeAttacker(List<AttackDefinition> attacks, List<CardInstance> energies) {
+        return activeAttacker(attacks, energies, List.of());
+    }
+
+    private PokemonInPlay activeAttacker(List<AttackDefinition> attacks, List<CardInstance> energies, List<CardEffectDefinition> effects) {
         return new PokemonInPlay(
-                card("p1-active", PLAYER_ONE, pokemonDefinition("p1-active-def", PokemonType.FIRE, attacks, List.of(), List.of())),
+                card("p1-active", PLAYER_ONE, pokemonDefinition("p1-active-def", PokemonType.FIRE, attacks, List.of(), List.of(), Set.of(CardSubtype.BASIC), 60, effects)),
                 new AttachedCards(energies)
         );
+    }
+
+    private PokemonInPlay activeSpikyShieldDefender(int hp) {
+        return PokemonInPlay.withoutAttachments(
+                card("p2-active", PLAYER_TWO, pokemonDefinition("xy1-14", PokemonType.GRASS, List.of(), List.of(), List.of(), Set.of(CardSubtype.STAGE_2), hp, spikyShieldEffects()))
+        );
+    }
+
+    private List<CardEffectDefinition> spikyShieldEffects() {
+        return new Xy1EffectCatalog().continuousEffectsForPokemon("xy1-14");
     }
 
     private PokemonInPlay activeDefender() {
@@ -515,6 +619,10 @@ class AttackServiceTest {
     }
 
     private CardDefinitionRef pokemonDefinition(String id, PokemonType type, List<AttackDefinition> attacks, List<Weakness> weaknesses, List<Resistance> resistances, Set<CardSubtype> subtypes, int hp) {
+        return pokemonDefinition(id, type, attacks, weaknesses, resistances, subtypes, hp, List.of());
+    }
+
+    private CardDefinitionRef pokemonDefinition(String id, PokemonType type, List<AttackDefinition> attacks, List<Weakness> weaknesses, List<Resistance> resistances, Set<CardSubtype> subtypes, int hp, List<CardEffectDefinition> effects) {
         return new CardDefinitionRef(
                 id,
                 "Pokemon " + id,
@@ -527,7 +635,8 @@ class AttackServiceTest {
                 attacks,
                 weaknesses,
                 resistances,
-                EnergyProfile.none()
+                EnergyProfile.none(),
+                effects
         );
     }
 

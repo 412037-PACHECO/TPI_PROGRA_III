@@ -37,6 +37,7 @@ import com.tpi.pokemon.game.engine.event.PokemonKnockedOutEvent;
 import com.tpi.pokemon.game.engine.event.PrizeCardsTakenEvent;
 import com.tpi.pokemon.game.engine.event.PokemonEvolvedEvent;
 import com.tpi.pokemon.game.engine.event.RetreatCostModifiedEvent;
+import com.tpi.pokemon.game.engine.event.ReactiveEffectTriggeredEvent;
 import com.tpi.pokemon.game.engine.event.SpecialConditionRemovedEvent;
 import com.tpi.pokemon.game.engine.event.StadiumReplacedEvent;
 import com.tpi.pokemon.game.engine.event.TrainerPlayedEvent;
@@ -53,6 +54,7 @@ import com.tpi.pokemon.game.engine.effect.modifier.ModifierLayer;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierOperation;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierTargetRole;
 import com.tpi.pokemon.game.engine.effect.modifier.ModifierType;
+import com.tpi.pokemon.game.engine.effect.mapping.Xy1EffectCatalog;
 import com.tpi.pokemon.game.engine.special.ApplySpecialConditionCommand;
 import java.util.List;
 import java.util.Optional;
@@ -192,6 +194,20 @@ class TurnActionServiceTest {
         assertThat(updated.getPlayerTwoState().getPrizeCards().remainingCount()).isEqualTo(1);
         assertThat(eventsOfType(updated, PokemonKnockedOutEvent.class)).hasSize(1);
         assertThat(eventsOfType(updated, PrizeCardsTakenEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void rainbowEnergyAttachDoesNotTriggerSpikyShieldReactiveAbility() {
+        CardDefinitionRef rainbowDefinition = energyDefinition("rainbow-energy", "Rainbow Energy", CardSubtype.SPECIAL_ENERGY, EnergyProfile.rainbow());
+        CardInstance rainbow = card("rainbow-no-reactive", rainbowDefinition, PLAYER_ONE);
+        CardDefinitionRef spikyShieldDefinition = definitionWithEffects("xy1-14", "Chesnaught", CardSupertype.POKEMON, Set.of(CardSubtype.STAGE_2), null, 4, new Xy1EffectCatalog().continuousEffectsForPokemon("xy1-14"));
+        PokemonInPlay active = PokemonInPlay.withoutAttachments(card("chesnaught-active", spikyShieldDefinition, PLAYER_ONE));
+        GameState state = activeMainState(playerWithBoard(PLAYER_ONE, List.of(rainbow), active, List.of(), 1), emptyPlayer(PLAYER_TWO), mainTurn());
+
+        GameState updated = service.attachEnergy(state, new AttachEnergyCommand(PLAYER_ONE, rainbow.id(), PokemonTarget.active()));
+
+        assertThat(activePokemon(updated, PLAYER_ONE).getDamageCounters()).isEqualTo(1);
+        assertThat(eventsOfType(updated, ReactiveEffectTriggeredEvent.class)).isEmpty();
     }
 
     @Test

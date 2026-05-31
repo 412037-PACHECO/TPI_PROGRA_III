@@ -43,6 +43,7 @@ Incluye:
 - Resolución KO/premios/victoria reutilizada para contadores de efectos críticos, incluyendo Rainbow Energy sobre Pokémon propio Activo o en Banca.
 - Cleanup continuo de condiciones especiales prevenidas, usado por `Sweet Veil`.
 - `Shadow Circle` como Estadio continuo que elimina Weakness de Pokémon con Energía Darkness-providing.
+- Infraestructura reactiva acotada para `Spiky Shield`: cuando Chesnaught Activo recibe daño positivo de ataque rival, coloca 3 contadores de daño sobre el atacante original e integra cualquier KO resultante con premios/victoria.
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 
 ## Modelo Game State
@@ -349,22 +350,28 @@ Fase 11E.2 agrega mapeo progresivo de Trainers XY1 usando handlers existentes o 
 Fase 11E.3 agrega mapeo progresivo de habilidades Pokémon XY1 usando la infraestructura continua de Fase 11D:
 
 - `xy1-114 Furfrou / Fur Coat`: habilidad continua que reduce 20 daño recibido después de Debilidad/Resistencia.
-- `xy1-95 Slurpuff / Sweet Veil`: prevención parcial de nuevas condiciones especiales para Pokémon propios con Energía Fairy unida; falta remover condiciones existentes.
-- `xy1-14 Chesnaught / Spiky Shield`: queda documentada como gap porque requiere resolver reactivo al recibir daño de ataque y colocar contadores en el atacante.
+- `xy1-95 Slurpuff / Sweet Veil`: fue parcial en 11E.3 y queda completa en 11G.1 para prevención y limpieza de condiciones.
+- `xy1-14 Chesnaught / Spiky Shield`: fue gap reactivo en 11E.3 y queda completo en 11G.2 para el trigger acotado de daño de ataque rival.
 
 Fase 11E.4 audita y mapea Energías XY1:
 
 - `xy1-132` a `xy1-140`: Energías Básicas sin efecto textual; se tratan como datos estructurales mediante `EnergyProfile.basic(...)`.
 - `xy1-130 Double Colorless Energy`: Energía Especial mapeada como `EnergyProfile.of(COLORLESS, COLORLESS)` para pagar dos símbolos incoloros.
-- `xy1-131 Rainbow Energy`: queda pendiente para soporte completo porque requiere provisión dinámica de cualquier tipo como una sola Energía a la vez y un trigger al adjuntarse desde mano que pone 1 contador de daño.
+- `xy1-131 Rainbow Energy`: queda mapeada como Energía flexible de un solo símbolo; desde 11G.1 su trigger al adjuntarse desde mano integra KO/premios/victoria.
 
 Fase 11E.5 cierra casos custom puntuales sin declarar cobertura total:
 
-- `xy1-131 Rainbow Energy`: ahora usa `EnergyProfile.rainbow()` para pagar exactamente 1 símbolo flexible mientras está unida y aplica 1 contador de daño al adjuntarse desde mano; sigue parcial hasta resolver KO/premios si ese contador causa KO.
+- `xy1-131 Rainbow Energy`: ahora usa `EnergyProfile.rainbow()` para pagar exactamente 1 símbolo flexible mientras está unida y aplica 1 contador de daño al adjuntarse desde mano; desde 11G.1 resuelve KO/premios/victoria si ese contador causa KO.
 - `xy1-117 Fairy Garden`: Estadio continuo que deja en 0 el coste de retirada de Pokémon con Energía Fairy-providing unida.
 - `PendingEffectSelection`: conserva metadata interna de reveal, shuffle y continuación para selecciones pendientes.
 
 Esto no implica soporte completo de Trainers, Stadiums, Tools ni efectos continuos. La ejecución pública de Trainers que requieren selección desde mazo/mano, reveal, shuffle o privacidad de zonas ocultas sigue limitada porque no hay endpoints REST de partida, WebSocket, frontend ni vistas seguras por jugador.
+
+Fase 11G.2 agrega infraestructura reactiva acotada:
+
+- `DamageSource` / `DamageReceivedContext` / `ReactiveEffectResolver` modelan daño recibido por ataque.
+- `xy1-14 Chesnaught / Spiky Shield` coloca 3 contadores en el atacante original cuando Chesnaught Activo recibe daño positivo de un ataque rival.
+- Si esos contadores dejan KO al atacante, se reutilizan KO/premios/victoria existentes; si ambos Activos quedan KO y ambos cumplen condición de victoria, se representa Muerte Súbita.
 
 Gaps documentados:
 

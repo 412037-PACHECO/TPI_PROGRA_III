@@ -71,6 +71,7 @@ Una carta no debe marcarse `FULLY_TESTED` solo porque exista un handler genéric
 - `STADIUM_EFFECT`
 - `ABILITY_ACTIVATED`
 - `ABILITY_PASSIVE`
+- `REACTIVE_EFFECT`
 - `CONTINUOUS_EFFECT`
 - `PREVENT_DAMAGE`
 - `PREVENT_WEAKNESS`
@@ -117,11 +118,11 @@ Fase 11E.1 agrega 17 mappings de ataques Pokémon XY1 verificados contra datos o
 
 Fase 11E.2 agrega mappings progresivos de 5 cartas Trainer XY1 (`Hard Charm`, `Muscle Band`, `Professor's Letter`, `Roller Skates`, `Team Flare Grunt`) y documenta los gaps del resto de Trainers del set. Esto no implica jugabilidad pública completa de Trainers desde UI/API.
 
-Fase 11E.3 agrega mappings progresivos de habilidades Pokémon XY1 (`Fur Coat`, prevención parcial de `Sweet Veil`) y documenta `Spiky Shield` como gap reactivo. Esto no implica cobertura completa de habilidades XY1.
+Fase 11E.3 agrega mappings progresivos de habilidades Pokémon XY1 (`Fur Coat`, prevención parcial inicial de `Sweet Veil`) y documenta `Spiky Shield` como gap reactivo histórico. Esto no implica cobertura completa de habilidades XY1.
 
 Fase 11E.4 audita Energías XY1: `Double Colorless Energy`, `Rainbow Energy` y las 9 Energías Básicas. Las Energías Básicas no requieren `EffectDefinition` textual; `Double Colorless Energy` se representa como dos símbolos `COLORLESS`.
 
-Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` como Energía flexible de un solo símbolo + trigger al adjuntarse desde mano, `Fairy Garden` como modificador continuo de retiro, y metadata ampliada de pending selection. Fase 11G.1 completa los gaps críticos de `Rainbow Energy` KO/premios/victoria, cleanup completo de `Sweet Veil` y `Shadow Circle` como prevención continua de Weakness. Los casos con zonas ocultas/top-N/mano completa y `Spiky Shield` siguen pendientes.
+Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` como Energía flexible de un solo símbolo + trigger al adjuntarse desde mano, `Fairy Garden` como modificador continuo de retiro, y metadata ampliada de pending selection. Fase 11G.1 completa los gaps críticos de `Rainbow Energy` KO/premios/victoria, cleanup completo de `Sweet Veil` y `Shadow Circle` como prevención continua de Weakness. Fase 11G.2 completa `Spiky Shield` con infraestructura reactiva acotada para daño recibido por ataque rival. Los casos con zonas ocultas/top-N/mano completa siguen pendientes.
 
 | cardId | name | supertype | subtypes | attacks | abilities | rules | effectText | effectCategory | complexity | supportedByCurrentEngine | genericHandlers | customHandlerRequired | implementationStatus | tested | notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -158,7 +159,7 @@ Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` c
 | xy1-127 | Shauna | Trainer | Supporter | none | none | Supporter rule | `Shuffle your hand into your deck. Then, draw 5 cards.` | DRAW_CARDS; DISCARD_CARD; CUSTOM_REQUIRED | MEDIUM | partial | DrawCardsEffectHandler partial only | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | No se mapea como robo simple porque falta mezclar la mano completa en el mazo antes de robar. |
 | xy1-128 | Super Potion | Trainer | Item | none | none | Item | Cura 60 de 1 Pokémon propio; si cura, descarta una Energía unida a ese Pokémon. | HEAL_DAMAGE; DISCARD_ENERGY; CUSTOM_REQUIRED | MEDIUM | partial | HealDamageEffectHandler; DiscardAttachedEnergyEffectHandler partial | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Requiere seleccionar Pokémon propio y condicionar el descarte a que haya curación. |
 | xy1-129 | Team Flare Grunt | Trainer | Supporter | none | none | Supporter rule | `Discard an Energy attached to your opponent's Active Pokémon.` | DISCARD_ENERGY | LOW | yes | DiscardAttachedEnergyEffectHandler | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.2 mapea descarte de Energía del Activo rival. |
-| xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | partial | HealDamageEffectHandler partial; reactive infra pendiente | yes/tbd | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_MAPPED; REQUIRES_CUSTOM_HANDLER; NOT_IMPLEMENTED_YET | no | Touchdown mapeado/testeado; Spiky Shield queda pendiente. |
+| xy1-14 | Chesnaught | Pokémon | Stage 2 | Touchdown | Spiky Shield | none | Ability: al recibir daño de ataque rival, pone 3 contadores en el atacante. Touchdown cura 20. | ABILITY_PASSIVE; REACTIVE_EFFECT; DAMAGE_PLUS_HEAL | HIGH | yes | HealDamageEffectHandler; ReactiveEffectResolver; PostAttackResolutionService | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Touchdown mapeado/testeado. Fase 11G.2 completa Spiky Shield como habilidad reactiva: cuando Chesnaught Activo recibe daño de ataque rival, coloca 3 contadores en el atacante, incluso si Chesnaught queda KO, e integra KO/premios/victoria. |
 | xy1-95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | Ability: Pokémon propios con Energía Fairy no pueden ser afectados por condiciones especiales; remueve condiciones. Draining Kiss cura 30. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | HIGH | yes | HealDamageEffectHandler; ModifierResolver PREVENT_SPECIAL_CONDITION; StatusEffectManager cleanup | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11G.1 completa Sweet Veil para prevenir nuevas condiciones y remover existentes en Pokémon propios con Energía Fairy-providing, incluyendo Rainbow. |
 | xy1-114 | Furfrou | Pokémon | Basic | Energy Cutoff | Fur Coat | none | Ability: daño hecho a este Pokémon por ataques se reduce 20 después de Debilidad/Resistencia. | ABILITY_PASSIVE; CONTINUOUS_EFFECT; MODIFY_DAMAGE | MEDIUM | yes | CardEffectDefinition; ModifierResolver | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.3 mapea Fur Coat como modificador continuo self/defender después de Debilidad/Resistencia. Energy Cutoff no queda cubierto por este mapping de habilidad. |
 | xy1-130 | Double Colorless Energy | Energy | Special | none | none | Special Energy rule | Provee dos Energías Colorless mientras está unida. | SPECIAL_ENERGY; PROVIDES_ENERGY | LOW | yes | EnergyProfile; EnergyCostValidator | no | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | Fase 11E.4 mapea estructuralmente `EnergyProfile.of(COLORLESS, COLORLESS)`. |
@@ -227,17 +228,21 @@ Infraestructura/mappings agregados en Fase 11G.1:
 - `Sweet Veil` remueve condiciones especiales existentes además de prevenir nuevas condiciones para Pokémon propios con Energía Fairy-providing.
 - `Shadow Circle` se modela como `PREVENT_WEAKNESS` continuo condicionado por Energía Darkness-providing; no altera Resistance.
 
+Infraestructura/mappings agregados en Fase 11G.2:
+
+- `DamageSource`, `DamageReceivedContext`, `ReactiveEffectContext` y `ReactiveEffectResolver` modelan el trigger acotado “recibió daño de ataque”.
+- `Spiky Shield` se modela como efecto `REACTIVE` / `ON_DAMAGE_RECEIVED` que coloca 3 contadores de daño en el atacante original.
+- Los contadores reactivos se resuelven antes de KO/premios/victoria y no disparan nuevos reactivos, evitando loops.
+- Si el atacante queda KO por Spiky Shield, premios/victoria se resuelven con los servicios existentes; si ambos Activos quedan KO y ambos cumplen condición de victoria, se representa Muerte Súbita.
+
 Gaps todavía pendientes para completar XY1:
 
 - Más mappings/tests reales para modificadores de daño, prevención, retiro y condiciones.
 - Servicio completo de habilidades activadas con límites de uso.
-- Resolver reactivo completo para habilidades pasivas/reactivas.
-- Cleanup continuo de condiciones especiales existentes para completar `Sweet Veil`.
+- Generalizar más triggers reactivos fuera del caso acotado `ON_DAMAGE_RECEIVED` por ataque rival.
 - Efectos continuos complejos de Tool/Stadium con condiciones/duración avanzadas.
-- Resolución de KO/premios para contadores colocados por `Rainbow Energy` al adjuntarse desde mano.
-- Supresión de Weakness para completar `Shadow Circle`.
 - Selección desde zonas ocultas, reveal y privacidad de mano/mazo/premios.
-- Timing avanzado: before damage, after damage, between turns, on damaged, while in play, next turn.
+- Timing avanzado: before damage, after damage no cubierto por Spiky Shield, between turns personalizados, while in play avanzado y next turn.
 
 ## Aclaración ACE SPEC
 

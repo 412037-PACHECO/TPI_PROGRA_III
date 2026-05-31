@@ -4,7 +4,7 @@
 
 Soportar efectos reales de cartas XY1 sin convertir el motor en una colección desordenada de `if cardId == ...`.
 
-Estado Fase 11G.1: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales e infraestructura de efectos continuos/modificadores. Además existe un catálogo explícito de mappings XY1 progresivos (`Xy1EffectCatalog`) para ataques, Trainers, habilidades Pokémon y Energías. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
+Estado Fase 11G.2: arquitectura base implementada con `EffectDefinition`, `EffectExecutionContext`, `EffectHandler`, `EffectRegistry`, `EffectExecutionService`, handlers genéricos iniciales, infraestructura de efectos continuos/modificadores e infraestructura reactiva acotada para daño recibido por ataque. Además existe un catálogo explícito de mappings XY1 progresivos (`Xy1EffectCatalog`) para ataques, Trainers, habilidades Pokémon y Energías. No implica que todos los efectos XY1 estén mapeados, implementados o testeados.
 
 ## CardDefinition vs CardInstance
 
@@ -75,7 +75,7 @@ Pendientes o futuros:
 - `NoOpEffect` para ataques cuyo único efecto actual sea daño base ya cubierto por `AttackService`.
 - Mappings reales para `RetreatCostModifierEffect`, `DamageModifierEffect`, `PreventDamageEffect` y efectos preventivos.
 - Persistencia temporal avanzada hasta fin de turno/próximo ataque.
-- Habilidades activadas/pasivas/reactivas completas.
+- Habilidades activadas y reactivas generales. Excepción cerrada en 11G.2: `Spiky Shield` con trigger acotado `ON_DAMAGE_RECEIVED` por ataque rival.
 - Efectos continuos complejos de Tool/Stadium con mappings carta por carta.
 - Contrato público de selección/reveal para frontend/API futura.
 
@@ -125,7 +125,7 @@ Orden documentado para daño contextual:
 6. prevención;
 7. clamp a `0` y múltiplos de 10.
 
-Decisión importante: infraestructura disponible no equivale a soporte completo de una carta. `xy1-14 Chesnaught / Spiky Shield` sigue requiriendo resolver reactivo real antes de considerarse soportada. Desde Fase 11G.1, `xy1-95 Slurpuff / Sweet Veil` sí queda completo para el alcance declarado: previene nuevas condiciones y remueve condiciones existentes cuando el Pokémon propio tiene Energía Fairy-providing.
+Decisión importante: infraestructura disponible no equivale a soporte completo de una carta. En Fase 11D, `xy1-14 Chesnaught / Spiky Shield` seguía requiriendo resolver reactivo real; desde Fase 11G.2 queda cubierto para el alcance declarado mediante infraestructura reactiva mínima. Desde Fase 11G.1, `xy1-95 Slurpuff / Sweet Veil` sí queda completo para el alcance declarado: previene nuevas condiciones y remueve condiciones existentes cuando el Pokémon propio tiene Energía Fairy-providing.
 
 ## Handlers custom
 
@@ -211,7 +211,7 @@ Fase 11E.1 agrega 17 mappings de ataques Pokémon verificados contra datos ofici
 - DAMAGE_PLUS_COIN_FLIP: `Blastoise-EX / Splash Bomb`, `Cloyster / Clamp Crush`.
 - DISCARD_ENERGY: `Slugma / Flamethrower`, `Pansear / Fireworks`, más descarte condicional dentro de `Cloyster / Clamp Crush`.
 
-No se afirma cobertura completa de XY1: ataques como `Flash Needle`, `Lead`, `Magma Mantle`, `Rapid Spin`, `Spike Cannon` y `Spiky Shield` siguen marcados como pendientes cuando requieren selección, daño variable, prevención futura, habilidades reactivas o custom handlers. `Sweet Veil` se cerró después en 11G.1 para el alcance declarado.
+No se afirma cobertura completa de XY1: ataques como `Flash Needle`, `Lead`, `Magma Mantle`, `Rapid Spin` y `Spike Cannon` siguen marcados como pendientes cuando requieren selección, daño variable, prevención futura o custom handlers. `Sweet Veil` se cerró después en 11G.1 y `Spiky Shield` se cerró después en 11G.2 para el alcance declarado.
 
 ## Fase 11E.2 - Mapeo progresivo de Trainers XY1
 
@@ -232,7 +232,7 @@ Fase 11E.3 agrega `AbilityEffectMapping` y APIs de catálogo para habilidades re
 
 - `xy1-114 Furfrou / Fur Coat`: mapeada como habilidad continua `POKEMON_ABILITY` con `ModifierType.DAMAGE`, resta 20 después de Debilidad/Resistencia al propio Furfrou cuando es defensor. Esta parte queda `FULLY_TESTED` para el alcance declarado.
 - `xy1-95 Slurpuff / Sweet Veil`: desde 11G.1 queda completa para el alcance declarado: previene nuevas condiciones especiales y remueve condiciones existentes para Pokémon propios que tengan Energía Fairy-providing unida. La condición por Energía Fairy queda explícita en `EffectCondition` y Rainbow puede satisfacerla mientras está unida.
-- `xy1-14 Chesnaught / Spiky Shield`: queda documentada como gap; requiere resolver reactivo `on damaged by opponent's attack` y colocar 3 contadores en el atacante incluso si Chesnaught queda KO.
+- `xy1-14 Chesnaught / Spiky Shield`: desde 11G.2 queda completa para el alcance declarado mediante trigger reactivo `on damaged by opponent's attack`, colocando 3 contadores en el atacante incluso si Chesnaught queda KO.
 
 Nuevo soporte estructural de 11E.3:
 
@@ -271,7 +271,6 @@ Fase 11E.5 cierra solo los gaps que podían resolverse con infraestructura míni
 
 Siguen pendientes para 11F:
 
-- `xy1-14 Chesnaught / Spiky Shield`: requiere resolver reactivo después de daño de ataque rival y antes de KO/premios.
 - Trainers con zonas ocultas/mano completa/top-N (`Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna`, `Super Potion`) requieren contratos de selección/reveal/privacidad o handlers custom de carta completa.
 
 ## Fase 11G.1 - Gaps críticos cerrados
@@ -282,11 +281,28 @@ Fase 11G.1 cierra tres gaps críticos sin ampliar alcance a UI/API/persistencia:
 - `xy1-126 Shadow Circle`: `ModifierType.PREVENT_WEAKNESS` permite que `DamageCalculator` saltee Weakness para Pokémon con Energía Darkness-providing, manteniendo Resistance y el resto del pipeline.
 - `xy1-131 Rainbow Energy`: el contador al adjuntarse desde mano puede disparar KO propio de Activo o Banca, con premios para el oponente y victoria si corresponde.
 
+## Fase 11G.2 - Infraestructura reactiva y Spiky Shield
+
+Fase 11G.2 cierra `xy1-14 Chesnaught / Spiky Shield` sin ampliar alcance público del backend.
+
+Comportamiento cubierto:
+
+- Detectar que Chesnaught Activo recibió daño positivo de un ataque del oponente.
+- Resolver la habilidad reactiva después de aplicar daño de ataque principal y antes de KO/premios/victoria.
+- Colocar 3 contadores de daño sobre el Pokémon atacante original.
+- Resolver KO/premios/victoria resultantes usando los servicios existentes.
+- Mantener la resolución aunque Chesnaught también quede KO por el ataque.
+
+Límites explícitos:
+
+- No implementa sistema completo de todos los triggers posibles.
+- No agrega frontend, WebSocket, persistencia, endpoints REST de juego ni parser automático.
+- No cierra Trainers complejos ni selección/reveal/privacidad.
+
 Gaps documentados, no implementados como soporte completo:
 
 - `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
 - `xy1-127 Shauna`: requiere mezclar mano en mazo y robar 5; `DrawCardsEffectHandler` solo no alcanza.
-- `xy1-14 Chesnaught / Spiky Shield`: habilidad pasiva/reactiva al recibir daño.
 
 ## Cómo agregar un nuevo mapping
 

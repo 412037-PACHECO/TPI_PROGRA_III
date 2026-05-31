@@ -192,7 +192,7 @@ Decisiones fase 11:
 - La auditoría completa de XY1 se declara `false` hasta revisar y testear el set completo.
 - Se mapearon efectos representativos con handlers existentes: condición especial, curación, robo, moneda y descarte de energía.
 - Trainers como `Professor's Letter` y `Shauna` quedan documentados como gaps porque requieren búsqueda/shuffle/manipulación de mano o mazo.
-- Habilidades pasivas/continuas como `Spiky Shield` y `Sweet Veil` quedan como `REQUIRES_CUSTOM_HANDLER` / `NOT_IMPLEMENTED_YET`.
+- Habilidades pasivas/continuas/reactivas se cierran de forma incremental: `Sweet Veil` queda completo en 11G.1 y `Spiky Shield` queda completo para su trigger acotado en 11G.2; eso no implica cobertura total de todas las habilidades XY1.
 - La subfase `feature/xy1-full-audit` no implementa handlers faltantes; clasifica efectos desde cache local y genera reporte con `importedCardCount`, conteos por complejidad y gaps.
 - Si no hay `backend/data`/cache importado, no se puede afirmar auditoría factual de las 146 cartas en ese entorno; debe importarse `xy1` antes de ejecutar el reporte completo.
 
@@ -220,7 +220,7 @@ Decisiones fase 11:
 - Objetivo: cerrar gaps puntuales que podían resolverse con infraestructura mínima y documentar el backlog complejo restante sin afirmar cobertura total de XY1.
 - Entregables: `EnergyProfile.rainbow()`, pago de un único símbolo flexible para Rainbow Energy, trigger básico de contador al adjuntar desde mano, mapping/test de `Fairy Garden`, metadata ampliada en `PendingEffectSelection`, matriz/docs actualizadas.
 - Fuera de alcance: frontend, WebSocket, persistencia, endpoints REST de juego, parser automático, contratos públicos de selección/privacidad y cierre total de todas las cartas XY1.
-- Gaps derivados a 11F: `Shadow Circle`, `Spiky Shield`, cleanup completo de `Sweet Veil`, Trainers con zonas ocultas/top-N/mano completa y handlers custom de carta completa.
+- Gaps derivados inicialmente a 11F: `Shadow Circle`, `Spiky Shield`, cleanup completo de `Sweet Veil`, Trainers con zonas ocultas/top-N/mano completa y handlers custom de carta completa. Los tres primeros se cierran luego en 11G.1/11G.2.
 - Criterio: gaps cerrados tienen mapping y tests; gaps restantes tienen motivo técnico explícito y no se marcan `FULLY_TESTED`.
 
 ### Fase 11G.1 - Cierre de gaps críticos XY1
@@ -230,6 +230,14 @@ Decisiones fase 11:
 - Entregables: `PREVENT_WEAKNESS` en `ModifierResolver`, integración de KO de Banca en `PostAttackResolutionService`, reconciliación de condiciones prevenidas en `StatusEffectManager`, mapping de `xy1-126 Shadow Circle`, actualización de estados para `xy1-95` y `xy1-131`, tests de acción/daño/catálogo.
 - Fuera de alcance: `Spiky Shield`, Trainers complejos con zonas ocultas/top-N/mano completa, UI/API pública de selección/reveal, auditoría real completa de 146 cartas sin cache local.
 - Criterio: Rainbow desde mano puede noquear Pokémon propio Activo o de Banca usando servicios existentes de KO/premios/victoria; Sweet Veil previene y remueve condiciones para Pokémon propios con Energía Fairy-providing; Shadow Circle suprime Weakness solo para Pokémon con Energía Darkness-providing y mantiene Resistance.
+
+### Fase 11G.2 - Spiky Shield e infraestructura reactiva mínima
+
+- Estado: implementada en engine puro Java; pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: cerrar `xy1-14 Chesnaught / Spiky Shield` mediante resolución reactiva acotada para habilidades que responden a daño recibido por ataque rival.
+- Entregables: mapping completo de `Spiky Shield`, infraestructura/contexto/resolver reactivo para `ON_DAMAGE_RECEIVED`, colocación de 3 contadores sobre el atacante original, integración con KO/premios/victoria y tests del timing.
+- Fuera de alcance: frontend, WebSocket, persistencia, endpoints REST de juego, parser automático, Trainers complejos, selección/reveal/privacidad y sistema universal de todos los triggers.
+- Criterio: Spiky Shield se ejecuta cuando Chesnaught Activo recibe daño positivo de ataque rival, aplica contadores al atacante incluso si Chesnaught queda KO, no dispara ante fuentes incorrectas y cualquier KO derivado usa los servicios existentes.
 
 ### Fase 11F - Reporte final de cumplimiento XY1
 

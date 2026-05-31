@@ -381,12 +381,22 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
-    void spikyShieldRemainsDocumentedGapUntilReactiveResolverExists() {
+    void spikyShieldIsMappedAsReactiveOnDamageReceivedAbility() {
         assertThat(catalog.abilityMappingForName("xy1-14", "Spiky Shield")).hasValueSatisfying(mapping -> {
-            assertThat(mapping.continuousEffects()).isEmpty();
-            assertThat(mapping.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
-            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
-            assertThat(mapping.tested()).isFalse();
+            assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+            assertThat(mapping.statuses()).doesNotContain(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
+            assertThat(mapping.tested()).isTrue();
+            assertThat(mapping.continuousEffects()).singleElement().satisfies(effect -> {
+                assertThat(effect.activationKind()).isEqualTo(com.tpi.pokemon.game.engine.effect.ability.EffectActivationKind.REACTIVE);
+                assertThat(effect.timing()).isEqualTo(EffectTiming.ON_DAMAGE_RECEIVED);
+                assertThat(effect.scope()).isEqualTo(EffectScope.OWN_ACTIVE);
+                assertThat(effect.modifiers()).singleElement().satisfies(modifier -> {
+                    assertThat(modifier.type()).isEqualTo(ModifierType.PLACE_DAMAGE_COUNTERS);
+                    assertThat(modifier.operation()).isEqualTo(ModifierOperation.ADD);
+                    assertThat(modifier.amount()).isEqualTo(3);
+                    assertThat(modifier.targetRole()).isEqualTo(ModifierTargetRole.ATTACKER);
+                });
+            });
         });
     }
 
@@ -530,7 +540,7 @@ class Xy1EffectCatalogTest {
         assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement()
                 .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
         assertThat(catalog.auditEntriesForCard("xy1-14")).singleElement()
-                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
+                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED));
     }
 
     private static PokemonInPlay pokemon(String id) {

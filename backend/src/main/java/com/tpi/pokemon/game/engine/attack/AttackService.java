@@ -32,6 +32,11 @@ import com.tpi.pokemon.game.engine.effect.EffectDefinition;
 import com.tpi.pokemon.game.engine.effect.EffectExecutionContext;
 import com.tpi.pokemon.game.engine.effect.EffectExecutionService;
 import com.tpi.pokemon.game.engine.effect.EffectTiming;
+import com.tpi.pokemon.game.engine.effect.reactive.DamageReceivedContext;
+import com.tpi.pokemon.game.engine.effect.reactive.DamageSource;
+import com.tpi.pokemon.game.engine.effect.reactive.ReactiveEffectContext;
+import com.tpi.pokemon.game.engine.effect.reactive.ReactiveEffectResolver;
+import com.tpi.pokemon.game.engine.effect.reactive.ReactiveEffectTrigger;
 import com.tpi.pokemon.game.engine.knockout.PostAttackResolutionService;
 import com.tpi.pokemon.game.engine.random.CoinFlipProvider;
 import com.tpi.pokemon.game.engine.random.CoinFlipResult;
@@ -53,6 +58,7 @@ public final class AttackService {
     private final CoinFlipProvider coinFlipProvider;
     private final EffectExecutionService effectExecutionService;
     private final ModifierResolver modifierResolver;
+    private final ReactiveEffectResolver reactiveEffectResolver;
 
     public AttackService() {
         this(new TurnManager());
@@ -75,6 +81,10 @@ public final class AttackService {
     }
 
     public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService, StatusEffectManager statusEffectManager, CoinFlipProvider coinFlipProvider, EffectExecutionService effectExecutionService, ModifierResolver modifierResolver) {
+        this(turnManager, energyCostValidator, damageCalculator, postAttackResolutionService, statusEffectManager, coinFlipProvider, effectExecutionService, modifierResolver, new ReactiveEffectResolver());
+    }
+
+    public AttackService(TurnManager turnManager, EnergyCostValidator energyCostValidator, DamageCalculator damageCalculator, PostAttackResolutionService postAttackResolutionService, StatusEffectManager statusEffectManager, CoinFlipProvider coinFlipProvider, EffectExecutionService effectExecutionService, ModifierResolver modifierResolver, ReactiveEffectResolver reactiveEffectResolver) {
         this.turnManager = Objects.requireNonNull(turnManager, "turnManager must not be null");
         this.energyCostValidator = Objects.requireNonNull(energyCostValidator, "energyCostValidator must not be null");
         this.damageCalculator = Objects.requireNonNull(damageCalculator, "damageCalculator must not be null");
@@ -83,6 +93,7 @@ public final class AttackService {
         this.coinFlipProvider = Objects.requireNonNull(coinFlipProvider, "coinFlipProvider must not be null");
         this.effectExecutionService = Objects.requireNonNull(effectExecutionService, "effectExecutionService must not be null");
         this.modifierResolver = Objects.requireNonNull(modifierResolver, "modifierResolver must not be null");
+        this.reactiveEffectResolver = Objects.requireNonNull(reactiveEffectResolver, "reactiveEffectResolver must not be null");
     }
 
     public GameState declareAttack(GameState state, DeclareAttackCommand command) {
@@ -143,7 +154,12 @@ public final class AttackService {
                 state.getActiveStadium().orElse(null),
                 events
         );
-        GameState afterEffects = executeAttackEffects(attackState, command.playerId(), defenderPlayer.getPlayerId(), attack, events);
+        GameState afterReactiveEffects = reactiveEffectResolver.resolveDamageReceived(new ReactiveEffectContext(
+                attackState,
+                ReactiveEffectTrigger.DAMAGE_RECEIVED,
+                new DamageReceivedContext(attackState, defenderPlayer.getPlayerId(), damagedDefender, damage.finalDamage(), DamageSource.attack(command.playerId(), attacker, attack.attackId())),
+                events));
+        GameState afterEffects = executeAttackEffects(afterReactiveEffects, command.playerId(), defenderPlayer.getPlayerId(), attack, events);
         events.add(new AttackResolvedEvent(state.getGameId(), command.playerId(), attacker.getTopCard().id(), attack.attackId()));
         GameState resolvedAttackState = new GameState(
                 afterEffects.getGameId(),
