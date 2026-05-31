@@ -1,0 +1,10 @@
+package com.tpi.pokemon.game.engine.event;
+
+import com.tpi.pokemon.game.domain.value.CardInstanceId;
+import com.tpi.pokemon.game.domain.value.GameId;
+import com.tpi.pokemon.game.domain.value.PlayerId;
+import java.util.List;
+
+public record CardsShuffledIntoDeckEvent(GameId gameId, PlayerId playerId, List<CardInstanceId> cardIds, int resultingDeckSize) implements GameEvent {
+    public CardsShuffledIntoDeckEvent { cardIds = List.copyOf(cardIds); }
+}

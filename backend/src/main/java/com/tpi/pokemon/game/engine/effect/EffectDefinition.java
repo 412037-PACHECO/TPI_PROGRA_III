@@ -79,6 +79,18 @@ public record EffectDefinition(
         return new EffectDefinition(EffectType.DISCARD_CARDS, timing, target, count, null, List.of(), null, null, selectedCardIds, sourceZone, EffectCardZone.DISCARD, CardFilterSpec.any(), -1, -1, -1, false, false);
     }
 
+    public static EffectDefinition discardHandDraw(EffectTarget target, int drawCount, EffectTiming timing) {
+        return new EffectDefinition(EffectType.DISCARD_HAND_DRAW, timing, target, drawCount, null, List.of(), null, null, List.of(), EffectCardZone.HAND, EffectCardZone.DISCARD, CardFilterSpec.any(), -1, -1, -1, false, false);
+    }
+
+    public static EffectDefinition shuffleHandIntoDeckDraw(EffectTarget target, int drawCount, EffectTiming timing) {
+        return new EffectDefinition(EffectType.SHUFFLE_HAND_INTO_DECK_DRAW, timing, target, drawCount, null, List.of(), null, null, List.of(), EffectCardZone.HAND, EffectCardZone.DECK, CardFilterSpec.any(), -1, -1, -1, false, true);
+    }
+
+    public static EffectDefinition putDiscardPokemonOnTopOfDeck(EffectTarget target, List<CardInstanceId> selectedCardIds, EffectTiming timing) {
+        return new EffectDefinition(EffectType.PUT_DISCARD_POKEMON_ON_TOP_DECK, timing, target, selectedCardIds == null || selectedCardIds.isEmpty() ? 1 : selectedCardIds.size(), null, List.of(), null, null, selectedCardIds, EffectCardZone.DISCARD, EffectCardZone.DECK, CardFilterSpec.supertype(com.tpi.pokemon.game.domain.enums.CardSupertype.POKEMON), -1, -1, -1, false, false);
+    }
+
     public static EffectDefinition attachEnergy(EffectTarget target, EffectCardZone sourceZone, List<CardInstanceId> selectedEnergyIds, int targetBenchIndex, EffectTiming timing) {
         return new EffectDefinition(EffectType.ATTACH_ENERGY, timing, target, selectedEnergyIds == null || selectedEnergyIds.isEmpty() ? 1 : selectedEnergyIds.size(), null, List.of(), null, null, selectedEnergyIds, sourceZone, EffectCardZone.ATTACHED, CardFilterSpec.supertype(com.tpi.pokemon.game.domain.enums.CardSupertype.ENERGY), targetBenchIndex, -1, -1, false, false);
     }

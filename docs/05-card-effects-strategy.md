@@ -222,7 +222,7 @@ Fase 11E.2 extiende `Xy1EffectCatalog` con mappings progresivos de cartas Traine
 - Tools mapeadas: `Hard Charm` y `Muscle Band` como `CardEffectDefinition` continuos sobre el pipeline de modificadores de daño.
 - Stadiums mapeados progresivamente: `Fairy Garden` queda completo en 11E.5 como modificador de retiro; `Shadow Circle` queda completo en 11G.1 como prevención continua de Weakness condicionada por Energía Darkness-providing.
 
-Trainers pendientes documentados: `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`. Los motivos principales son selección desde zonas ocultas, reveal, shuffle con privacidad, mover mano completa al mazo, evolución directa o lógica custom.
+Trainers pendientes históricos: `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion`. Fase 11G.3 cierra `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y el alcance interno de `Professor's Letter`; siguen pendientes `Cassius`, `Evosoda`, `Great Ball` y `Super Potion` por selección de tablero/top-N/evolución directa/energía unida.
 
 Para Trainers, `EFFECT_MAPPED` no equivale automáticamente a “jugable desde UI/API”. Puede existir mapping engine-interno testeado mientras siga pendiente el contrato público de selección, reveal, privacidad o sincronización.
 
@@ -271,7 +271,7 @@ Fase 11E.5 cierra solo los gaps que podían resolverse con infraestructura míni
 
 Siguen pendientes para 11F:
 
-- Trainers con zonas ocultas/mano completa/top-N (`Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna`, `Super Potion`) requieren contratos de selección/reveal/privacidad o handlers custom de carta completa.
+- Trainers con zonas ocultas/mano completa/top-N siguen siendo backlog salvo los cerrados en 11G.3: `Cassius`, `Evosoda`, `Great Ball` y `Super Potion` requieren contratos de selección o handlers custom adicionales.
 
 ## Fase 11G.1 - Gaps críticos cerrados
 
@@ -299,10 +299,27 @@ Límites explícitos:
 - No agrega frontend, WebSocket, persistencia, endpoints REST de juego ni parser automático.
 - No cierra Trainers complejos ni selección/reveal/privacidad.
 
+## Fase 11G.3 - Trainers complejos internos
+
+Fase 11G.3 cierra Trainers que podían resolverse de forma segura dentro del engine sin UI/API pública:
+
+- `Professor Sycamore`: descarta la mano completa y roba hasta 7.
+- `Shauna`: mezcla la mano propia en el mazo sin revelar y roba hasta 5.
+- `Red Card`: mezcla la mano rival en su mazo sin revelar y el rival roba hasta 4.
+- `Max Revive`: selección pendiente desde descarte público de un Pokémon y movimiento al tope del mazo.
+- `Professor's Letter`: selección pendiente de hasta 2 Energías Básicas con metadata de reveal y shuffle.
+
+Decisiones de privacidad:
+
+- Los handlers de mano no publican contenido de la mano; solo eventos internos con IDs en el log de engine, que no es una vista segura de frontend.
+- Las búsquedas en mazo conservan `PendingEffectSelection` y metadata `revealSelectedCards/requiresShuffle` para una futura API segura.
+
 Gaps documentados, no implementados como soporte completo:
 
-- `xy1-123 Professor's Letter`: requiere búsqueda en mazo, reveal y shuffle.
-- `xy1-127 Shauna`: requiere mezclar mano en mazo y robar 5; `DrawCardsEffectHandler` solo no alcanza.
+- `xy1-115 Cassius`: requiere devolver Pokémon propio en juego con evolución/attachments al mazo y resolver tablero/Activo.
+- `xy1-116 Evosoda`: requiere evolución directa desde mazo validando restricciones de evolución.
+- `xy1-118 Great Ball`: requiere inspección privada top-7, elección opcional, reveal y manejo seguro del resto.
+- `xy1-128 Super Potion`: requiere elegir Pokémon propio y Energía unida; el descarte depende de que haya curación válida.
 
 ## Cómo agregar un nuevo mapping
 

@@ -44,6 +44,7 @@ Incluye:
 - Cleanup continuo de condiciones especiales prevenidas, usado por `Sweet Veil`.
 - `Shadow Circle` como Estadio continuo que elimina Weakness de Pokémon con Energía Darkness-providing.
 - Infraestructura reactiva acotada para `Spiky Shield`: cuando Chesnaught Activo recibe daño positivo de ataque rival, coloca 3 contadores de daño sobre el atacante original e integra cualquier KO resultante con premios/victoria.
+- Handlers internos para Trainers complejos cerrados en 11G.3: descarte de mano + robo, mezclar mano en mazo + robo, y mover Pokémon del descarte al tope del mazo con selección pendiente.
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 
 ## Modelo Game State

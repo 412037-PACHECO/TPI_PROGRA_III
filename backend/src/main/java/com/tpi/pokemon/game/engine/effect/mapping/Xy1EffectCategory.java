@@ -10,6 +10,7 @@ public enum Xy1EffectCategory {
     DRAW_CARDS,
     DISCARD_ENERGY,
     DISCARD_CARD,
+    MOVE_CARD,
     SEARCH_DECK,
     SWITCH_ACTIVE,
     ATTACH_ENERGY,

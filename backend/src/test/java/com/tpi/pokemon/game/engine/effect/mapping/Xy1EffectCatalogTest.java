@@ -496,17 +496,26 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
-    void pendingTrainerMappingsDoNotClaimFullyTested() {
-        assertThat(catalog.auditEntriesForCard("xy1-127")).singleElement().satisfies(entry -> {
-            assertThat(entry.statuses()).contains(Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
-            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
-            assertThat(entry.tested()).isFalse();
+    void phase11G3TrainerMappingsUseComplexHandlers() {
+        assertThat(catalog.effectsForTrainer("xy1-122")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.DISCARD_HAND_DRAW));
+        assertThat(catalog.effectsForTrainer("xy1-124")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.SHUFFLE_HAND_INTO_DECK_DRAW);
+            assertThat(effect.target()).isEqualTo(EffectTarget.DEFENDER_ACTIVE);
+            assertThat(effect.amount()).isEqualTo(4);
         });
-        assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement().satisfies(entry -> {
-            assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET);
-            assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.FULLY_TESTED);
-            assertThat(entry.tested()).isFalse();
+        assertThat(catalog.effectsForTrainer("xy1-127")).singleElement().satisfies(effect -> {
+            assertThat(effect.type()).isEqualTo(EffectType.SHUFFLE_HAND_INTO_DECK_DRAW);
+            assertThat(effect.target()).isEqualTo(EffectTarget.ACTING_PLAYER);
+            assertThat(effect.amount()).isEqualTo(5);
         });
+        assertThat(catalog.effectsForTrainer("xy1-120")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.PUT_DISCARD_POKEMON_ON_TOP_DECK));
+        for (String cardId : List.of("xy1-120", "xy1-122", "xy1-123", "xy1-124", "xy1-127")) {
+            assertThat(catalog.auditEntriesForCard(cardId)).singleElement().satisfies(entry -> {
+                assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+                assertThat(entry.statuses()).doesNotContain(Xy1AuditStatus.NOT_IMPLEMENTED_YET, Xy1AuditStatus.REQUIRES_CUSTOM_HANDLER);
+                assertThat(entry.tested()).isTrue();
+            });
+        }
     }
 
     @Test
@@ -537,8 +546,6 @@ class Xy1EffectCatalogTest {
 
     @Test
     void unsupportedTrainerAndAbilityGapsRemainDocumented() {
-        assertThat(catalog.auditEntriesForCard("xy1-123")).singleElement()
-                .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.NOT_IMPLEMENTED_YET));
         assertThat(catalog.auditEntriesForCard("xy1-14")).singleElement()
                 .satisfies(entry -> assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED));
     }

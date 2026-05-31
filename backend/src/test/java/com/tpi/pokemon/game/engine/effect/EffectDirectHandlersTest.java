@@ -26,7 +26,10 @@ import com.tpi.pokemon.game.domain.value.CardInstanceId;
 import com.tpi.pokemon.game.domain.value.GameId;
 import com.tpi.pokemon.game.domain.value.PlayerId;
 import com.tpi.pokemon.game.engine.event.ActivePokemonSwitchedEvent;
+import com.tpi.pokemon.game.engine.event.CardDrawEffectResolvedEvent;
+import com.tpi.pokemon.game.engine.event.CardPlacedOnTopOfDeckEvent;
 import com.tpi.pokemon.game.engine.event.CardsDiscardedEvent;
+import com.tpi.pokemon.game.engine.event.CardsShuffledIntoDeckEvent;
 import com.tpi.pokemon.game.engine.event.DamageCountersPlacedEvent;
 import com.tpi.pokemon.game.engine.event.DeckSearchedEvent;
 import com.tpi.pokemon.game.engine.event.DeckShuffledEvent;
@@ -54,6 +57,9 @@ class EffectDirectHandlersTest {
         assertThat(registry.findHandler(EffectType.SEARCH_DECK)).isPresent();
         assertThat(registry.findHandler(EffectType.SHUFFLE_DECK)).isPresent();
         assertThat(registry.findHandler(EffectType.DISCARD_CARDS)).isPresent();
+        assertThat(registry.findHandler(EffectType.DISCARD_HAND_DRAW)).isPresent();
+        assertThat(registry.findHandler(EffectType.SHUFFLE_HAND_INTO_DECK_DRAW)).isPresent();
+        assertThat(registry.findHandler(EffectType.PUT_DISCARD_POKEMON_ON_TOP_DECK)).isPresent();
         assertThat(registry.findHandler(EffectType.ATTACH_ENERGY)).isPresent();
         assertThat(registry.findHandler(EffectType.MOVE_ENERGY)).isPresent();
         assertThat(registry.findHandler(EffectType.SWITCH_ACTIVE)).isPresent();
@@ -128,6 +134,67 @@ class EffectDirectHandlersTest {
         assertThat(result.getPlayerOneState().getHand().getCards()).extracting(CardInstance::id).containsExactly(remaining.id());
         assertThat(result.getPlayerOneState().getDiscardPile().getCards()).extracting(CardInstance::id).containsExactly(discarded.id());
         assertThat(eventsOfType(events, CardsDiscardedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void discardHandDrawDiscardsWholeHandAndDrawsRequestedCards() {
+        CardInstance handOne = pokemonCard("hand-one", PLAYER_ONE, 60);
+        CardInstance handTwo = pokemonCard("hand-two", PLAYER_ONE, 60);
+        CardInstance deckOne = pokemonCard("deck-one", PLAYER_ONE, 60);
+        CardInstance deckTwo = pokemonCard("deck-two", PLAYER_ONE, 60);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(deckOne, deckTwo), List.of(handOne, handTwo), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        List<GameEvent> events = new ArrayList<>();
+
+        GameState result = new EffectExecutionService().execute(EffectDefinition.discardHandDraw(EffectTarget.ACTING_PLAYER, 7, EffectTiming.ON_PLAY_TRAINER), context(state, events)).state();
+
+        assertThat(result.getPlayerOneState().getHand().getCards()).extracting(CardInstance::id).containsExactly(deckOne.id(), deckTwo.id());
+        assertThat(result.getPlayerOneState().getDeck().getCards()).isEmpty();
+        assertThat(result.getPlayerOneState().getDiscardPile().getCards()).extracting(CardInstance::id).containsExactly(handOne.id(), handTwo.id());
+        assertThat(eventsOfType(events, CardsDiscardedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(events, CardDrawEffectResolvedEvent.class)).singleElement().satisfies(event -> assertThat(event.requestedCount()).isEqualTo(7));
+    }
+
+    @Test
+    void shuffleHandIntoDeckDrawShufflesPrivateHandWithoutRevealAndDrawsCards() {
+        CardInstance handOne = pokemonCard("hand-one", PLAYER_ONE, 60);
+        CardInstance deckOne = pokemonCard("deck-one", PLAYER_ONE, 60);
+        CardInstance deckTwo = pokemonCard("deck-two", PLAYER_ONE, 60);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(deckOne, deckTwo), List.of(handOne), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        EffectExecutionService service = new EffectExecutionService(new EffectRegistry(List.of(new ShuffleHandIntoDeckDrawEffectHandler(cards -> List.of(handOne, deckOne, deckTwo)))));
+        List<GameEvent> events = new ArrayList<>();
+
+        GameState result = service.execute(EffectDefinition.shuffleHandIntoDeckDraw(EffectTarget.ACTING_PLAYER, 2, EffectTiming.ON_PLAY_TRAINER), context(state, events)).state();
+
+        assertThat(result.getPlayerOneState().getHand().getCards()).extracting(CardInstance::id).containsExactly(handOne.id(), deckOne.id());
+        assertThat(result.getPlayerOneState().getDeck().getCards()).extracting(CardInstance::id).containsExactly(deckTwo.id());
+        assertThat(eventsOfType(events, CardsShuffledIntoDeckEvent.class)).singleElement().satisfies(event -> assertThat(event.cardIds()).containsExactly(handOne.id()));
+        assertThat(eventsOfType(events, CardDrawEffectResolvedEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void putDiscardPokemonOnTopDeckRequiresSelectionAndRejectsNonPokemon() {
+        CardInstance pokemon = pokemonCard("discard-pokemon", PLAYER_ONE, 60);
+        CardInstance item = new CardInstance(new CardInstanceId("discard-item"), new CardDefinitionRef("item-def", "Item", CardSupertype.TRAINER, Set.of(CardSubtype.ITEM)), PLAYER_ONE);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(), List.of(), List.of(pokemon, item), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+
+        EffectResult pending = new EffectExecutionService().execute(EffectDefinition.putDiscardPokemonOnTopOfDeck(EffectTarget.ACTING_PLAYER, List.of(), EffectTiming.ON_PLAY_TRAINER), context(state, new ArrayList<>()));
+        assertThat(pending.pendingSelectionOptional()).hasValueSatisfying(selection -> assertThat(selection.cardFilter().supertype()).isEqualTo(CardSupertype.POKEMON));
+        assertThatThrownBy(() -> new EffectExecutionService().execute(EffectDefinition.putDiscardPokemonOnTopOfDeck(EffectTarget.ACTING_PLAYER, List.of(item.id()), EffectTiming.ON_PLAY_TRAINER), context(state, new ArrayList<>())))
+                .isInstanceOf(EffectException.class);
+    }
+
+    @Test
+    void putDiscardPokemonOnTopDeckMovesSelectedPokemonToTop() {
+        CardInstance pokemon = pokemonCard("discard-pokemon", PLAYER_ONE, 60);
+        CardInstance deckTop = pokemonCard("deck-top", PLAYER_ONE, 60);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(deckTop), List.of(), List.of(pokemon), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        List<GameEvent> events = new ArrayList<>();
+
+        GameState result = new EffectExecutionService().execute(EffectDefinition.putDiscardPokemonOnTopOfDeck(EffectTarget.ACTING_PLAYER, List.of(pokemon.id()), EffectTiming.ON_PLAY_TRAINER), context(state, events)).state();
+
+        assertThat(result.getPlayerOneState().getDeck().getCards()).extracting(CardInstance::id).containsExactly(pokemon.id(), deckTop.id());
+        assertThat(result.getPlayerOneState().getDiscardPile().getCards()).isEmpty();
+        assertThat(eventsOfType(events, CardPlacedOnTopOfDeckEvent.class)).hasSize(1);
     }
 
     @Test
