@@ -50,6 +50,24 @@ class Xy1CardByCardVerificationDocTest {
         }
     }
 
+    @Test
+    void phase11G6DocumentReflectsClosedDamageOnlyFollowUpCounts() throws IOException {
+        List<String> rows = xy1Rows();
+
+        assertThat(rows).filteredOn(row -> columns(row).get(12).equals("DAMAGE_ONLY_SUPPORTED")).isEmpty();
+        assertThat(rows).filteredOn(row -> columns(row).get(12).equals("NO_OPEN_GAP_FOR_DECLARED_SCOPE")).hasSize(39);
+        assertThat(rows).filteredOn(row -> columns(row).get(10).contains("FULLY_TESTED")).hasSize(39);
+
+        for (String cardId : List.of("xy1-47", "xy1-49", "xy1-69", "xy1-83", "xy1-94", "xy1-108")) {
+            assertThat(rows).filteredOn(row -> columns(row).get(0).equals(cardId)).singleElement().satisfies(row -> {
+                List<String> columns = columns(row);
+                assertThat(columns.get(10)).contains("EFFECT_MAPPED", "FULLY_TESTED");
+                assertThat(columns.get(11)).isEqualTo("yes");
+                assertThat(columns.get(12)).isEqualTo("NO_OPEN_GAP_FOR_DECLARED_SCOPE");
+            });
+        }
+    }
+
     private List<String> xy1Rows() throws IOException {
         return Files.readAllLines(resolveDocPath()).stream()
                 .filter(line -> line.startsWith("| xy1-"))

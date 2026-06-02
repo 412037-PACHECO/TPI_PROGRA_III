@@ -1,26 +1,42 @@
-# 12 - Verificación y clasificación carta por carta XY1 (Fase 11G.5)
+# 12 - Verificación y clasificación carta por carta XY1 (Fase 11G.6 follow-up)
 
 ## Alcance
 
-11G.5 completa la clasificación documental de las 99 cartas oficiales `xy1` que en 11G.4 estaban como `PENDING_ROW_CREATION`. No implementa lógica grande nueva, no agrega handlers, no expone API pública y no afirma soporte jugable completo.
+11G.5 completa la clasificación documental de las 99 cartas oficiales `xy1` que en 11G.4 estaban como `PENDING_ROW_CREATION`. El follow-up 11G.6 cierra solo los seis casos `DAMAGE_ONLY_SUPPORTED` mediante mappings vacíos explícitos, sin lógica grande nueva, sin nuevos handlers, sin API pública y sin afirmar soporte jugable completo.
 
 - Fuente oficial: `pokemontcg.io v2 /cards?q=set.id:xy1&pageSize=250`, guardada localmente por la herramienta.
 - Esta matriz clasifica efectos y gaps; una carta clasificada no equivale a carta implementada.
 - `EFFECT_SUPPORTED_BY_GENERIC_HANDLER` no implica `EFFECT_MAPPED`; `EFFECT_MAPPED` no implica `FULLY_TESTED`.
+- Las notas heredadas que mencionan “documentado para 11G.6” identifican backlog detectado originalmente para esa fase; tras este follow-up acotado, esos gaps siguen como backlog posterior salvo los seis `DAMAGE_ONLY_SUPPORTED` cerrados explícitamente.
 
-## Conteos post-11G.5
+## Conteos post-11G.6 follow-up
 
 | Métrica | Cantidad |
 |---|---:|
 | Total oficial XY1 | 146 |
 | Cartas con clasificación documental | 146 |
 | Cartas sin fila detallada | 0 |
-| DAMAGE_ONLY_SUPPORTED nuevas | 6 |
+| DAMAGE_ONLY_SUPPORTED pendientes | 0 |
 | PARTIAL_SUPPORT nuevas | 14 |
 | REQUIRES_UI_SELECTION nuevas | 28 |
 | REQUIRES_CUSTOM_HANDLER nuevas | 34 |
 | NOT_IMPLEMENTED_YET nuevas | 17 |
-| FULLY_TESTED existentes para alcance declarado | 33 |
+| FULLY_TESTED para alcance declarado | 39 |
+| EFFECT_MAPPED | 44 |
+| Cartas con `PendingEffectSelection` interno | 6 |
+| Cartas con gap real restante | 107 |
+
+## Desglose final de gaps
+
+| gapType | Cantidad |
+|---|---:|
+| NO_OPEN_GAP_FOR_DECLARED_SCOPE | 39 |
+| PARTIAL_SUPPORT | 24 |
+| REQUIRES_UI_SELECTION | 28 |
+| REQUIRES_CUSTOM_HANDLER | 34 |
+| NOT_IMPLEMENTED_YET | 17 |
+| DAMAGE_ONLY_SUPPORTED | 0 |
+| MAPPED_NOT_FULLY_TESTED | 4 |
 
 ## Matriz de clasificación carta por carta
 
@@ -72,9 +88,9 @@
 | xy1-44 | 44 | Voltorb | Pokémon | Basic | Rollout | Destiny Burst | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
 | xy1-45 | 45 | Electrode | Pokémon | Stage 1 | Eerie Impulse; Rollout | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 | xy1-46 | 46 | Emolga-EX | Pokémon | Basic, EX | Energy Glide; Electron Crush | none | yes | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
-| xy1-47 | 47 | Ekans | Pokémon | Basic | Bite | none | none | DAMAGE_ONLY | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | DAMAGE_ONLY_SUPPORTED | Daño base puro; AttackService cubre cálculo/KO. Falta mapping/test por cardId antes de FULLY_TESTED. |
+| xy1-47 | 47 | Ekans | Pokémon | Basic | Bite | none | none | DAMAGE_ONLY | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | NO_OPEN_GAP_FOR_DECLARED_SCOPE | Mapping vacío agregado para daño puro en follow-up 11G.6; el daño base queda en `AttackDefinition`/`AttackService`. |
 | xy1-48 | 48 | Arbok | Pokémon | Stage 1 | Gastro Acid; Poison Jab | none | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
-| xy1-49 | 49 | Spoink | Pokémon | Basic | Splash | none | none | DAMAGE_ONLY | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | DAMAGE_ONLY_SUPPORTED | Daño base puro; AttackService cubre cálculo/KO. Falta mapping/test por cardId antes de FULLY_TESTED. |
+| xy1-49 | 49 | Spoink | Pokémon | Basic | Splash | none | none | DAMAGE_ONLY | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | NO_OPEN_GAP_FOR_DECLARED_SCOPE | Mapping vacío agregado para daño puro en follow-up 11G.6; el daño base queda en `AttackDefinition`/`AttackService`. |
 | xy1-50 | 50 | Grumpig | Pokémon | Stage 1 | Tricky Steps; Psybeam | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 | xy1-51 | 51 | Venipede | Pokémon | Basic | Poison Sting | none | none | DAMAGE_PLUS_STATUS; DAMAGE_PLUS_COIN_FLIP; DISCARD_ENERGY; DRAW_CARDS | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; PARTIAL_SUPPORT | no | PARTIAL_SUPPORT | Soporte parcial por handlers existentes; falta mapping/test completo o queda subefecto pendiente. |
 | xy1-52 | 52 | Whirlipede | Pokémon | Stage 1 | Continuous Tumble | none | none | DAMAGE_PLUS_COIN_FLIP; MODIFY_DAMAGE; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | NOT_IMPLEMENTED_YET | Daño dinámico/condicional no modelado todavía; documentado para 11G.6. |
@@ -94,7 +110,7 @@
 | xy1-66 | 66 | Gurdurr | Pokémon | Stage 1 | Pummel; Hammer Arm | none | none | DAMAGE_PLUS_COIN_FLIP; MODIFY_DAMAGE; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | NOT_IMPLEMENTED_YET | Daño dinámico/condicional no modelado todavía; documentado para 11G.6. |
 | xy1-67 | 67 | Conkeldurr | Pokémon | Stage 2 | Wake-Up Slap; Dynamic Punch | none | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
 | xy1-68 | 68 | Sableye | Pokémon | Basic | Filch; Rip Claw | none | none | DRAW_CARDS; DAMAGE_PLUS_COIN_FLIP; DISCARD_ENERGY | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | NO_OPEN_GAP_FOR_DECLARED_SCOPE | Mapping creado para robo y descarte condicional de energía. |
-| xy1-69 | 69 | Sandile | Pokémon | Basic | Ram; Darkness Fang | none | none | DAMAGE_ONLY | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | DAMAGE_ONLY_SUPPORTED | Daño base puro; AttackService cubre cálculo/KO. Falta mapping/test por cardId antes de FULLY_TESTED. |
+| xy1-69 | 69 | Sandile | Pokémon | Basic | Ram; Darkness Fang | none | none | DAMAGE_ONLY | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | NO_OPEN_GAP_FOR_DECLARED_SCOPE | Mappings vacíos agregados para ambos ataques de daño puro en follow-up 11G.6; el daño base queda en `AttackDefinition`/`AttackService`. |
 | xy1-70 | 70 | Krokorok | Pokémon | Stage 1 | Crunch; Darkness Fang | none | none | DAMAGE_PLUS_STATUS; DAMAGE_PLUS_COIN_FLIP; DISCARD_ENERGY; DRAW_CARDS | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; PARTIAL_SUPPORT | no | PARTIAL_SUPPORT | Soporte parcial por handlers existentes; falta mapping/test completo o queda subefecto pendiente. |
 | xy1-71 | 71 | Krookodile | Pokémon | Stage 2 | Bother; Knock Back | none | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
 | xy1-72 | 72 | Zorua | Pokémon | Basic | Scratch; Nasty Plot | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
@@ -108,7 +124,7 @@
 | xy1-80 | 80 | Skarmory-EX | Pokémon | Basic, EX | Joust; Tailspin Piledriver | none | yes | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
 | xy1-81 | 81 | Pawniard | Pokémon | Basic | Cut Down; Metal Claw | none | none | DAMAGE_PLUS_STATUS; DAMAGE_PLUS_COIN_FLIP; DISCARD_ENERGY; DRAW_CARDS | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; PARTIAL_SUPPORT | no | PARTIAL_SUPPORT | Soporte parcial por handlers existentes; falta mapping/test completo o queda subefecto pendiente. |
 | xy1-82 | 82 | Bisharp | Pokémon | Stage 1 | Metal Sound; Metal Wallop | none | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
-| xy1-83 | 83 | Honedge | Pokémon | Basic | Pierce | none | none | DAMAGE_ONLY | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | DAMAGE_ONLY_SUPPORTED | Daño base puro; AttackService cubre cálculo/KO. Falta mapping/test por cardId antes de FULLY_TESTED. |
+| xy1-83 | 83 | Honedge | Pokémon | Basic | Pierce | none | none | DAMAGE_ONLY | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | NO_OPEN_GAP_FOR_DECLARED_SCOPE | Mapping vacío agregado para daño puro en follow-up 11G.6; el daño base queda en `AttackDefinition`/`AttackService`. |
 | xy1-84 | 84 | Doublade | Pokémon | Stage 1 | Dual Blades | none | none | DAMAGE_PLUS_COIN_FLIP; MODIFY_DAMAGE; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | NOT_IMPLEMENTED_YET | Daño dinámico/condicional no modelado todavía; documentado para 11G.6. |
 | xy1-85 | 85 | Aegislash | Pokémon | Stage 2 | Buster Swing | Stance Change | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
 | xy1-86 | 86 | Aegislash | Pokémon | Stage 2 | King's Shield | Stance Change | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
@@ -119,7 +135,7 @@
 | xy1-91 | 91 | Mr. Mime | Pokémon | Basic | Massage; Slap Down | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 | xy1-92 | 92 | Spritzee | Pokémon | Basic | Sweet Scent; Flop | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 | xy1-93 | 93 | Aromatisse | Pokémon | Stage 1 | Fairy Wind | Fairy Transfer | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
-| xy1-94 | 94 | Swirlix | Pokémon | Basic | Tackle; Fairy Wind | none | none | DAMAGE_ONLY | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | DAMAGE_ONLY_SUPPORTED | Daño base puro; AttackService cubre cálculo/KO. Falta mapping/test por cardId antes de FULLY_TESTED. |
+| xy1-94 | 94 | Swirlix | Pokémon | Basic | Tackle; Fairy Wind | none | none | DAMAGE_ONLY | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | NO_OPEN_GAP_FOR_DECLARED_SCOPE | Mappings vacíos agregados para ambos ataques de daño puro en follow-up 11G.6; el daño base queda en `AttackDefinition`/`AttackService`. |
 | xy1-95 | 95 | Slurpuff | Pokémon | Stage 1 | Draining Kiss | Sweet Veil | none | ABILITY_PASSIVE; CONTINUOUS_EFFECT; DAMAGE_PLUS_HEAL | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; NOT_IMPLEMENTED_YET | no | PARTIAL_SUPPORT | Sweet Veil está mapeada/testeada para el alcance de habilidad, pero Draining Kiss no tiene mapping/test de carta completa; no marcar FULLY_TESTED. |
 | xy1-96 | 96 | Xerneas | Pokémon | Basic | Geomancy; Rainbow Spear | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 | xy1-97 | 97 | Xerneas-EX | Pokémon | Basic, EX | Break Through; X Blast | none | yes | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
@@ -133,7 +149,7 @@
 | xy1-105 | 105 | Delcatty | Pokémon | Stage 1 | Energy Salon; Fake Out | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 | xy1-106 | 106 | Bidoof | Pokémon | Basic | Hyper Fang | none | none | DAMAGE_PLUS_COIN_FLIP; MODIFY_DAMAGE; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | NOT_IMPLEMENTED_YET | Daño dinámico/condicional no modelado todavía; documentado para 11G.6. |
 | xy1-107 | 107 | Bibarel | Pokémon | Stage 1 | Double Headbutt; Hypno Headbutt | none | none | DAMAGE_PLUS_COIN_FLIP; MODIFY_DAMAGE; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | NOT_IMPLEMENTED_YET | Daño dinámico/condicional no modelado todavía; documentado para 11G.6. |
-| xy1-108 | 108 | Lillipup | Pokémon | Basic | Tackle; Bite | none | none | DAMAGE_ONLY | partial | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; NOT_IMPLEMENTED_YET | no | DAMAGE_ONLY_SUPPORTED | Daño base puro; AttackService cubre cálculo/KO. Falta mapping/test por cardId antes de FULLY_TESTED. |
+| xy1-108 | 108 | Lillipup | Pokémon | Basic | Tackle; Bite | none | none | DAMAGE_ONLY | yes | DATA_IMPORTED; EFFECT_CLASSIFIED; EFFECT_SUPPORTED_BY_GENERIC_HANDLER; EFFECT_MAPPED; FULLY_TESTED | yes | NO_OPEN_GAP_FOR_DECLARED_SCOPE | Mappings vacíos agregados para ambos ataques de daño puro en follow-up 11G.6; el daño base queda en `AttackDefinition`/`AttackService`. |
 | xy1-109 | 109 | Herdier | Pokémon | Stage 1 | Bite; Jump On | none | none | DAMAGE_PLUS_COIN_FLIP; MODIFY_DAMAGE; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; NOT_IMPLEMENTED_YET | no | NOT_IMPLEMENTED_YET | Daño dinámico/condicional no modelado todavía; documentado para 11G.6. |
 | xy1-110 | 110 | Stoutland | Pokémon | Stage 2 | Bite Off; Wild Barking | none | none | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 | xy1-111 | 111 | Bunnelby | Pokémon | Basic | Dig | none | none | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
@@ -173,11 +189,11 @@
 | xy1-145 | 145 | Skarmory-EX | Pokémon | Basic, EX | Joust; Tailspin Piledriver | none | yes | ABILITY_ACTIVATED; PREVENT_DAMAGE; CONTINUOUS_EFFECT; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_CUSTOM_HANDLER | no | REQUIRES_CUSTOM_HANDLER | Requiere lógica custom de engine; documentado para 11G.6. |
 | xy1-146 | 146 | Xerneas-EX | Pokémon | Basic, EX | Break Through; X Blast | none | yes | SEARCH_DECK; SWITCH_ACTIVE; ATTACH_ENERGY; CUSTOM_REQUIRED | no | DATA_IMPORTED; EFFECT_CLASSIFIED; REQUIRES_UI_SELECTION | no | REQUIRES_UI_SELECTION | Requiere selección/reveal/target público seguro antes de jugabilidad completa. |
 
-## Gaps restantes para 11G.6
+## Gaps restantes después del follow-up 11G.6
 
 - **Game Engine**: daño dinámico por monedas/energías/banca/contadores, efectos `next turn`, daño a Banca/múltiples objetivos, locks, habilidades activadas y cambios coordinados de Activo.
 - **Selection/API**: selección segura desde mazo/mano/descarte/Banca, reveal parcial, shuffle y vistas por jugador.
 - **Frontend**: UI para targets, búsquedas, elecciones opcionales, reemplazo de Activo y pending selections.
 - **WebSocket/persistencia**: snapshots/event log seguro, reconexión y sincronización de pending selections siguen fuera de alcance.
 
-11G.6 es necesaria antes de 11F si el reporte final debe afirmar soporte jugable completo de XY1.
+Un cierre posterior sigue siendo necesario antes de 11F si el reporte final debe afirmar soporte jugable completo de XY1.

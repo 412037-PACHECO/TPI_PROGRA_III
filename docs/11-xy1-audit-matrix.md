@@ -57,7 +57,22 @@ Conteos post-11G.5:
 | Nuevas REQUIRES_CUSTOM_HANDLER | 34 |
 | Nuevas NOT_IMPLEMENTED_YET | 17 |
 
-La fuente de detalle queda en `docs/12-xy1-card-by-card-verification.md`. 11G.6 queda recomendada antes de 11F para cerrar gaps de motor/selección si el equipo necesita afirmar soporte jugable completo de XY1.
+La fuente de detalle queda en `docs/12-xy1-card-by-card-verification.md`. En ese momento 11G.6 quedaba recomendada antes de 11F para cerrar gaps de motor/selección si el equipo necesitaba afirmar soporte jugable completo de XY1; el follow-up posterior solo cerró el subconjunto damage-only seguro.
+
+## Fase 11G.6 - Follow-up damage-only
+
+11G.6 cierra el subconjunto más seguro detectado por 11G.5: los seis `DAMAGE_ONLY_SUPPORTED`. No agrega handlers ni endpoints; agrega mappings vacíos explícitos porque `AttackService` ya resuelve daño base, KO, premios y victoria.
+
+Conteos post-11G.6 follow-up:
+
+| Métrica | Cantidad |
+|---|---:|
+| FULLY_TESTED para alcance declarado | 39 |
+| DAMAGE_ONLY_SUPPORTED pendientes | 0 |
+| EFFECT_MAPPED | 44 |
+| Cartas con gap real restante | 107 |
+
+Cartas cerradas: `xy1-47`, `xy1-49`, `xy1-69`, `xy1-83`, `xy1-94` y `xy1-108`. Siguen pendientes los gaps de selección pública, daño variable, duración `next turn`, habilidades activadas, daño a Banca/múltiples objetivos y switch coordinado.
 
 Herramienta interna agregada:
 
@@ -164,7 +179,7 @@ Fase 11E.3 agrega mappings progresivos de habilidades Pokémon XY1 (`Fur Coat`, 
 
 Fase 11E.4 audita Energías XY1: `Double Colorless Energy`, `Rainbow Energy` y las 9 Energías Básicas. Las Energías Básicas no requieren `EffectDefinition` textual; `Double Colorless Energy` se representa como dos símbolos `COLORLESS`.
 
-Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` como Energía flexible de un solo símbolo + trigger al adjuntarse desde mano, `Fairy Garden` como modificador continuo de retiro, y metadata ampliada de pending selection. Fase 11G.1 completa los gaps críticos de `Rainbow Energy` KO/premios/victoria, cleanup completo de `Sweet Veil` y `Shadow Circle` como prevención continua de Weakness. Fase 11G.2 completa `Spiky Shield` con infraestructura reactiva acotada para daño recibido por ataque rival. Los casos con zonas ocultas/top-N/mano completa siguen pendientes.
+Fase 11E.5 cierra gaps puntuales con infraestructura mínima: `Rainbow Energy` como Energía flexible de un solo símbolo + trigger al adjuntarse desde mano, `Fairy Garden` como modificador continuo de retiro, y metadata ampliada de pending selection. Fase 11G.1 completa los gaps críticos de `Rainbow Energy` KO/premios/victoria, cleanup completo de `Sweet Veil` y `Shadow Circle` como prevención continua de Weakness. Fase 11G.2 completa `Spiky Shield` con infraestructura reactiva acotada para daño recibido por ataque rival. Fase 11G.6 cierra los seis `DAMAGE_ONLY_SUPPORTED` con mappings vacíos explícitos. Los casos con zonas ocultas/top-N/mano completa siguen pendientes.
 
 | cardId | name | supertype | subtypes | attacks | abilities | rules | effectText | effectCategory | complexity | supportedByCurrentEngine | genericHandlers | customHandlerRequired | implementationStatus | tested | notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

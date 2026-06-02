@@ -594,6 +594,38 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void phase11G6DamageOnlyFollowUpAddsExplicitEmptyMappings() {
+        for (String[] cardAndAttack : List.of(
+                new String[] {"xy1-47", "Bite"},
+                new String[] {"xy1-49", "Splash"},
+                new String[] {"xy1-69", "Ram"},
+                new String[] {"xy1-69", "Darkness Fang"},
+                new String[] {"xy1-83", "Pierce"},
+                new String[] {"xy1-94", "Tackle"},
+                new String[] {"xy1-94", "Fairy Wind"},
+                new String[] {"xy1-108", "Tackle"},
+                new String[] {"xy1-108", "Bite"})) {
+            String cardId = cardAndAttack[0];
+            String attackName = cardAndAttack[1];
+
+            assertThat(catalog.effectsForAttack(cardId, attackName)).isEmpty();
+            assertThat(catalog.mappingForAttackName(cardId, attackName)).hasValueSatisfying(mapping -> {
+                assertThat(mapping.categories()).contains(Xy1EffectCategory.DAMAGE_ONLY);
+                assertThat(mapping.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+                assertThat(mapping.tested()).isTrue();
+            });
+        }
+
+        for (String cardId : List.of("xy1-47", "xy1-49", "xy1-69", "xy1-83", "xy1-94", "xy1-108")) {
+            assertThat(catalog.auditEntriesForCard(cardId)).singleElement().satisfies(entry -> {
+                assertThat(entry.categories()).contains(Xy1EffectCategory.DAMAGE_ONLY);
+                assertThat(entry.statuses()).contains(Xy1AuditStatus.EFFECT_MAPPED, Xy1AuditStatus.FULLY_TESTED);
+                assertThat(entry.tested()).isTrue();
+            });
+        }
+    }
+
+    @Test
     void phase11G4ClosedCriticalMappingsExistWithoutClaimingFullXy1Completion() {
         assertThat(catalog.effectsForTrainer("xy1-115")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.RETURN_POKEMON_TO_DECK));
         assertThat(catalog.effectsForTrainer("xy1-116")).singleElement().satisfies(effect -> assertThat(effect.type()).isEqualTo(EffectType.EVOSODA_EVOLVE));

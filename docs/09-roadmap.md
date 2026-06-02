@@ -268,8 +268,16 @@ Decisiones fase 11:
 - La matriz `docs/12-xy1-card-by-card-verification.md` ahora enumera y clasifica las 146 cartas oficiales.
 - Resultado de las 99 nuevas: 6 `DAMAGE_ONLY_SUPPORTED`, 14 `PARTIAL_SUPPORT`, 28 `REQUIRES_UI_SELECTION`, 34 `REQUIRES_CUSTOM_HANDLER`, 17 `NOT_IMPLEMENTED_YET`.
 - No agrega handlers ni aumenta `FULLY_TESTED`; solo identifica gaps reales.
-- 11G.6 queda recomendada antes de 11F para cerrar gaps de Game Engine y selección pública si se busca soporte jugable completo.
+- En ese momento 11G.6 quedaba recomendada antes de 11F; el follow-up implementado cerró solo damage-only de bajo riesgo, por lo que soporte jugable completo aún requiere un pase posterior de Game Engine y selección pública.
 - Criterio: no se elige automáticamente cuando hay elección del jugador; pending selections conservan metadata; hand-to-deck shuffle no revela manos; mappings cerrados tienen tests y gaps restantes quedan explícitos.
+
+### Fase 11G.6 - Follow-up damage-only de bajo riesgo
+
+- Estado: implementada como cierre acotado de Game Engine puro; pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: cerrar únicamente los 6 casos `DAMAGE_ONLY_SUPPORTED` detectados en 11G.5 mediante mappings vacíos explícitos, sin handlers nuevos ni contrato público.
+- Entregables: mappings/audit entries para `xy1-47 Ekans`, `xy1-49 Spoink`, `xy1-69 Sandile`, `xy1-83 Honedge`, `xy1-94 Swirlix` y `xy1-108 Lillipup`; tests de catálogo que verifican categoría `DAMAGE_ONLY`, `EFFECT_MAPPED` y `FULLY_TESTED` para ese alcance.
+- Resultado honesto: `FULLY_TESTED` sube de 33 a 39; `DAMAGE_ONLY_SUPPORTED` pendiente baja de 6 a 0; quedan 107 cartas con gap real o soporte parcial.
+- Fuera de alcance: daño variable, efectos `next turn`, búsqueda+attach desde mazo, switch coordinado, habilidades activadas, selección pública segura, frontend, WebSocket, persistencia y endpoints REST de juego.
 
 ### Fase 11F - Reporte final de cumplimiento XY1
 

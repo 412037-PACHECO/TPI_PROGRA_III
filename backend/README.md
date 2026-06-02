@@ -47,6 +47,7 @@ Incluye:
 - Handlers internos para Trainers complejos cerrados en 11G.3/11G.3B: descarte de mano + robo, mezclar mano en mazo + robo, mover Pokémon del descarte al tope del mazo, top-7 de Great Ball, evolución directa de Evosoda, Super Potion y retorno a mazo de Cassius con selección pendiente.
 - Verificación documental 11G.4 carta por carta contra fuente oficial `xy1`: 146 cartas oficiales, 47 con fila detallada previa y 99 pendientes de clasificación fina en `docs/12-xy1-card-by-card-verification.md`.
 - Clasificación documental 11G.5 de las 146 cartas: las 99 pendientes quedan clasificadas por gap real, sin implementar features nuevas ni afirmar soporte jugable completo.
+- Follow-up 11G.6 de bajo riesgo: los 6 casos `DAMAGE_ONLY_SUPPORTED` (`Ekans`, `Spoink`, `Sandile`, `Honedge`, `Swirlix`, `Lillipup`) quedan con mapping vacío explícito y test de catálogo para alcance de daño puro; `FULLY_TESTED` sube a 39 sin afirmar XY1 completo.
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 
 ## Modelo Game State
@@ -383,6 +384,12 @@ Gaps documentados actualizados en 11G.5:
 - `Professor's Letter` queda como mapping interno, no `FULLY_TESTED`, porque depende de selección/reveal seguro desde zona oculta para soporte público.
 - `Sweet Veil`, `Spiky Shield`, `Fur Coat`, `Shadow Circle` y `Rainbow Energy` tienen alcances internos cerrados/testeados, pero una carta completa no debe marcarse completa si otro ataque/ability de esa misma carta sigue sin mapear.
 - Gaps engine mayores para 11G.6: daño variable por monedas, efectos con duración `next turn`, daño/contadores a Banca o múltiples objetivos, habilidades activadas con límites de uso, ataques con switch/reemplazo coordinado y más búsquedas/selecciones de zonas ocultas.
+
+Follow-up 11G.6:
+
+- Se cerraron solo mappings vacíos de daño puro para `xy1-47`, `xy1-49`, `xy1-69`, `xy1-83`, `xy1-94` y `xy1-108`.
+- No se forzaron efectos de búsqueda+attach desde mazo ni switch porque todavía necesitan contrato público seguro o aclaración de selección.
+- Quedan 107 cartas con gap real o soporte parcial; el backend no afirma soporte jugable completo de XY1.
 
 Reglas de diseño de Fase 11:
 

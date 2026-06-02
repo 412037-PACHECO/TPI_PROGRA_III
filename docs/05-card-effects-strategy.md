@@ -348,7 +348,22 @@ Límite explícito: estos handlers devuelven `PendingEffectSelection` y metadata
 - Las 99 pendientes de 11G.4 se clasifican como: 6 `DAMAGE_ONLY_SUPPORTED`, 14 `PARTIAL_SUPPORT`, 28 `REQUIRES_UI_SELECTION`, 34 `REQUIRES_CUSTOM_HANDLER` y 17 `NOT_IMPLEMENTED_YET`.
 - `DAMAGE_ONLY_SUPPORTED` significa que el motor base puede resolver daño/KO, pero todavía no equivale a `FULLY_TESTED` por cardId.
 - `REQUIRES_UI_SELECTION` separa el gap de contrato público seguro de selección/reveal/privacidad del gap del engine puro.
-- 11G.6 queda como fase necesaria para cerrar soporte jugable completo: daño dinámico, efectos `next turn`, daño a Banca/múltiples objetivos, habilidades activadas, locks y selección pública segura.
+- Un pase posterior sigue siendo necesario para cerrar soporte jugable completo: daño dinámico, efectos `next turn`, daño a Banca/múltiples objetivos, habilidades activadas, locks y selección pública segura. 11G.6 solo cerró el follow-up damage-only de bajo riesgo.
+
+## Fase 11G.6 - Follow-up damage-only
+
+11G.6 cierra solo los casos de bajo riesgo clasificados como `DAMAGE_ONLY_SUPPORTED` en 11G.5. La solución correcta para estos ataques no es crear un `NoOpEffect`, sino agregar mappings vacíos explícitos porque el daño base ya vive en `AttackDefinition` y se resuelve con `AttackService`.
+
+Cartas cerradas para alcance damage-only:
+
+- `xy1-47 Ekans / Bite`.
+- `xy1-49 Spoink / Splash`.
+- `xy1-69 Sandile / Ram` y `Darkness Fang`.
+- `xy1-83 Honedge / Pierce`.
+- `xy1-94 Swirlix / Tackle` y `Fairy Wind`.
+- `xy1-108 Lillipup / Tackle` y `Bite`.
+
+Decisión explícita: no se cerraron mappings de `SEARCH_DECK`, `ATTACH_ENERGY` desde mazo ni `SWITCH_ACTIVE` porque todavía requieren contrato de selección/reveal/shuffle o aclaración de quién elige. Forzarlos ahora produciría tests verdes pero semántica jugable dudosa.
 
 ## Cómo agregar un nuevo mapping
 
@@ -373,7 +388,7 @@ Orden recomendado para completar soporte:
 
 1. Importar/cachear las 146 cartas con `POST /api/cards/import/xy1`.
 2. Generar `Xy1AuditReport` desde `Xy1AuditService.generateReportFromLocalCache()`.
-3. Resolver primero `DAMAGE_ONLY`, `DAMAGE_PLUS_STATUS`, `DAMAGE_PLUS_HEAL`, `DRAW_CARDS`, `DISCARD_ENERGY` porque ya tienen soporte genérico parcial o completo.
+3. Resolver primero `DAMAGE_PLUS_STATUS`, `DAMAGE_PLUS_HEAL`, `DRAW_CARDS`, `DISCARD_ENERGY` y nuevos `DAMAGE_ONLY` por mapping vacío explícito cuando falten por cardId; los seis `DAMAGE_ONLY_SUPPORTED` de 11G.5 ya quedaron cerrados en 11G.6.
 4. Implementar luego handlers reutilizables para `SEARCH_DECK`, `DISCARD_CARD`, `SWITCH_ACTIVE`, `ATTACH_ENERGY`, `MOVE_ENERGY` y `MODIFY_DAMAGE`.
 5. Dejar para después efectos persistentes: `TOOL_EFFECT`, `STADIUM_EFFECT`, `ABILITY_PASSIVE`, `CONTINUOUS_EFFECT`, `PREVENT_DAMAGE`, `MODIFY_RETREAT_COST`.
 6. Solo crear handlers custom cuando una carta real no encaje razonablemente en un genérico.
