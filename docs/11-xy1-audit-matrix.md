@@ -40,6 +40,25 @@ Conteos verificados en 11G.4:
 
 Importante: esta verificación **no afirma cobertura completa jugable**. La fuente oficial descargada permite verificar conteos y existencia carta por carta, pero no reemplaza la importación/cache local del backend ni la ejecución de `Xy1AuditService`. Las 99 cartas sin fila detallada y las filas con `NOT_IMPLEMENTED_YET`/`REQUIRES_CUSTOM_HANDLER` quedan como entrada explícita para 11G.5 antes de cualquier reporte final 11F.
 
+## Fase 11G.5 - Clasificación completa de las 99 pendientes
+
+La Fase 11G.5 completa la clasificación documental de las 99 cartas que en 11G.4 estaban como `PENDING_ROW_CREATION`. No agrega handlers ni afirma jugabilidad completa: convierte la matriz de 146 IDs en una matriz clasificada con gap real por carta.
+
+Conteos post-11G.5:
+
+| Métrica | Cantidad |
+|---|---:|
+| Total oficial XY1 | 146 |
+| Cartas con clasificación documental | 146 |
+| Cartas sin fila detallada | 0 |
+| Nuevas DAMAGE_ONLY_SUPPORTED | 6 |
+| Nuevas PARTIAL_SUPPORT | 14 |
+| Nuevas REQUIRES_UI_SELECTION | 28 |
+| Nuevas REQUIRES_CUSTOM_HANDLER | 34 |
+| Nuevas NOT_IMPLEMENTED_YET | 17 |
+
+La fuente de detalle queda en `docs/12-xy1-card-by-card-verification.md`. 11G.6 queda recomendada antes de 11F para cerrar gaps de motor/selección si el equipo necesita afirmar soporte jugable completo de XY1.
+
 Herramienta interna agregada:
 
 - `Xy1AuditService`: servicio interno Spring, sin endpoint público, que lee cartas `xy1` desde `CardRepository`.

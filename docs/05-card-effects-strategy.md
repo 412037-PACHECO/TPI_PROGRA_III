@@ -340,6 +340,16 @@ Límite explícito: estos handlers devuelven `PendingEffectSelection` y metadata
 - Gaps mayores detectados para 11G.5: daño variable por monedas, efectos de duración `next turn`, daño/contadores a Banca o múltiples objetivos, habilidades activadas, búsqueda/selección de zonas ocultas con privacidad pública, y ataques con cambio/reemplazo coordinado.
 - Regla de calidad: `FULLY_TESTED` solo aplica cuando la carta o el alcance declarado están mapeados y testeados; handler genérico disponible no equivale a carta completa soportada.
 
+## Fase 11G.5 - Clasificación de las 99 pendientes
+
+11G.5 completa la clasificación documental de la matriz 146 sin implementar lógica nueva:
+
+- 146 cartas oficiales quedan listadas y clasificadas en `docs/12-xy1-card-by-card-verification.md`.
+- Las 99 pendientes de 11G.4 se clasifican como: 6 `DAMAGE_ONLY_SUPPORTED`, 14 `PARTIAL_SUPPORT`, 28 `REQUIRES_UI_SELECTION`, 34 `REQUIRES_CUSTOM_HANDLER` y 17 `NOT_IMPLEMENTED_YET`.
+- `DAMAGE_ONLY_SUPPORTED` significa que el motor base puede resolver daño/KO, pero todavía no equivale a `FULLY_TESTED` por cardId.
+- `REQUIRES_UI_SELECTION` separa el gap de contrato público seguro de selección/reveal/privacidad del gap del engine puro.
+- 11G.6 queda como fase necesaria para cerrar soporte jugable completo: daño dinámico, efectos `next turn`, daño a Banca/múltiples objetivos, habilidades activadas, locks y selección pública segura.
+
 ## Cómo agregar un nuevo mapping
 
 1. Verificar la carta contra catálogo local importado o fuente oficial de `xy1`.

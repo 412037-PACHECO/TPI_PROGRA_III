@@ -261,6 +261,14 @@ Decisiones fase 11:
 - Resultado actual: 47 cartas tienen fila detallada previa y 99 quedan con `PENDING_ROW_CREATION` para 11G.5.
 - Corrige criterios de completitud: no marcar `FULLY_TESTED` si la carta completa depende de UI/API futura, selección pública segura o tiene ataques/abilities pendientes.
 - 11F queda bloqueada por 11G.5 si el equipo necesita reporte final real de cumplimiento XY1 completo.
+
+### Fase 11G.5 - Clasificación completa de cartas pendientes
+
+- Completa la clasificación documental de las 99 cartas que en 11G.4 estaban como `PENDING_ROW_CREATION`.
+- La matriz `docs/12-xy1-card-by-card-verification.md` ahora enumera y clasifica las 146 cartas oficiales.
+- Resultado de las 99 nuevas: 6 `DAMAGE_ONLY_SUPPORTED`, 14 `PARTIAL_SUPPORT`, 28 `REQUIRES_UI_SELECTION`, 34 `REQUIRES_CUSTOM_HANDLER`, 17 `NOT_IMPLEMENTED_YET`.
+- No agrega handlers ni aumenta `FULLY_TESTED`; solo identifica gaps reales.
+- 11G.6 queda recomendada antes de 11F para cerrar gaps de Game Engine y selección pública si se busca soporte jugable completo.
 - Criterio: no se elige automáticamente cuando hay elección del jugador; pending selections conservan metadata; hand-to-deck shuffle no revela manos; mappings cerrados tienen tests y gaps restantes quedan explícitos.
 
 ### Fase 11F - Reporte final de cumplimiento XY1

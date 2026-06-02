@@ -578,6 +578,12 @@ class Xy1EffectCatalogTest {
     }
 
     @Test
+    void phase11G5DocumentCanBeCompleteWhileCatalogStillAvoidsFullCompletionClaim() {
+        assertThat(catalog.expectedCardCount()).isEqualTo(146);
+        assertThat(catalog.isCompleteAudit()).isFalse();
+    }
+
+    @Test
     void phase11G4KnownPartialCardsAreNotMarkedFullyTested() {
         for (String cardId : List.of("xy1-5", "xy1-8", "xy1-18", "xy1-21", "xy1-27", "xy1-29", "xy1-32", "xy1-95", "xy1-114", "xy1-115", "xy1-116", "xy1-118", "xy1-123", "xy1-128")) {
             assertThat(catalog.auditEntriesForCard(cardId)).singleElement().satisfies(entry -> {
