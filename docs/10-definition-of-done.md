@@ -11,6 +11,18 @@
 - No implementa validaciones de expansiones opcionales como obligatorias del alcance base; por ejemplo, AS TÁCTICO / ACE SPEC no se valida para mazos solo `xy1`.
 - Deck Builder puede persistir mazos incompletos; las reglas de mazo completo deben estar en endpoint/servicio explícito de validación, no como bloqueo del CRUD.
 
+## Persistencia de partida
+
+- Persiste metadata consultable de partida sin parsear el snapshot para listados básicos.
+- Guarda snapshot JSON completo y versionado de `GameState`, incluyendo zonas ocultas necesarias para reconstrucción.
+- Mantiene log inmutable append-only con `sequence` monotónica por partida.
+- Snapshot, log y metadata se actualizan de forma consistente después de cada acción relevante aceptada.
+- Reconstruye desde el último snapshot y aplica/verifica logs posteriores en orden.
+- No acopla el engine a entidades JPA, repositorios, DTOs REST ni WebSocket.
+- No expone `GameState` crudo ni logs privados como vista pública de frontend.
+- Documenta `snapshotVersion`/versión de formato del snapshot y estrategia ante cambios de formato.
+- Tiene tests de reconstrucción, duplicados/fuera de orden, privacidad de datos y consistencia de metadata.
+
 ## Game Engine
 
 - Implementa la regla oficial o documenta explícitamente cualquier decisión pendiente.

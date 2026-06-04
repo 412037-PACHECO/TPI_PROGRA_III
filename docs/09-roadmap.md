@@ -288,11 +288,19 @@ Decisiones fase 11:
 
 ## Fase 12 - Persistencia de snapshots/logs
 
-- Objetivo: guardar/reconstruir partida.
-- Entregables: snapshots versionados, log inmutable.
+- Objetivo: guardar y reconstruir una partida completa para cubrir RF-03/RF-05 sin acoplar el engine a JPA.
+- Entregables: metadata consultable de partida (`GameSessionEntity`), snapshots JSON completos de `GameState` (`GameSnapshotEntity`), log inmutable append-only con `sequence` (`GameActionLogEntity`), repositorios/servicio de aplicación para persistir después de acciones relevantes y reconstrucción desde último snapshot.
 - Dependencias: Game State estable y auditoría/mapping incremental para efectos ejecutables.
-- Riesgos: pérdida de información oculta.
-- Criterio: reconstrucción exacta en tests.
+- Riesgos: pérdida de información oculta, filtración de zonas privadas si se expone el snapshot crudo, incompatibilidad al cambiar el formato de `GameState`, secuencias duplicadas o gaps por concurrencia.
+- Criterio: reconstrucción exacta en tests desde último snapshot + logs posteriores; metadata coincide con el estado reconstruido; logs son append-only; el engine sigue sin depender de entidades JPA/Spring/API.
+
+Decisiones fase 12:
+
+- No se normaliza todo el estado interno en tablas relacionales; el `GameState` completo se guarda como JSON versionado para evitar duplicar el modelo mutable del engine.
+- Se normaliza solo lo necesario para consulta operativa: `gameId`, jugadores, estado, timestamps, ganador/resultado, turno/fase y `sequence`.
+- Las entidades de persistencia (`GameSessionEntity`, `GameSnapshotEntity`, `GameActionLogEntity`) quedan separadas de los modelos del engine.
+- El log no reemplaza al snapshot: explica y audita la transición, mientras el snapshot acelera recuperación/reconexión.
+- No se agregan todavía endpoints REST de juego, WebSocket, frontend ni vistas seguras por jugador; quedan como próximo paso de API de partidas.
 
 ## Fase 13 - WebSockets
 

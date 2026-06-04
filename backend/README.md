@@ -415,6 +415,27 @@ POST /api/cards/import/xy1
 
 Luego verificá que haya 146 cartas cacheadas antes de cerrar la auditoría completa.
 
+## Persistencia de partidas: RF-03/RF-05
+
+La persistencia interna de partidas está implementada como Fase 12 y documentada en `docs/06-persistence-strategy.md`. A nivel backend incluye:
+
+- `GameSessionEntity`: metadata normalizada y consultable por `gameId`, jugadores, estado, turno/fase, ganador y timestamps.
+- `GameSnapshotEntity`: `GameState` completo serializado como snapshot JSON versionado, con `sequence`, `reason`, referencia opcional al log y selección pendiente interna cuando exista.
+- `GameActionLogEntity`: log inmutable append-only de comandos/resultados/eventos con `sequence` monotónica por partida.
+- `GamePersistenceService`: guarda snapshot, recupera último snapshot, reconstruye `GameState`, persiste logs y coordina snapshot+log de una acción resuelta.
+- Entidades de persistencia separadas del engine; `game/domain` y `game/engine` siguen sin depender de JPA, controllers, WebSocket ni API externa.
+
+No se mapea todo el `GameState` a tablas relacionales porque eso duplicaría el modelo mutable del engine: zonas ocultas, orden de mazo, premios, evolución, attachments, condiciones especiales, efectos persistentes y selecciones pendientes cambian con las reglas. El snapshot JSON conserva fidelidad completa; la metadata normalizada cubre las consultas operativas.
+
+Limitaciones actuales:
+
+- No hay todavía endpoints REST públicos de partida; la capa queda lista para una API/application layer posterior.
+- No hay WebSocket/reconexión ni vistas seguras por jugador.
+- El snapshot/log crudo puede contener información privada y no debe exponerse como contrato de frontend.
+- La persistencia de partida no implica soporte jugable completo de todas las cartas XY1; la auditoría de efectos sigue siendo incremental.
+
+Próximo paso recomendado: diseñar la API de partidas sobre esta base para crear partida, ejecutar comandos, consultar estado seguro por jugador e historial filtrado, sin mover reglas de juego a controllers.
+
 ## Endpoints de catálogo
 
 ### Importar/cachear XY1
@@ -605,7 +626,7 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Mapeo completo de todos los efectos XY1.
 - Parseo automático de texto natural de cartas.
 - Endpoints REST de juego.
-- Persistencia de partidas.
+- Endpoints REST públicos de partida; la persistencia interna de sesión/snapshot/log ya existe para RF-03/RF-05.
 - WebSocket/realtime.
 - Frontend.
 - Regla ACE SPEC obligatoria para `xy1`.
