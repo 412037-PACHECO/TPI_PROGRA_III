@@ -2,7 +2,7 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 17 - Gameplay realtime seguro
+## Alcance actual: Fase 18 - Trainers y selecciones seguras
 
 El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y motor extensible de efectos. La Fase 11 agrega auditoría progresiva de cartas reales XY1 y un primer catálogo explícito de mappings hacia `EffectDefinition`, sin intentar cubrir todo XY1 de golpe y sin parser automático de texto natural.
 
@@ -53,6 +53,7 @@ Incluye:
 - API REST básica de partidas para crear sala en espera, unirse, consultar metadata, listar salas en espera y consultar historial persistido.
 - Proyección segura por jugador para devolver estado de partida desde la perspectiva del solicitante sin filtrar mano, orden de mazo, premios ocultos ni selecciones privadas del rival.
 - WebSocket/STOMP backend para eventos realtime de sesión, envío de vistas seguras por jugador, reconexión básica y publicación de acciones jugables estructurales.
+- Endpoints backend para jugar Trainers soportados y resolver `PendingEffectSelection` con vistas seguras, persistencia y realtime.
 
 ## Modelo Game State
 
@@ -373,7 +374,7 @@ Fase 11E.5 cierra casos custom puntuales sin declarar cobertura total:
 - `xy1-117 Fairy Garden`: Estadio continuo que deja en 0 el coste de retirada de Pokémon con Energía Fairy-providing unida.
 - `PendingEffectSelection`: conserva metadata interna de reveal, shuffle y continuación para selecciones pendientes.
 
-Esto no implica soporte completo de Trainers, Stadiums, Tools ni efectos continuos. La ejecución pública de Trainers que requieren selección desde mazo/mano, reveal, shuffle o privacidad de zonas ocultas sigue limitada porque no hay endpoints REST de partida, WebSocket, frontend ni vistas seguras por jugador.
+Esto no implica soporte completo de Trainers, Stadiums, Tools ni efectos continuos. La ejecución pública de Trainers soportados ahora usa endpoints REST seguros, vistas por jugador y realtime; los gaps restantes son reglas no mapeadas, autenticación real, `selectionId` fuerte/versionado y hardening de privacidad avanzado.
 
 Fase 11G.2 agrega infraestructura reactiva acotada:
 
@@ -384,7 +385,7 @@ Fase 11G.2 agrega infraestructura reactiva acotada:
 Gaps documentados actualizados en 11G.5:
 
 - La trazabilidad oficial tiene 146 cartas y 11G.5 ya clasifica documentalmente todas; queda pendiente 11G.6 para cerrar gaps de soporte jugable.
-- Trainers complejos como `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Red Card`, `Shauna` y `Super Potion` cuentan con handlers internos para el alcance engine actual; todavía requieren contrato público de selección/privacidad/top-N/mano completa antes de exponerlos por API/UI/WebSocket.
+- Trainers complejos como `Cassius`, `Evosoda`, `Great Ball`, `Max Revive`, `Professor Sycamore`, `Professor's Letter`, `Red Card`, `Shauna` y `Super Potion` cuentan con handlers internos y contrato público backend para `play-trainer`/`resolve-selection`; frontend/auth quedan fuera de alcance.
 - `Professor's Letter` queda como mapping interno, no `FULLY_TESTED`, porque depende de selección/reveal seguro desde zona oculta para soporte público.
 - `Sweet Veil`, `Spiky Shield`, `Fur Coat`, `Shadow Circle` y `Rainbow Energy` tienen alcances internos cerrados/testeados, pero una carta completa no debe marcarse completa si otro ataque/ability de esa misma carta sigue sin mapear.
 - Gaps engine mayores para 11G.6: daño variable por monedas, efectos con duración `next turn`, daño/contadores a Banca o múltiples objetivos, habilidades activadas con límites de uso, ataques con switch/reemplazo coordinado y más búsquedas/selecciones de zonas ocultas.
@@ -750,11 +751,12 @@ POST /api/games/{gameId}/setup/complete?playerId=player-one&startingPlayerId=pla
 - `POST /api/games/{gameId}/actions/attack`
 - `POST /api/games/{gameId}/actions/end-turn`
 - `POST /api/games/{gameId}/actions/replace-active`
+- `POST /api/games/{gameId}/actions/play-trainer`
+- `POST /api/games/{gameId}/actions/resolve-selection`
 
-No se exponen todavía:
+`play-trainer` recibe `playerId`, `trainerCardInstanceId` y `target` opcional para Tool/efectos que lo requieran. Ejecuta la acción estructural de Trainer, aplica mapping XY1 si existe, persiste `PendingEffectSelection` cuando el efecto necesita elección y publica realtime.
 
-- `play-trainer`: el engine tiene acción estructural para mover Trainer, pero no contrato público seguro completo para ejecutar todos sus efectos textuales.
-- `resolve-selection`: `PendingEffectSelection` existe como metadata segura, pero no hay resolver público genérico para aplicar selecciones y continuation effects sin riesgo de reglas inventadas.
+`resolve-selection` recibe `playerId`, `selectionId` opcional, `selectedCardIds` y `target` opcional. En el alcance actual se resuelve la única selección pendiente activa del último snapshot; `selectionId` fuerte/versionado queda para hardening futuro.
 
 ## WebSocket/STOMP
 
@@ -775,7 +777,7 @@ Application destination prefix:
 
 Canales usados:
 
-- `/topic/games/{gameId}/events`: eventos públicos de sesión/reconexión/gameplay (`GAME_CREATED`, `GAME_STARTED`, `PLAYER_JOINED`, `SETUP_UPDATED`, `LOG_UPDATED`, `PLAYER_RECONNECTED`, `TURN_STARTED`, `BASIC_PLAYED`, `ENERGY_ATTACHED`, `POKEMON_EVOLVED`, `RETREAT_PERFORMED`, `ATTACK_DECLARED`, `TURN_ENDED`, `ACTIVE_REPLACED`, `GAME_FINISHED`).
+- `/topic/games/{gameId}/events`: eventos públicos de sesión/reconexión/gameplay (`GAME_CREATED`, `GAME_STARTED`, `PLAYER_JOINED`, `SETUP_UPDATED`, `LOG_UPDATED`, `PLAYER_RECONNECTED`, `TURN_STARTED`, `BASIC_PLAYED`, `ENERGY_ATTACHED`, `POKEMON_EVOLVED`, `RETREAT_PERFORMED`, `ATTACK_DECLARED`, `TURN_ENDED`, `ACTIVE_REPLACED`, `TRAINER_PLAYED`, `SELECTION_REQUIRED`, `SELECTION_RESOLVED`, `GAME_FINISHED`).
 - `/queue/games/{gameId}/players/{playerId}/view`: vista segura para ese jugador.
 - `/queue/games/{gameId}/players/{playerId}/log`: log público/sanitizado para ese jugador.
 
@@ -813,11 +815,11 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Partida completa jugable de punta a punta vía API pública.
 - Daño a Banca.
 - Flujo completo de Muerte Súbita.
-- Efectos complejos de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.
+- Efectos complejos no mapeados de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.
 - Mapeo completo de todos los efectos XY1.
 - Parseo automático de texto natural de cartas.
 - Gameplay realtime avanzado con ordenamiento/idempotencia fuerte, reconexión autenticada y hardening de colas por usuario.
-- Endpoints públicos de `play-trainer` y `resolve-selection` hasta cerrar contrato seguro de efectos/pending selections.
+- `selectionId` fuerte/versionado, auth real y hardening avanzado de consumo de colas privadas.
 - Frontend.
 - Autenticación real/JWT; por ahora `playerId`/`viewerPlayerId` selecciona perspectiva y debe endurecerse con sesión/token.
 - Regla ACE SPEC obligatoria para `xy1`.

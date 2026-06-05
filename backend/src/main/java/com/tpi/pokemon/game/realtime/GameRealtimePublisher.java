@@ -64,13 +64,30 @@ public class GameRealtimePublisher {
             List<GameLogPublicView> log,
             boolean gameFinished
     ) {
+        publishGameplayAction(gameId, eventType, actorPlayerId, actionType, playerOneView, playerTwoView, log, gameFinished, false);
+    }
+
+    public void publishGameplayAction(
+            String gameId,
+            GameRealtimeEventType eventType,
+            String actorPlayerId,
+            String actionType,
+            GameViewResponse playerOneView,
+            GameViewResponse playerTwoView,
+            List<GameLogPublicView> log,
+            boolean gameFinished,
+            boolean selectionRequired
+    ) {
         publishPublicEvent(GameRealtimeEvent.of(
                 gameId,
                 eventType,
                 actorPlayerId,
                 actionType + " applied",
-                Map.of("actionType", actionType, "actorPlayerId", actorPlayerId)
+                Map.of("actionType", actionType, "actorPlayerId", actorPlayerId, "selectionRequired", selectionRequired)
         ));
+        if (selectionRequired && eventType != GameRealtimeEventType.SELECTION_REQUIRED) {
+            publishPublicEvent(GameRealtimeEvent.of(gameId, GameRealtimeEventType.SELECTION_REQUIRED, actorPlayerId, "Selection required", Map.of("actionType", actionType, "actorPlayerId", actorPlayerId)));
+        }
         publishSafeView(playerOneView);
         publishSafeView(playerTwoView);
         publishSafeLog(gameId, playerOneView.viewerPlayerId(), log);

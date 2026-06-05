@@ -367,7 +367,18 @@ Decisiones fase 12:
 - Riesgos: `playerId` sigue siendo selector de perspectiva hasta agregar autenticación; clientes concurrentes pueden necesitar versión de estado para reconciliación avanzada.
 - Criterio: acción válida publica evento/vistas/log; acción inválida no publica éxito ni persiste snapshot falso; player one/player two reciben vistas distintas y seguras.
 
-## Fase 18 - Tests fuertes
+## Fase 18 - Trainers y selecciones seguras
+
+- Estado: implementada como contrato backend inicial, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: cerrar `play-trainer` y `resolve-selection` para Trainers XY1 soportados sin filtrar zonas ocultas.
+- Entregables: endpoints `POST /api/games/{gameId}/actions/play-trainer` y `POST /api/games/{gameId}/actions/resolve-selection`, DTOs de request, resolver puro de `PendingEffectSelection`, integración con `EffectExecutionService`/`Xy1EffectCatalog`, persistencia de pending selection, limpieza al resolver, eventos realtime `TRAINER_PLAYED`, `SELECTION_REQUIRED`, `SELECTION_RESOLVED` y tests mínimos.
+- Decisión: el snapshot mantiene una única `PendingEffectSelection` activa; `selectionId` se acepta como campo opcional del request pero queda sin enforcement fuerte hasta versionar/identificar pending selections.
+- Decisión: los candidatos privados solo viajan en `GameViewResponse` del jugador autorizado; eventos públicos no incluyen `candidateCardIds`.
+- Fuera de alcance: frontend, auth/JWT, parser automático, nuevas expansiones, refactor masivo del engine y cobertura completa de todos los textos XY1.
+- Riesgos: selección opcional vacía y efectos con múltiples objetivos requieren pruebas locales completas; hardening futuro debe agregar ID/version de selección y colas autenticadas.
+- Criterio: Trainer soportado ejecuta acción + efecto, pending se persiste, resolve valida jugador/cantidad/candidatos, realtime publica vistas/logs seguros y no se exponen raw snapshots/logs.
+
+## Fase 19 - Tests fuertes y hardening final backend
 
 - Objetivo: cobertura y casos críticos.
 - Entregables: unit/integration/WS/E2E mínimos.
@@ -375,7 +386,7 @@ Decisiones fase 12:
 - Riesgos: tests frágiles.
 - Criterio: JaCoCo >=80% y críticos >90%.
 
-## Fase 19 - Preparación para frontend
+## Fase 20 - Preparación para frontend
 
 - Objetivo: contratos estables para Angular.
 - Entregables: OpenAPI, DTOs, eventos, vistas seguras.

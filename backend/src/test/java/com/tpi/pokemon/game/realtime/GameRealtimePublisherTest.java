@@ -93,6 +93,20 @@ class GameRealtimePublisherTest {
         verify(messagingTemplate).convertAndSend(eq("/queue/games/game-1/players/player-two/log"), org.mockito.Mockito.any(GameLogUpdatedEvent.class));
     }
 
+    @Test
+    void publishesSelectionRequiredWithoutCandidateIdsInPublicEvent() {
+        GameViewResponse playerOneView = view("player-one", 2, 3);
+        GameViewResponse playerTwoView = view("player-two", 3, 2);
+
+        publisher.publishGameplayAction("game-1", GameRealtimeEventType.TRAINER_PLAYED, "player-one", "PLAY_TRAINER", playerOneView, playerTwoView, List.of(publicLog()), false, true);
+
+        ArgumentCaptor<GameRealtimeEvent> publicEvent = ArgumentCaptor.forClass(GameRealtimeEvent.class);
+        verify(messagingTemplate, org.mockito.Mockito.times(3)).convertAndSend(eq("/topic/games/game-1/events"), publicEvent.capture());
+        assertThat(publicEvent.getAllValues()).extracting(GameRealtimeEvent::type)
+                .containsExactly(GameRealtimeEventType.TRAINER_PLAYED, GameRealtimeEventType.SELECTION_REQUIRED, GameRealtimeEventType.LOG_UPDATED);
+        assertThat(publicEvent.getAllValues()).allSatisfy(event -> assertThat(event.payload()).doesNotContainKey("candidateCardIds"));
+    }
+
     private GameSessionSummary session() {
         Instant now = Instant.parse("2026-06-05T00:00:00Z");
         return new GameSessionSummary("game-1", "player-one", "player-two", "CREATED", null, 0, "NOT_STARTED", null, now, now);

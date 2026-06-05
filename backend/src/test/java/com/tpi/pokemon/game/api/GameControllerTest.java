@@ -149,6 +149,8 @@ class GameControllerTest {
         GameViewResponse view = safeView("game-1", "player-one");
         when(gameplayService.startTurn("game-1", new StartTurnRequest("player-one"))).thenReturn(view);
         when(gameplayService.playBasic("game-1", new PlayBasicPokemonRequest("player-one", "card-1"))).thenReturn(view);
+        when(gameplayService.playTrainer("game-1", new PlayTrainerRequest("player-one", "trainer-1", null))).thenReturn(view);
+        when(gameplayService.resolveSelection("game-1", new ResolveSelectionRequest("player-one", null, List.of("card-1"), null))).thenReturn(view);
 
         mockMvc.perform(post("/api/games/game-1/actions/start-turn")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,6 +160,16 @@ class GameControllerTest {
         mockMvc.perform(post("/api/games/game-1/actions/play-basic")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new PlayBasicPokemonRequest("player-one", "card-1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewerPlayerId").value("player-one"));
+        mockMvc.perform(post("/api/games/game-1/actions/play-trainer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PlayTrainerRequest("player-one", "trainer-1", null))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewerPlayerId").value("player-one"));
+        mockMvc.perform(post("/api/games/game-1/actions/resolve-selection")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ResolveSelectionRequest("player-one", null, List.of("card-1"), null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.viewerPlayerId").value("player-one"));
     }

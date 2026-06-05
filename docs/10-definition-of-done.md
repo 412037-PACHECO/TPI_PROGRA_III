@@ -89,6 +89,18 @@
 - No expone endpoints falsos para reglas sin contrato seguro, como pending selections o Trainers complejos.
 - Documenta gaps explícitos.
 
+## Trainers y selecciones pendientes
+
+- `play-trainer` valida jugador, turno/fase, carta en mano y tipo Trainer mediante engine.
+- Respeta límites oficiales ya modelados: Item sin límite, Supporter/Stadium una vez por turno y Tool única por Pokémon.
+- Ejecuta solo mappings soportados; no interpreta texto natural.
+- Si el efecto requiere elección, persiste `PendingEffectSelection` en el snapshot más reciente.
+- `resolve-selection` valida jugador autorizado, min/max y candidatos permitidos antes de ejecutar la continuación.
+- Al resolver completamente, persiste snapshot sin selección pendiente fantasma.
+- Eventos públicos no incluyen `candidateCardIds` ni cartas ocultas no reveladas.
+- Vistas seguras muestran candidatos solo al jugador que debe elegir.
+- Realtime publica `TRAINER_PLAYED`, `SELECTION_REQUIRED` y/o `SELECTION_RESOLVED` según corresponda.
+
 ## Prueba
 
 - Valida comportamiento real, no implementación accidental.

@@ -374,6 +374,62 @@ class EffectDirectHandlersTest {
         assertThat(eventsOfType(events, PrizeCardsTakenEvent.class)).hasSize(1);
     }
 
+    @Test
+    void pendingSelectionResolverValidatesCandidatesAndResolvesSearchDeck() {
+        CardInstance energy = energy("search-energy", PLAYER_ONE);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(energy), List.of(), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        PendingEffectSelection pending = new PendingEffectSelection(
+                PLAYER_ONE,
+                EffectType.SEARCH_DECK,
+                "trainer-source",
+                EffectCardZone.DECK,
+                EffectTarget.ACTING_PLAYER,
+                0,
+                1,
+                CardFilterSpec.supertype(CardSupertype.ENERGY),
+                true,
+                true,
+                EffectDefinition.searchDeck(EffectTarget.ACTING_PLAYER, 1, CardFilterSpec.supertype(CardSupertype.ENERGY), List.of(), true, true, EffectTiming.ON_PLAY_TRAINER),
+                List.of(energy.id())
+        );
+
+        EffectResult result = new PendingEffectSelectionResolver().resolve(state, pending, new ResolvePendingEffectSelectionCommand(PLAYER_ONE, List.of(energy.id()), null));
+
+        assertThat(result.pendingSelectionOptional()).isEmpty();
+        assertThat(result.state().getPlayerOneState().getHand().getCards()).extracting(CardInstance::id).containsExactly(energy.id());
+        assertThat(result.state().getPlayerOneState().getDeck().getCards()).isEmpty();
+        assertThat(eventsOfType(result.state().getEvents(), DeckSearchedEvent.class)).hasSize(1);
+        assertThat(eventsOfType(result.state().getEvents(), DeckShuffledEvent.class)).hasSize(1);
+    }
+
+    @Test
+    void pendingSelectionResolverRejectsWrongPlayerAndInvalidCandidate() {
+        CardInstance energy = energy("candidate-energy", PLAYER_ONE);
+        GameState state = game(player(PLAYER_ONE, active("p1-active", PLAYER_ONE, 60), List.of(energy), List.of(), List.of(), List.of()), player(PLAYER_TWO, active("p2-active", PLAYER_TWO, 60), List.of(), List.of(), List.of(), List.of()));
+        PendingEffectSelection pending = new PendingEffectSelection(
+                PLAYER_ONE,
+                EffectType.SEARCH_DECK,
+                "trainer-source",
+                EffectCardZone.DECK,
+                EffectTarget.ACTING_PLAYER,
+                0,
+                1,
+                CardFilterSpec.supertype(CardSupertype.ENERGY),
+                true,
+                true,
+                EffectDefinition.searchDeck(EffectTarget.ACTING_PLAYER, 1, CardFilterSpec.supertype(CardSupertype.ENERGY), List.of(), true, true, EffectTiming.ON_PLAY_TRAINER),
+                List.of(energy.id())
+        );
+
+        PendingEffectSelectionResolver resolver = new PendingEffectSelectionResolver();
+        assertThatThrownBy(() -> resolver.resolve(state, pending, new ResolvePendingEffectSelectionCommand(PLAYER_TWO, List.of(energy.id()), null)))
+                .isInstanceOf(EffectException.class)
+                .hasMessageContaining("pending selection player");
+        assertThatThrownBy(() -> resolver.resolve(state, pending, new ResolvePendingEffectSelectionCommand(PLAYER_ONE, List.of(new CardInstanceId("missing")), null)))
+                .isInstanceOf(EffectException.class)
+                .hasMessageContaining("pending candidates");
+    }
+
     private EffectExecutionContext context(GameState state, List<GameEvent> events) {
         return new EffectExecutionContext(state, PLAYER_ONE, PLAYER_TWO, "direct-effect", events, () -> CoinFlipResult.HEADS);
     }

@@ -13,8 +13,10 @@ import com.tpi.pokemon.game.api.DeclareAttackRequest;
 import com.tpi.pokemon.game.api.EndTurnRequest;
 import com.tpi.pokemon.game.api.EvolvePokemonRequest;
 import com.tpi.pokemon.game.api.PlayBasicPokemonRequest;
+import com.tpi.pokemon.game.api.PlayTrainerRequest;
 import com.tpi.pokemon.game.api.PokemonTargetRequest;
 import com.tpi.pokemon.game.api.ReplaceActiveRequest;
+import com.tpi.pokemon.game.api.ResolveSelectionRequest;
 import com.tpi.pokemon.game.api.RetreatRequest;
 import com.tpi.pokemon.game.api.StartGameRequest;
 import com.tpi.pokemon.game.api.StartTurnRequest;
@@ -28,6 +30,7 @@ import com.tpi.pokemon.game.domain.value.GameId;
 import com.tpi.pokemon.game.domain.value.PlayerId;
 import com.tpi.pokemon.game.engine.action.AttachEnergyCommand;
 import com.tpi.pokemon.game.engine.action.EvolvePokemonCommand;
+import com.tpi.pokemon.game.engine.action.PlayTrainerCommand;
 import com.tpi.pokemon.game.engine.action.PokemonTarget;
 import com.tpi.pokemon.game.engine.action.PokemonTargetZone;
 import com.tpi.pokemon.game.engine.action.PutBasicPokemonOnBenchCommand;
@@ -35,6 +38,15 @@ import com.tpi.pokemon.game.engine.action.RetreatActivePokemonCommand;
 import com.tpi.pokemon.game.engine.action.TurnActionService;
 import com.tpi.pokemon.game.engine.attack.AttackService;
 import com.tpi.pokemon.game.engine.attack.DeclareAttackCommand;
+import com.tpi.pokemon.game.engine.effect.EffectDefinition;
+import com.tpi.pokemon.game.engine.effect.EffectExecutionContext;
+import com.tpi.pokemon.game.engine.effect.EffectExecutionService;
+import com.tpi.pokemon.game.engine.effect.EffectResult;
+import com.tpi.pokemon.game.engine.effect.PendingEffectSelection;
+import com.tpi.pokemon.game.engine.effect.PendingEffectSelectionResolver;
+import com.tpi.pokemon.game.engine.effect.ResolvePendingEffectSelectionCommand;
+import com.tpi.pokemon.game.engine.effect.mapping.Xy1EffectCatalog;
+import com.tpi.pokemon.game.engine.event.GameEvent;
 import com.tpi.pokemon.game.engine.knockout.ActivePokemonReplacementResolver;
 import com.tpi.pokemon.game.engine.knockout.ReplaceActivePokemonCommand;
 import com.tpi.pokemon.game.engine.setup.ChooseInitialPokemonCommand;
@@ -48,6 +60,7 @@ import com.tpi.pokemon.game.realtime.GameRealtimePublisher;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -66,6 +79,9 @@ public class GameplayApplicationService {
     private final TurnActionService turnActionService = new TurnActionService();
     private final AttackService attackService = new AttackService(turnManager);
     private final ActivePokemonReplacementResolver replacementResolver = new ActivePokemonReplacementResolver(turnManager);
+    private final EffectExecutionService effectExecutionService = new EffectExecutionService();
+    private final PendingEffectSelectionResolver pendingSelectionResolver = new PendingEffectSelectionResolver();
+    private final Xy1EffectCatalog xy1EffectCatalog = new Xy1EffectCatalog();
 
     public GameplayApplicationService(GamePersistenceService persistenceService, GameQueryService queryService, DeckService deckService, DeckValidator deckValidator, CardRepository cardRepository, GameDeckCardMapper cardMapper, GameRealtimePublisher realtimePublisher) {
         this.persistenceService = persistenceService;
@@ -172,6 +188,41 @@ public class GameplayApplicationService {
         return executeAndView(gameId, player, "REPLACE_ACTIVE", GameRealtimeEventType.ACTIVE_REPLACED, request, state -> replacementResolver.replaceActive(state, new ReplaceActivePokemonCommand(player, request.benchIndex())));
     }
 
+    @Transactional
+    public GameViewResponse playTrainer(String gameId, PlayTrainerRequest request) {
+        requireBody(request);
+        PlayerId player = player(request == null ? null : request.playerId(), "playerId");
+        CardInstanceId trainerCardId = cardId(request.trainerCardInstanceId(), "trainerCardInstanceId");
+        GameState current = requireState(gameId);
+        requirePlayerInGame(current, player);
+        CardInstance trainer = requireCardInHand(current, player, trainerCardId);
+        GameState trainerPlayed = applyEngineAction(current, state -> turnActionService.playTrainer(state, new PlayTrainerCommand(player, trainerCardId, Optional.ofNullable(request.target()).map(this::target))));
+        EffectResult effectResult = executeTrainerEffects(trainerPlayed, player, trainer);
+        GameState updated = effectResult.state();
+        PendingEffectSelection pending = effectResult.pendingSelection();
+        persistAction(updated, player, "PLAY_TRAINER", request, current, pending, pending == null ? "PLAY_TRAINER" : "SELECTION_REQUIRED");
+        publishGameplayAfterCommit(updated, player, "PLAY_TRAINER", GameRealtimeEventType.TRAINER_PLAYED, pending != null);
+        return queryService.view(gameId, player.value());
+    }
+
+    @Transactional
+    public GameViewResponse resolveSelection(String gameId, ResolveSelectionRequest request) {
+        requireBody(request);
+        PlayerId player = player(request == null ? null : request.playerId(), "playerId");
+        GameState current = requireState(gameId);
+        requirePlayerInGame(current, player);
+        PendingEffectSelection pending = persistenceService.loadLatestPendingEffectSelection(new GameId(gameId))
+                .orElseThrow(() -> new InvalidGameCommandException("No pending selection exists for game " + gameId));
+        List<CardInstanceId> selected = cardIds(request.selectedCardIds());
+        Integer targetBenchIndex = request.target() == null ? null : targetBenchIndex(request.target());
+        EffectResult result = applyEngineEffect(() -> pendingSelectionResolver.resolve(current, pending, new ResolvePendingEffectSelectionCommand(player, selected, targetBenchIndex)));
+        GameState updated = result.state();
+        PendingEffectSelection nextPending = result.pendingSelection();
+        persistAction(updated, player, "RESOLVE_SELECTION", request, current, nextPending, nextPending == null ? "SELECTION_RESOLVED" : "SELECTION_REQUIRED");
+        publishGameplayAfterCommit(updated, player, "RESOLVE_SELECTION", GameRealtimeEventType.SELECTION_RESOLVED, nextPending != null);
+        return queryService.view(gameId, player.value());
+    }
+
     private GameViewResponse executeAndView(String gameId, PlayerId player, String actionType, GameRealtimeEventType eventType, Object request, java.util.function.Function<GameState, GameState> action) {
         GameState current = requireState(gameId);
         requirePlayerInGame(current, player);
@@ -192,16 +243,51 @@ public class GameplayApplicationService {
         } catch (RuntimeException exception) {
             throw new InvalidGameCommandException(exception.getMessage());
         }
-        List<Map<String, String>> eventDelta = updated.getEvents().stream()
-                .skip(current.getEvents().size())
-                .map(event -> Map.of("type", event.getClass().getSimpleName()))
-                .toList();
-        persistenceService.persistActionResult(updated, new GameActionLogCommand(updated.getGameId(), actor, actionType, commandPayload, Map.of("status", updated.getStatus().name()), eventDelta), null, actionType);
+        persistAction(updated, actor, actionType, commandPayload, current, null, actionType);
         publishGameplayAfterCommit(updated, actor, actionType, eventType);
         return updated;
     }
 
+    private GameState applyEngineAction(GameState current, java.util.function.Function<GameState, GameState> action) {
+        try {
+            return action.apply(current);
+        } catch (RuntimeException exception) {
+            throw new InvalidGameCommandException(exception.getMessage());
+        }
+    }
+
+    private EffectResult applyEngineEffect(java.util.function.Supplier<EffectResult> action) {
+        try {
+            return action.get();
+        } catch (RuntimeException exception) {
+            throw new InvalidGameCommandException(exception.getMessage());
+        }
+    }
+
+    private EffectResult executeTrainerEffects(GameState state, PlayerId player, CardInstance trainer) {
+        List<EffectDefinition> effects = xy1EffectCatalog.effectsForTrainer(trainer.definition().cardId());
+        if (effects.isEmpty()) {
+            return new EffectResult(state);
+        }
+        List<GameEvent> events = new ArrayList<>(state.getEvents());
+        EffectExecutionContext context = new EffectExecutionContext(state, player, opponent(state, player), trainer.id().value(), events, () -> com.tpi.pokemon.game.engine.random.CoinFlipResult.HEADS);
+        EffectResult result = applyEngineEffect(() -> effectExecutionService.executeAll(effects, context));
+        return new EffectResult(withEvents(result.state(), events), result.pendingSelection());
+    }
+
+    private void persistAction(GameState updated, PlayerId actor, String actionType, Object commandPayload, GameState previous, PendingEffectSelection pending, String snapshotReason) {
+        List<Map<String, String>> eventDelta = updated.getEvents().stream()
+                .skip(previous.getEvents().size())
+                .map(event -> Map.of("type", event.getClass().getSimpleName()))
+                .toList();
+        persistenceService.persistActionResult(updated, new GameActionLogCommand(updated.getGameId(), actor, actionType, commandPayload, Map.of("status", updated.getStatus().name()), eventDelta), pending, snapshotReason);
+    }
+
     private void publishGameplayAfterCommit(GameState updated, PlayerId actor, String actionType, GameRealtimeEventType eventType) {
+        publishGameplayAfterCommit(updated, actor, actionType, eventType, false);
+    }
+
+    private void publishGameplayAfterCommit(GameState updated, PlayerId actor, String actionType, GameRealtimeEventType eventType, boolean selectionRequired) {
         String gameId = updated.getGameId().value();
         String playerOneId = updated.getPlayerOneState().getPlayerId().value();
         String playerTwoId = updated.getPlayerTwoState().getPlayerId().value();
@@ -209,7 +295,7 @@ public class GameplayApplicationService {
         GameViewResponse playerTwoView = queryService.view(gameId, playerTwoId);
         List<GameLogPublicView> publicLog = queryService.publicHistory(gameId, playerOneId);
         boolean finished = updated.getStatus() == GameStatus.FINISHED;
-        publishAfterCommit(() -> realtimePublisher.publishGameplayAction(gameId, eventType, actor.value(), actionType, playerOneView, playerTwoView, publicLog, finished));
+        publishAfterCommit(() -> realtimePublisher.publishGameplayAction(gameId, eventType, actor.value(), actionType, playerOneView, playerTwoView, publicLog, finished, selectionRequired));
     }
 
     private void publishAfterCommit(Runnable publication) {
@@ -231,6 +317,29 @@ public class GameplayApplicationService {
         } catch (GamePersistenceException exception) {
             throw new GameNotInExpectedStateException(exception.getMessage());
         }
+    }
+
+    private PlayerId opponent(GameState state, PlayerId player) {
+        if (state.getPlayerOneState().getPlayerId().equals(player)) return state.getPlayerTwoState().getPlayerId();
+        if (state.getPlayerTwoState().getPlayerId().equals(player)) return state.getPlayerOneState().getPlayerId();
+        throw new UnauthorizedGameActionException("Player " + player.value() + " is not part of game " + state.getGameId().value());
+    }
+
+    private GameState withEvents(GameState state, List<GameEvent> events) {
+        return new GameState(state.getGameId(), state.getStatus(), state.getPlayerOneState(), state.getPlayerTwoState(), state.getTurnState(), state.getActiveStadium().orElse(null), state.getFinishResult().orElse(null), state.getPendingActiveReplacement().orElse(null), events);
+    }
+
+    private CardInstance requireCardInHand(GameState state, PlayerId player, CardInstanceId cardId) {
+        return playerState(state, player).getHand().getCards().stream()
+                .filter(card -> card.id().equals(cardId))
+                .findFirst()
+                .orElseThrow(() -> new InvalidGameCommandException("Card must be in hand"));
+    }
+
+    private com.tpi.pokemon.game.domain.model.PlayerGameState playerState(GameState state, PlayerId player) {
+        if (state.getPlayerOneState().getPlayerId().equals(player)) return state.getPlayerOneState();
+        if (state.getPlayerTwoState().getPlayerId().equals(player)) return state.getPlayerTwoState();
+        throw new UnauthorizedGameActionException("Player " + player.value() + " is not part of game " + state.getGameId().value());
     }
 
     private DeckEntity validDeck(Long deckId) {
@@ -290,6 +399,11 @@ public class GameplayApplicationService {
         if (zone == PokemonTargetZone.ACTIVE) return PokemonTarget.active();
         if (request.benchIndex() == null) throw new InvalidGameCommandException("target.benchIndex is required for BENCH target");
         return PokemonTarget.bench(request.benchIndex());
+    }
+
+    private int targetBenchIndex(PokemonTargetRequest request) {
+        PokemonTarget parsed = target(request);
+        return parsed.zone() == PokemonTargetZone.ACTIVE ? -1 : parsed.benchIndex();
     }
 
     private void requireBody(Object request) {

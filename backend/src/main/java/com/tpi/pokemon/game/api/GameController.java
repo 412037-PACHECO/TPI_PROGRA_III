@@ -121,6 +121,16 @@ public class GameController {
         return gameplayService.replaceActive(gameId, request);
     }
 
+    @PostMapping("/{gameId}/actions/play-trainer")
+    public GameViewResponse playTrainer(@PathVariable String gameId, @RequestBody PlayTrainerRequest request) {
+        return gameplayService.playTrainer(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/resolve-selection")
+    public GameViewResponse resolveSelection(@PathVariable String gameId, @RequestBody ResolveSelectionRequest request) {
+        return gameplayService.resolveSelection(gameId, request);
+    }
+
     private GameResponse toResponse(GameSessionSummary summary) {
         return new GameResponse(
                 summary.gameId(),
