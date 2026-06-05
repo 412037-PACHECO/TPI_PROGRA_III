@@ -52,6 +52,18 @@
 - Si expone datos de partida, distingue metadata/log interno de vistas seguras finales por jugador.
 - No publica `GameState` completo como contrato frontend porque contiene zonas ocultas.
 
+## Vista segura de partida
+
+- Requiere `viewerPlayerId` y valida que pertenezca a la partida.
+- El jugador ve su mano completa, descarte y campo propio.
+- El jugador no ve orden de mazo ni premios boca abajo salvo efecto futuro explícito.
+- El rival solo muestra conteos de mano, mazo y premios.
+- El campo público del rival muestra Activo, Banca, daño, condiciones y attachments públicos.
+- El descarte de ambos jugadores es visible.
+- Las selecciones pendientes solo muestran candidatos privados al jugador autorizado.
+- El log público no incluye `commandJson`, `resultJson` ni `eventsJson` crudos.
+- Tiene tests que fallarían ante filtración de mano rival, orden de mazo, premios ocultos o candidatos privados.
+
 ## Prueba
 
 - Valida comportamiento real, no implementación accidental.

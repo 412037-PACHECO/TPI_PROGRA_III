@@ -167,7 +167,8 @@ Cada snapshot debe tener versión incremental para:
 ## Limitaciones conocidas
 
 - El snapshot completo contiene zonas ocultas; no puede exponerse directamente a frontend ni WebSocket.
-- Los eventos actuales del engine no son todavía contrato público seguro por jugador.
+- Los eventos/logs crudos del engine no son contrato público seguro por jugador.
+- Para UI/reconexión debe usarse la proyección segura `GET /api/games/{gameId}/view?viewerPlayerId=...` y el log sanitizado `GET /api/games/{gameId}/log?viewerPlayerId=...`.
 - Si cambia la estructura de `GameState`, se necesita migración o compatibilidad por `snapshotVersion`.
 - Persistir JSON completo reduce fricción del engine, pero dificulta reportes SQL profundos sobre zonas internas.
 - La auditoría XY1 sigue siendo incremental: persistir una partida no implica que todos los efectos del set estén soportados.
@@ -180,19 +181,34 @@ Endpoints disponibles:
 - `POST /api/games/{gameId}/join`: agrega `playerTwoId`, crea `GameState.CREATED`, persiste snapshot inicial y registra log `GAME_JOINED`.
 - `GET /api/games/{gameId}`: consulta metadata normalizada.
 - `GET /api/games/waiting`: lista salas en espera.
-- `GET /api/games/{gameId}/log`: consulta historial persistido append-only.
+- `GET /api/games/{gameId}/log?viewerPlayerId=...`: consulta historial público/sanitizado sin JSON crudo.
+- `GET /api/games/{gameId}/view?viewerPlayerId=...`: consulta vista segura desde la perspectiva del jugador.
 
-Decisión importante: no se exponen endpoints de acciones de engine hasta cerrar DTOs de mazos/cartas, autorización mínima y vistas seguras por jugador. Exponer `GameState` o logs crudos como contrato final filtraría zonas ocultas.
+Decisión importante: no se exponen endpoints de acciones de engine hasta cerrar DTOs de mazos/cartas y autorización mínima. Exponer `GameState`, snapshots o logs crudos como contrato final filtraría zonas ocultas.
 
 La operación de join toma lock pesimista sobre `GameSessionEntity` para evitar que dos requests simultáneos unan jugadores distintos a la misma sala `WAITING`.
+
+`viewerPlayerId` selecciona perspectiva, pero no equivale a autenticación real. En una fase con seguridad debe obtenerse de sesión/token y no desde un parámetro controlado por el cliente.
+
+## Vistas seguras y privacidad
+
+La proyección segura separa estado interno de contrato público:
+
+- Mano propia: visible completa.
+- Mano rival: solo cantidad.
+- Mazo propio/rival: solo cantidad; no se expone orden.
+- Premios propios/rivales boca abajo: solo cantidad.
+- Campo propio/rival: público, incluyendo Activo, Banca, daño, condiciones, energías y herramienta.
+- Descarte propio/rival: público.
+- `PendingEffectSelection`: solo el jugador autorizado ve candidatos privados; el rival ve metadata pública de selección pendiente.
+
+WebSocket/reconexión debe emitir estas vistas por jugador, no snapshots crudos.
 
 ## Próximo paso recomendado
 
 Evolucionar la **API de partidas** como capa de aplicación sobre esta persistencia:
 
-- consultar metadata/estado seguro por jugador,
 - enviar comandos de juego,
-- obtener historial/auditoría filtrada,
 - preparar contrato de reconexión para WebSocket futuro.
 
 Ese diseño debe hacerse sin mover reglas a controllers ni exponer `GameState` crudo.

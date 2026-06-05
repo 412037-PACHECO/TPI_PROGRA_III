@@ -7,13 +7,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tpi.pokemon.game.application.GameActionLogSummary;
 import com.tpi.pokemon.game.application.GameApplicationService;
 import com.tpi.pokemon.game.application.GameNotFoundException;
 import com.tpi.pokemon.game.application.GameQueryService;
 import com.tpi.pokemon.game.application.GameSessionStatus;
 import com.tpi.pokemon.game.application.GameSessionSummary;
 import com.tpi.pokemon.game.application.InvalidGameCommandException;
+import com.tpi.pokemon.game.application.UnauthorizedGameViewException;
+import com.tpi.pokemon.game.application.view.DeckView;
+import com.tpi.pokemon.game.application.view.DiscardPileView;
+import com.tpi.pokemon.game.application.view.GameLogPublicView;
+import com.tpi.pokemon.game.application.view.GameViewResponse;
+import com.tpi.pokemon.game.application.view.HandView;
+import com.tpi.pokemon.game.application.view.OpponentBoardView;
+import com.tpi.pokemon.game.application.view.OpponentPerspectiveView;
+import com.tpi.pokemon.game.application.view.PendingSelectionView;
+import com.tpi.pokemon.game.application.view.PlayerBoardView;
+import com.tpi.pokemon.game.application.view.PlayerPerspectiveView;
+import com.tpi.pokemon.game.application.view.PrizeCardsView;
+import com.tpi.pokemon.game.application.view.TurnView;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -46,7 +58,7 @@ class GameControllerTest {
                         .content(objectMapper.writeValueAsString(new CreateGameRequest("player-one"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.gameId").value("game-1"))
-                .andExpect(jsonPath("$.status").value(GameSessionStatus.WAITING));
+                .andExpect(jsonPath("$.status").value("WAITING"));
     }
 
     @Test
@@ -64,20 +76,53 @@ class GameControllerTest {
     @Test
     void listsWaitingGamesAndHistory() throws Exception {
         when(queryService.waitingGames()).thenReturn(List.of(summary("game-1", "player-one", null, GameSessionStatus.WAITING)));
-        when(queryService.history("game-1")).thenReturn(List.of(new GameActionLogSummary(1, 0, "NOT_STARTED", "player-two", "GAME_JOINED", "{}", "{}", "[]", Instant.parse("2026-06-05T00:00:00Z"))));
+        when(queryService.publicHistory("game-1", "player-one")).thenReturn(List.of(new GameLogPublicView(1, 0, "player-two", "GAME_JOINED", Instant.parse("2026-06-05T00:00:00Z"), "player-two resolved GAME_JOINED", List.of("GAME_JOINED"))));
 
         mockMvc.perform(get("/api/games/waiting"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].status").value(GameSessionStatus.WAITING));
-        mockMvc.perform(get("/api/games/game-1/log"))
+                .andExpect(jsonPath("$[0].status").value("WAITING"));
+        mockMvc.perform(get("/api/games/game-1/log").param("viewerPlayerId", "player-one"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].actionType").value("GAME_JOINED"));
+                .andExpect(jsonPath("$[0].actionType").value("GAME_JOINED"))
+                .andExpect(jsonPath("$[0].commandJson").doesNotExist())
+                .andExpect(jsonPath("$[0].resultJson").doesNotExist())
+                .andExpect(jsonPath("$[0].eventsJson").doesNotExist());
+    }
+
+    @Test
+    void returnsSafeViewAndPublicLog() throws Exception {
+        when(queryService.view("game-1", "player-one")).thenReturn(new GameViewResponse(
+                "game-1",
+                "ACTIVE",
+                "player-one",
+                new PlayerPerspectiveView("player-one", true, new HandView(1, List.of()), new DeckView(10, false, List.of()), new PrizeCardsView(6, false, List.of()), new DiscardPileView(0, List.of()), new PlayerBoardView(null, List.of()), 1),
+                new OpponentPerspectiveView("player-two", new HandView(2, List.of()), new DeckView(20, false, List.of()), new PrizeCardsView(6, false, List.of()), new DiscardPileView(0, List.of()), new OpponentBoardView(null, List.of()), 1),
+                new TurnView("player-one", "player-one", 1, "MAIN", true, false, false, false, false),
+                null,
+                new PendingSelectionView(false, false, null, null, null, null, null, 0, 0, false, false, List.of()),
+                null,
+                null,
+                null
+        ));
+        when(queryService.publicHistory("game-1", "player-one")).thenReturn(List.of(new GameLogPublicView(1, 0, "player-one", "GAME_JOINED", Instant.parse("2026-06-05T00:00:00Z"), "player-one resolved GAME_JOINED", List.of("GAME_JOINED"))));
+
+        mockMvc.perform(get("/api/games/game-1/view").param("viewerPlayerId", "player-one"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewerPlayerId").value("player-one"))
+                .andExpect(jsonPath("$.opponent.hand.count").value(2))
+                .andExpect(jsonPath("$.opponent.hand.cards").isEmpty())
+                .andExpect(jsonPath("$.opponent.deck.cards").isEmpty());
+        mockMvc.perform(get("/api/games/game-1/log").param("viewerPlayerId", "player-one"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].actionType").value("GAME_JOINED"))
+                .andExpect(jsonPath("$[0].summary").value("player-one resolved GAME_JOINED"));
     }
 
     @Test
     void mapsGameErrorsToHttpStatuses() throws Exception {
         when(queryService.get("missing-game")).thenThrow(new GameNotFoundException("missing-game"));
         when(applicationService.createWaitingGame(null)).thenThrow(new InvalidGameCommandException("playerOneId is required"));
+        when(queryService.view("game-1", "intruder")).thenThrow(new UnauthorizedGameViewException("intruder", "game-1"));
 
         mockMvc.perform(get("/api/games/missing-game"))
                 .andExpect(status().isNotFound())
@@ -85,6 +130,9 @@ class GameControllerTest {
         mockMvc.perform(post("/api/games").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("playerOneId is required"));
+        mockMvc.perform(get("/api/games/game-1/view").param("viewerPlayerId", "intruder"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Player intruder is not allowed to view game game-1"));
     }
 
     private GameSessionSummary summary(String gameId, String playerOneId, String playerTwoId, String status) {

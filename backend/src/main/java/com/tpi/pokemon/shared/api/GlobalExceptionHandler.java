@@ -9,6 +9,7 @@ import com.tpi.pokemon.decks.application.DeckNotFoundException;
 import com.tpi.pokemon.game.application.GameAlreadyFullException;
 import com.tpi.pokemon.game.application.GameNotFoundException;
 import com.tpi.pokemon.game.application.InvalidGameCommandException;
+import com.tpi.pokemon.game.application.UnauthorizedGameViewException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -46,6 +47,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({InvalidGameCommandException.class, GameAlreadyFullException.class})
     ResponseEntity<ApiErrorResponse> handleInvalidGameCommand(RuntimeException exception) {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedGameViewException.class)
+    ResponseEntity<ApiErrorResponse> handleUnauthorizedGameView(UnauthorizedGameViewException exception) {
+        return error(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 
     private ResponseEntity<ApiErrorResponse> error(HttpStatus status, String message) {

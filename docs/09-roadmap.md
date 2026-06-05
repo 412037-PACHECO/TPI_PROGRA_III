@@ -313,15 +313,28 @@ Decisiones fase 12:
 - Riesgos: el log crudo puede contener información privada; no debe usarse como contrato final de frontend.
 - Criterio: endpoints delegan a application services, validan entrada básica, persisten snapshot/log al crear GameState inicial y tienen tests de application/API.
 
-## Fase 14 - WebSockets
+## Fase 14 - Vistas seguras por jugador
+
+- Estado: implementada como capa de proyección application, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: devolver estado de partida desde la perspectiva de cada jugador sin exponer `GameState` crudo ni datos ocultos del rival.
+- Entregables: DTOs en `game/application/view`, `GameViewProjectionService`, `GameLogProjectionService`, endpoints `GET /api/games/{gameId}/view?viewerPlayerId=...` y `GET /api/games/{gameId}/log?viewerPlayerId=...`.
+- Reglas de visibilidad: mano propia visible, mano rival solo conteo; mazos sin orden; premios boca abajo solo conteo; descarte público; campo público de ambos jugadores visible; selecciones pendientes privadas solo para el jugador autorizado.
+- Decisión: `GET /api/games/{gameId}` sigue devolviendo metadata para compatibilidad; `/view` es el contrato recomendado para frontend/reconexión.
+- Decisión: `GET /api/games/{gameId}/log` devuelve solo log público/sanitizado; el log crudo queda como servicio interno de auditoría/debug, no endpoint público.
+- Decisión: `viewerPlayerId` es selector de perspectiva en esta fase sin autenticación completa; cuando exista seguridad debe derivarse de sesión/token.
+- Fuera de alcance: WebSocket, frontend, autenticación completa, endpoints completos de gameplay y nuevas reglas de cartas.
+- Riesgos: cualquier DTO nuevo de partida debe pasar por proyección segura; nunca devolver snapshots ni logs crudos como contrato frontend.
+- Criterio: tests prueban que mano rival, orden de mazo, premios ocultos y candidatos privados de pending selection no se filtran.
+
+## Fase 15 - WebSockets
 
 - Objetivo: sincronización realtime.
-- Entregables: canales, eventos, reconexión, vistas seguras.
-- Dependencias: persistencia y eventos.
+- Entregables: canales, eventos, reconexión y emisión de las vistas seguras por jugador de Fase 14.
+- Dependencias: persistencia, eventos y vistas seguras.
 - Riesgos: filtración o duplicados.
 - Criterio: contrato WS testeado.
 
-## Fase 15 - Tests fuertes
+## Fase 16 - Tests fuertes
 
 - Objetivo: cobertura y casos críticos.
 - Entregables: unit/integration/WS/E2E mínimos.
@@ -329,7 +342,7 @@ Decisiones fase 12:
 - Riesgos: tests frágiles.
 - Criterio: JaCoCo >=80% y críticos >90%.
 
-## Fase 16 - Preparación para frontend
+## Fase 17 - Preparación para frontend
 
 - Objetivo: contratos estables para Angular.
 - Entregables: OpenAPI, DTOs, eventos, vistas seguras.

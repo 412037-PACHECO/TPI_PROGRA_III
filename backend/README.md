@@ -2,7 +2,7 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 13 - API REST básica de partidas
+## Alcance actual: Fase 14 - Vistas seguras por jugador
 
 El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y motor extensible de efectos. La Fase 11 agrega auditoría progresiva de cartas reales XY1 y un primer catálogo explícito de mappings hacia `EffectDefinition`, sin intentar cubrir todo XY1 de golpe y sin parser automático de texto natural.
 
@@ -51,6 +51,7 @@ Incluye:
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
 - Persistencia interna RF-03/RF-05 con metadata de sesión, snapshots JSON versionados y log append-only.
 - API REST básica de partidas para crear sala en espera, unirse, consultar metadata, listar salas en espera y consultar historial persistido.
+- Proyección segura por jugador para devolver estado de partida desde la perspectiva del solicitante sin filtrar mano, orden de mazo, premios ocultos ni selecciones privadas del rival.
 
 ## Modelo Game State
 
@@ -596,9 +597,9 @@ Reglas XY1 implementadas solo en el endpoint explícito de validación:
 
 Los mazos incompletos pueden guardarse y editarse. Las reglas de mazo completo no bloquean el CRUD.
 
-## API REST básica de partidas
+## API REST de partidas y vistas seguras
 
-Esta fase expone un contrato mínimo de sesión y auditoría. **No** expone todavía acciones completas de setup/turno/ataque ni vistas seguras finales por jugador.
+Esta fase expone un contrato mínimo de sesión/auditoría y agrega vistas seguras por jugador. **No** expone todavía acciones completas de setup/turno/ataque, WebSocket ni frontend.
 
 ### Crear sala en espera
 
@@ -650,10 +651,33 @@ Devuelve partidas con estado externo `WAITING`.
 ### Consultar log persistido
 
 ```http
-GET /api/games/{gameId}/log
+GET /api/games/{gameId}/log?viewerPlayerId=player-one
 ```
 
-Devuelve historial append-only persistido. El log puede contener datos internos y no debe tratarse como vista pública final para frontend hasta implementar vistas seguras por jugador.
+Devuelve historial público/sanitizado apto para UI/reconexión futura con `sequence`, `turnNumber`, `playerId`, `actionType`, `createdAt`, `summary` y `publicEvents`. No devuelve `commandJson`, `resultJson` ni `eventsJson` crudos.
+
+### Consultar vista segura por jugador
+
+```http
+GET /api/games/{gameId}/view?viewerPlayerId=player-one
+```
+
+Este es el contrato recomendado para frontend y futura reconexión WebSocket. Devuelve el estado desde la perspectiva de `viewerPlayerId`:
+
+- Jugador solicitante: ve su mano completa, descarte completo y campo propio completo.
+- Jugador solicitante: **no** ve el orden completo de su mazo ni sus premios boca abajo; solo conteos.
+- Rival: no se devuelve contenido de mano; solo cantidad.
+- Rival: no se devuelve orden de mazo; solo cantidad.
+- Rival: no se devuelven premios boca abajo; solo cantidad restante.
+- Rival: se devuelve campo público: Activo, Banca, daño, energías, herramienta y condiciones especiales.
+- Rival: se devuelve descarte, porque es zona pública.
+- Selección pendiente: solo el jugador autorizado ve `candidateCardIds`; el rival ve metadata pública de que hay una selección pendiente.
+
+Si `viewerPlayerId` no pertenece a la partida, responde `403`.
+
+El log crudo (`commandJson`, `resultJson`, `eventsJson`) sigue existiendo internamente para auditoría/debug backend, pero no se expone como endpoint público.
+
+Nota: `viewerPlayerId` selecciona la perspectiva de la vista. No reemplaza autenticación real; cuando se agregue seguridad, debe derivarse de sesión/token y no confiarse al cliente.
 
 ## Base de datos local/dev
 
@@ -687,7 +711,6 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Mapeo completo de todos los efectos XY1.
 - Parseo automático de texto natural de cartas.
 - Acciones REST completas de juego: setup, inicio/fin de turno, bajar Pokémon, unir Energía, evolucionar, retirar, jugar Trainers, atacar y resolver selecciones pendientes.
-- Vistas públicas seguras por jugador; el `GameState` interno y logs crudos no son contrato final de frontend.
 - WebSocket/realtime.
 - Frontend.
 - Regla ACE SPEC obligatoria para `xy1`.
