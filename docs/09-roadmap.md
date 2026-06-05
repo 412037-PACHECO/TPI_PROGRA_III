@@ -343,7 +343,26 @@ Decisiones fase 12:
 - Riesgos: `playerId` sigue siendo selector de perspectiva hasta agregar auth; debe derivarse de sesión/token en hardening y las colas por jugador deben protegerse o migrarse a `/user/queue`.
 - Criterio: publisher probado con `SimpMessagingTemplate` mockeado; vistas distintas por jugador y log sanitizado sin datos crudos.
 
-## Fase 16 - Tests fuertes
+## Fase 16 - Gameplay REST API
+
+- Estado: implementada como Application/API jugable estructural, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: exponer comandos reales del engine desde REST, persistiendo snapshot + log y devolviendo vistas seguras.
+- Entregables: `GameplayApplicationService`, mapper catálogo/deck a `CardInstance`, DTOs de request y endpoints REST de setup/acciones.
+- Endpoints implementados: `POST /api/games/{gameId}/start`, `/setup/choose-initial`, `/setup/complete`, `/actions/start-turn`, `/actions/play-basic`, `/actions/attach-energy`, `/actions/evolve`, `/actions/retreat`, `/actions/attack`, `/actions/end-turn`, `/actions/replace-active`.
+- Decisión: no se exponen `play-trainer` ni `resolve-selection` todavía porque no hay contrato público seguro completo para ejecutar efectos textuales/pending selections sin inventar reglas.
+- Decisión: cada acción válida carga último snapshot, ejecuta engine, persiste log + snapshot con `GamePersistenceService.persistActionResult` y devuelve `GameViewResponse`.
+- Decisión: setup desde mazos valida `DeckValidator`, exige que cada mazo pertenezca al jugador correspondiente por `ownerName` y construye definiciones estructurales desde catálogo local sin parser natural de reglas.
+- Fuera de alcance: frontend, gameplay realtime WebSocket completo, JWT/auth, nuevas reglas grandes de cartas, parser automático.
+- Riesgos: el mapper de catálogo interpreta campos estructurales JSON (`attacks`, tipos, HP, retreat, energías) pero no texto libre; cartas con metadata incompleta pueden limitar ataques/retiros.
+- Criterio: no se devuelve `GameState` crudo; acciones inválidas no persisten snapshots falsos; tests cubren persistencia de acción válida y rechazo de jugador ajeno.
+
+## Fase 17 - Gameplay realtime WebSocket
+
+- Objetivo: publicar por WebSocket los resultados de acciones jugables usando vistas seguras y eventos específicos de turnos/KO/premios/condiciones/fin de partida.
+- Dependencias: Fase 16.
+- Riesgos: orden/idempotencia y privacidad por jugador.
+
+## Fase 18 - Tests fuertes
 
 - Objetivo: cobertura y casos críticos.
 - Entregables: unit/integration/WS/E2E mínimos.
@@ -351,7 +370,7 @@ Decisiones fase 12:
 - Riesgos: tests frágiles.
 - Criterio: JaCoCo >=80% y críticos >90%.
 
-## Fase 17 - Preparación para frontend
+## Fase 19 - Preparación para frontend
 
 - Objetivo: contratos estables para Angular.
 - Entregables: OpenAPI, DTOs, eventos, vistas seguras.

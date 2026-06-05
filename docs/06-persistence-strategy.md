@@ -184,6 +184,7 @@ Endpoints disponibles:
 - `GET /api/games/{gameId}/log?viewerPlayerId=...`: consulta historial público/sanitizado sin JSON crudo.
 - `GET /api/games/{gameId}/view?viewerPlayerId=...`: consulta vista segura desde la perspectiva del jugador.
 - `POST /api/games/{gameId}/reconnect?playerId=...`: devuelve vista segura actualizada y publica reconexión por WebSocket.
+- `POST /api/games/{gameId}/start` y endpoints `/actions/...`: ejecutan comandos reales de gameplay, persistiendo log + snapshot por acción válida.
 
 Decisión importante: no se exponen endpoints de acciones de engine hasta cerrar DTOs de mazos/cartas y autorización mínima. Exponer `GameState`, snapshots o logs crudos como contrato final filtraría zonas ocultas.
 
@@ -215,6 +216,19 @@ La infraestructura realtime consume la persistencia a través de la capa Applica
 - `POST /api/games/{gameId}/reconnect?playerId=...` reconstruye la vista desde el último snapshot y la publica al jugador.
 
 Regla: la persistencia puede guardar estado completo privado, pero la capa realtime solo publica proyecciones seguras.
+
+## Gameplay API y persistencia por acción
+
+La API jugable REST usa el patrón obligatorio:
+
+1. cargar último snapshot;
+2. construir comando de engine;
+3. ejecutar engine puro Java;
+4. persistir action log append-only;
+5. persistir snapshot posterior;
+6. devolver vista segura por jugador.
+
+No se persisten snapshots para acciones inválidas. Los endpoints `play-trainer` y `resolve-selection` quedan fuera hasta que exista contrato público seguro de efectos y selección.
 
 ## Próximo paso recomendado
 

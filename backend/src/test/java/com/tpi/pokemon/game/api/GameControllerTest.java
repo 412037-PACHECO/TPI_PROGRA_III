@@ -12,6 +12,7 @@ import com.tpi.pokemon.game.application.GameNotFoundException;
 import com.tpi.pokemon.game.application.GameQueryService;
 import com.tpi.pokemon.game.application.GameSessionStatus;
 import com.tpi.pokemon.game.application.GameSessionSummary;
+import com.tpi.pokemon.game.application.GameplayApplicationService;
 import com.tpi.pokemon.game.application.InvalidGameCommandException;
 import com.tpi.pokemon.game.application.UnauthorizedGameViewException;
 import com.tpi.pokemon.game.application.view.DeckView;
@@ -48,6 +49,9 @@ class GameControllerTest {
 
     @MockBean
     private GameQueryService queryService;
+
+    @MockBean
+    private GameplayApplicationService gameplayService;
 
     @Test
     void createsWaitingGame() throws Exception {
@@ -141,6 +145,24 @@ class GameControllerTest {
     }
 
     @Test
+    void delegatesGameplayActionAndReturnsSafeView() throws Exception {
+        GameViewResponse view = safeView("game-1", "player-one");
+        when(gameplayService.startTurn("game-1", new StartTurnRequest("player-one"))).thenReturn(view);
+        when(gameplayService.playBasic("game-1", new PlayBasicPokemonRequest("player-one", "card-1"))).thenReturn(view);
+
+        mockMvc.perform(post("/api/games/game-1/actions/start-turn")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new StartTurnRequest("player-one"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewerPlayerId").value("player-one"));
+        mockMvc.perform(post("/api/games/game-1/actions/play-basic")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PlayBasicPokemonRequest("player-one", "card-1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewerPlayerId").value("player-one"));
+    }
+
+    @Test
     void mapsGameErrorsToHttpStatuses() throws Exception {
         when(queryService.get("missing-game")).thenThrow(new GameNotFoundException("missing-game"));
         when(applicationService.createWaitingGame(null)).thenThrow(new InvalidGameCommandException("playerOneId is required"));
@@ -160,5 +182,21 @@ class GameControllerTest {
     private GameSessionSummary summary(String gameId, String playerOneId, String playerTwoId, String status) {
         Instant now = Instant.parse("2026-06-05T00:00:00Z");
         return new GameSessionSummary(gameId, playerOneId, playerTwoId, status, null, 0, "NOT_STARTED", null, now, now);
+    }
+
+    private GameViewResponse safeView(String gameId, String viewerPlayerId) {
+        return new GameViewResponse(
+                gameId,
+                "ACTIVE",
+                viewerPlayerId,
+                new PlayerPerspectiveView(viewerPlayerId, true, new HandView(1, List.of()), new DeckView(10, false, List.of()), new PrizeCardsView(6, false, List.of()), new DiscardPileView(0, List.of()), new PlayerBoardView(null, List.of()), 1),
+                new OpponentPerspectiveView("player-two", new HandView(2, List.of()), new DeckView(20, false, List.of()), new PrizeCardsView(6, false, List.of()), new DiscardPileView(0, List.of()), new OpponentBoardView(null, List.of()), 1),
+                new TurnView(viewerPlayerId, viewerPlayerId, 1, "MAIN", true, false, false, false, false),
+                null,
+                new PendingSelectionView(false, false, null, null, null, null, null, 0, 0, false, false, List.of()),
+                null,
+                null,
+                null
+        );
     }
 }

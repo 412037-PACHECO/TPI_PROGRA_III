@@ -7,8 +7,12 @@ import com.tpi.pokemon.decks.application.DeckCardNotFoundException;
 import com.tpi.pokemon.decks.application.DeckInvalidOperationException;
 import com.tpi.pokemon.decks.application.DeckNotFoundException;
 import com.tpi.pokemon.game.application.GameAlreadyFullException;
+import com.tpi.pokemon.game.application.DeckNotValidForGameException;
+import com.tpi.pokemon.game.application.GameNotInExpectedStateException;
 import com.tpi.pokemon.game.application.GameNotFoundException;
 import com.tpi.pokemon.game.application.InvalidGameCommandException;
+import com.tpi.pokemon.game.application.PendingSelectionException;
+import com.tpi.pokemon.game.application.UnauthorizedGameActionException;
 import com.tpi.pokemon.game.application.UnauthorizedGameViewException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
@@ -44,13 +48,13 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
-    @ExceptionHandler({InvalidGameCommandException.class, GameAlreadyFullException.class})
+    @ExceptionHandler({InvalidGameCommandException.class, GameAlreadyFullException.class, GameNotInExpectedStateException.class, PendingSelectionException.class, DeckNotValidForGameException.class})
     ResponseEntity<ApiErrorResponse> handleInvalidGameCommand(RuntimeException exception) {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
-    @ExceptionHandler(UnauthorizedGameViewException.class)
-    ResponseEntity<ApiErrorResponse> handleUnauthorizedGameView(UnauthorizedGameViewException exception) {
+    @ExceptionHandler({UnauthorizedGameViewException.class, UnauthorizedGameActionException.class})
+    ResponseEntity<ApiErrorResponse> handleUnauthorizedGameView(RuntimeException exception) {
         return error(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 

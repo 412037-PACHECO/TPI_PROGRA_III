@@ -600,7 +600,7 @@ Los mazos incompletos pueden guardarse y editarse. Las reglas de mazo completo n
 
 ## API REST de partidas y vistas seguras
 
-Esta fase expone un contrato mínimo de sesión/auditoría, vistas seguras por jugador y eventos WebSocket de sesión/reconexión. **No** expone todavía acciones completas de setup/turno/ataque ni frontend.
+Esta fase expone sesión/auditoría, vistas seguras por jugador, eventos WebSocket de sesión/reconexión y una API REST jugable para los comandos estructurales ya soportados por el engine. **No** expone todavía frontend, gameplay realtime completo ni endpoints falsos para efectos sin contrato seguro.
 
 ### Crear sala en espera
 
@@ -701,6 +701,61 @@ El log crudo (`commandJson`, `resultJson`, `eventsJson`) sigue existiendo intern
 
 Nota: `viewerPlayerId` selecciona la perspectiva de la vista. No reemplaza autenticación real; cuando se agregue seguridad, debe derivarse de sesión/token y no confiarse al cliente.
 
+## API REST jugable
+
+Todas las acciones jugables cargan el último snapshot, ejecutan el engine puro Java, persisten log + snapshot si la acción fue válida y devuelven `GameViewResponse` seguro para el jugador que actuó. Si la acción falla, responde error controlado y no persiste snapshot falso.
+
+### Setup desde mazos
+
+```http
+POST /api/games/{gameId}/start
+Content-Type: application/json
+
+{
+  "playerId": "player-one",
+  "playerOneDeckId": 1,
+  "playerTwoDeckId": 2
+}
+```
+
+Valida ambos mazos con `DeckValidator`, verifica que pertenezcan a los jugadores de la partida por `ownerName`, construye `CardInstance` desde el catálogo local y ejecuta `SetupService.startSetup`.
+
+Luego cada jugador elige Activo/Banca inicial:
+
+```http
+POST /api/games/{gameId}/setup/choose-initial
+
+{
+  "playerId": "player-one",
+  "activePokemonId": "player-one-p1-xy1-1-1",
+  "benchPokemonIds": []
+}
+```
+
+Completar setup:
+
+```http
+POST /api/games/{gameId}/setup/complete?playerId=player-one&startingPlayerId=player-one
+```
+
+`startingPlayerId` es opcional; si no se envía, se usa player one como selector determinista inicial.
+
+### Acciones de turno expuestas
+
+- `POST /api/games/{gameId}/actions/start-turn`
+- `POST /api/games/{gameId}/actions/play-basic`
+- `POST /api/games/{gameId}/actions/attach-energy`
+- `POST /api/games/{gameId}/actions/evolve`
+- `POST /api/games/{gameId}/actions/retreat`
+- `POST /api/games/{gameId}/actions/attack`
+- `POST /api/games/{gameId}/actions/end-turn`
+- `POST /api/games/{gameId}/actions/replace-active`
+
+No se exponen todavía:
+
+- `play-trainer`: el engine tiene acción estructural para mover Trainer, pero no contrato público seguro completo para ejecutar todos sus efectos textuales.
+- `resolve-selection`: `PendingEffectSelection` existe como metadata segura, pero no hay resolver público genérico para aplicar selecciones y continuation effects sin riesgo de reglas inventadas.
+
 ## WebSocket/STOMP
 
 Endpoint STOMP:
@@ -761,7 +816,8 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Efectos complejos de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.
 - Mapeo completo de todos los efectos XY1.
 - Parseo automático de texto natural de cartas.
-- Acciones REST completas de juego: setup, inicio/fin de turno, bajar Pokémon, unir Energía, evolucionar, retirar, jugar Trainers, atacar y resolver selecciones pendientes.
+- Gameplay realtime completo por WebSocket; las acciones jugables actuales son REST y la publicación realtime de gameplay queda para la fase siguiente.
+- Endpoints públicos de `play-trainer` y `resolve-selection` hasta cerrar contrato seguro de efectos/pending selections.
 - Frontend.
 - Autenticación real/JWT; por ahora `playerId`/`viewerPlayerId` selecciona perspectiva y debe endurecerse con sesión/token.
 - Regla ACE SPEC obligatoria para `xy1`.

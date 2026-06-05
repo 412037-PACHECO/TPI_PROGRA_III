@@ -1,6 +1,7 @@
 package com.tpi.pokemon.game.api;
 
 import com.tpi.pokemon.game.application.GameApplicationService;
+import com.tpi.pokemon.game.application.GameplayApplicationService;
 import com.tpi.pokemon.game.application.GameQueryService;
 import com.tpi.pokemon.game.application.GameSessionSummary;
 import com.tpi.pokemon.game.application.view.GameLogPublicView;
@@ -21,10 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class GameController {
     private final GameApplicationService applicationService;
     private final GameQueryService queryService;
+    private final GameplayApplicationService gameplayService;
 
-    public GameController(GameApplicationService applicationService, GameQueryService queryService) {
+    public GameController(GameApplicationService applicationService, GameQueryService queryService, GameplayApplicationService gameplayService) {
         this.applicationService = applicationService;
         this.queryService = queryService;
+        this.gameplayService = gameplayService;
     }
 
     @PostMapping
@@ -41,6 +44,21 @@ public class GameController {
     @PostMapping("/{gameId}/reconnect")
     public GameViewResponse reconnect(@PathVariable String gameId, @RequestParam String playerId) {
         return applicationService.reconnect(gameId, playerId);
+    }
+
+    @PostMapping("/{gameId}/start")
+    public GameViewResponse startGame(@PathVariable String gameId, @RequestBody StartGameRequest request) {
+        return gameplayService.startGame(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/setup/choose-initial")
+    public GameViewResponse chooseInitial(@PathVariable String gameId, @RequestBody ChooseInitialPokemonRequest request) {
+        return gameplayService.chooseInitial(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/setup/complete")
+    public GameViewResponse completeSetup(@PathVariable String gameId, @RequestParam String playerId, @RequestParam(required = false) String startingPlayerId) {
+        return gameplayService.completeSetup(gameId, playerId, startingPlayerId);
     }
 
     @GetMapping("/{gameId}")
@@ -61,6 +79,46 @@ public class GameController {
     @GetMapping("/{gameId}/log")
     public List<GameLogPublicView> log(@PathVariable String gameId, @RequestParam String viewerPlayerId) {
         return queryService.publicHistory(gameId, viewerPlayerId);
+    }
+
+    @PostMapping("/{gameId}/actions/start-turn")
+    public GameViewResponse startTurn(@PathVariable String gameId, @RequestBody StartTurnRequest request) {
+        return gameplayService.startTurn(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/play-basic")
+    public GameViewResponse playBasic(@PathVariable String gameId, @RequestBody PlayBasicPokemonRequest request) {
+        return gameplayService.playBasic(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/attach-energy")
+    public GameViewResponse attachEnergy(@PathVariable String gameId, @RequestBody AttachEnergyRequest request) {
+        return gameplayService.attachEnergy(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/evolve")
+    public GameViewResponse evolve(@PathVariable String gameId, @RequestBody EvolvePokemonRequest request) {
+        return gameplayService.evolve(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/retreat")
+    public GameViewResponse retreat(@PathVariable String gameId, @RequestBody RetreatRequest request) {
+        return gameplayService.retreat(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/attack")
+    public GameViewResponse attack(@PathVariable String gameId, @RequestBody DeclareAttackRequest request) {
+        return gameplayService.attack(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/end-turn")
+    public GameViewResponse endTurn(@PathVariable String gameId, @RequestBody EndTurnRequest request) {
+        return gameplayService.endTurn(gameId, request);
+    }
+
+    @PostMapping("/{gameId}/actions/replace-active")
+    public GameViewResponse replaceActive(@PathVariable String gameId, @RequestBody ReplaceActiveRequest request) {
+        return gameplayService.replaceActive(gameId, request);
     }
 
     private GameResponse toResponse(GameSessionSummary summary) {

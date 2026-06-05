@@ -75,6 +75,17 @@
 - La reconexión devuelve vista segura actualizada.
 - Tiene tests con `SimpMessagingTemplate` mockeado que verifican destinos y payloads seguros.
 
+## Gameplay API
+
+- Cada endpoint representa un comando real existente del engine.
+- Carga el último snapshot antes de ejecutar.
+- Valida jugador y delega reglas al engine.
+- Persiste log + snapshot solo si la acción fue válida.
+- Devuelve `GameViewResponse`, nunca `GameState`.
+- Una acción inválida devuelve error claro y no crea snapshot falso.
+- No expone endpoints falsos para reglas sin contrato seguro, como pending selections o Trainers complejos.
+- Documenta gaps explícitos.
+
 ## Prueba
 
 - Valida comportamiento real, no implementación accidental.
