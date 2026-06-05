@@ -64,6 +64,17 @@
 - El log público no incluye `commandJson`, `resultJson` ni `eventsJson` crudos.
 - Tiene tests que fallarían ante filtración de mano rival, orden de mazo, premios ocultos o candidatos privados.
 
+## WebSocket / Realtime
+
+- Configura endpoint STOMP `/ws` y broker simple para `/topic` y `/queue`.
+- Usa canales públicos por partida solo para eventos sin zonas ocultas.
+- Usa canales privados por jugador/perspectiva para `GameViewResponse` y logs públicos.
+- Reutiliza las mismas vistas seguras de REST; no duplica lógica de privacidad.
+- No publica `GameState`, snapshots JSON ni logs crudos.
+- Publica eventos de sesión/reconexión después de create/join/reconnect.
+- La reconexión devuelve vista segura actualizada.
+- Tiene tests con `SimpMessagingTemplate` mockeado que verifican destinos y payloads seguros.
+
 ## Prueba
 
 - Valida comportamiento real, no implementación accidental.

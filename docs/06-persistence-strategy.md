@@ -183,6 +183,7 @@ Endpoints disponibles:
 - `GET /api/games/waiting`: lista salas en espera.
 - `GET /api/games/{gameId}/log?viewerPlayerId=...`: consulta historial público/sanitizado sin JSON crudo.
 - `GET /api/games/{gameId}/view?viewerPlayerId=...`: consulta vista segura desde la perspectiva del jugador.
+- `POST /api/games/{gameId}/reconnect?playerId=...`: devuelve vista segura actualizada y publica reconexión por WebSocket.
 
 Decisión importante: no se exponen endpoints de acciones de engine hasta cerrar DTOs de mazos/cartas y autorización mínima. Exponer `GameState`, snapshots o logs crudos como contrato final filtraría zonas ocultas.
 
@@ -202,13 +203,24 @@ La proyección segura separa estado interno de contrato público:
 - Descarte propio/rival: público.
 - `PendingEffectSelection`: solo el jugador autorizado ve candidatos privados; el rival ve metadata pública de selección pendiente.
 
-WebSocket/reconexión debe emitir estas vistas por jugador, no snapshots crudos.
+WebSocket/reconexión emite estas vistas por jugador, no snapshots crudos.
+
+## WebSocket y reconexión
+
+La infraestructura realtime consume la persistencia a través de la capa Application/API:
+
+- `GameRealtimePublisher` publica eventos públicos en `/topic/games/{gameId}/events`.
+- Las vistas seguras se publican por jugador en `/queue/games/{gameId}/players/{playerId}/view`.
+- Los logs públicos/sanitizados se publican por jugador en `/queue/games/{gameId}/players/{playerId}/log`.
+- `POST /api/games/{gameId}/reconnect?playerId=...` reconstruye la vista desde el último snapshot y la publica al jugador.
+
+Regla: la persistencia puede guardar estado completo privado, pero la capa realtime solo publica proyecciones seguras.
 
 ## Próximo paso recomendado
 
 Evolucionar la **API de partidas** como capa de aplicación sobre esta persistencia:
 
 - enviar comandos de juego,
-- preparar contrato de reconexión para WebSocket futuro.
+- endurecer identidad/autenticación para que `playerId` derive de sesión/token.
 
 Ese diseño debe hacerse sin mover reglas a controllers ni exponer `GameState` crudo.

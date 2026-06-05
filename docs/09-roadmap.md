@@ -328,11 +328,20 @@ Decisiones fase 12:
 
 ## Fase 15 - WebSockets
 
-- Objetivo: sincronización realtime.
-- Entregables: canales, eventos, reconexión y emisión de las vistas seguras por jugador de Fase 14.
+- Estado: implementada como infraestructura backend STOMP/realtime mínima, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: sincronización realtime y reconexión básica reutilizando vistas seguras por jugador.
+- Entregables: `spring-boot-starter-websocket`, `WebSocketConfig`, `GameRealtimePublisher`, eventos realtime, canales por partida/jugador y endpoint `POST /api/games/{gameId}/reconnect?playerId=...`.
+- Canales: `/topic/games/{gameId}/events`, `/queue/games/{gameId}/players/{playerId}/view`, `/queue/games/{gameId}/players/{playerId}/log`.
+- Eventos implementados para alcance actual: `GAME_CREATED`, `PLAYER_JOINED`, `VIEW_UPDATED`, `LOG_UPDATED`, `PLAYER_RECONNECTED`; se reservan tipos para turnos, acciones, KO, premios, condiciones y finalización cuando existan actions seguras.
+- Decisión: el publisher nunca publica `GameState`, snapshots ni logs crudos; solo `GameViewResponse`/`GameLogPublicView` y eventos públicos.
+- Decisión: reconexión mínima por REST devuelve vista segura actualizada y emite evento/vista/log por WebSocket.
+- Decisión: las publicaciones realtime se registran `afterCommit` cuando hay transacción activa, para no emitir estados que luego puedan rollbackear.
+- Decisión: los eventos incluyen `eventId` para deduplicación básica; `stateVersion`/`snapshotSequence` queda recomendado para cuando existan acciones jugables completas en realtime.
+- Decisión: los segmentos de destino STOMP se normalizan para evitar rutas ambiguas con caracteres raros en IDs.
 - Dependencias: persistencia, eventos y vistas seguras.
-- Riesgos: filtración o duplicados.
-- Criterio: contrato WS testeado.
+- Fuera de alcance: frontend Angular, JWT/autenticación real, acciones jugables completas, nuevas reglas de cartas, chat/ranking.
+- Riesgos: `playerId` sigue siendo selector de perspectiva hasta agregar auth; debe derivarse de sesión/token en hardening y las colas por jugador deben protegerse o migrarse a `/user/queue`.
+- Criterio: publisher probado con `SimpMessagingTemplate` mockeado; vistas distintas por jugador y log sanitizado sin datos crudos.
 
 ## Fase 16 - Tests fuertes
 

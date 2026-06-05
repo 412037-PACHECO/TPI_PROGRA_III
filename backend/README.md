@@ -2,7 +2,7 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 14 - Vistas seguras por jugador
+## Alcance actual: Fase 15 - WebSocket y reconexión básica
 
 El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y motor extensible de efectos. La Fase 11 agrega auditoría progresiva de cartas reales XY1 y un primer catálogo explícito de mappings hacia `EffectDefinition`, sin intentar cubrir todo XY1 de golpe y sin parser automático de texto natural.
 
@@ -52,6 +52,7 @@ Incluye:
 - Persistencia interna RF-03/RF-05 con metadata de sesión, snapshots JSON versionados y log append-only.
 - API REST básica de partidas para crear sala en espera, unirse, consultar metadata, listar salas en espera y consultar historial persistido.
 - Proyección segura por jugador para devolver estado de partida desde la perspectiva del solicitante sin filtrar mano, orden de mazo, premios ocultos ni selecciones privadas del rival.
+- WebSocket/STOMP backend para eventos realtime de sesión, envío de vistas seguras por jugador y reconexión básica.
 
 ## Modelo Game State
 
@@ -599,7 +600,7 @@ Los mazos incompletos pueden guardarse y editarse. Las reglas de mazo completo n
 
 ## API REST de partidas y vistas seguras
 
-Esta fase expone un contrato mínimo de sesión/auditoría y agrega vistas seguras por jugador. **No** expone todavía acciones completas de setup/turno/ataque, WebSocket ni frontend.
+Esta fase expone un contrato mínimo de sesión/auditoría, vistas seguras por jugador y eventos WebSocket de sesión/reconexión. **No** expone todavía acciones completas de setup/turno/ataque ni frontend.
 
 ### Crear sala en espera
 
@@ -614,6 +615,8 @@ Content-Type: application/json
 
 Respuesta `201 Created` con metadata de sesión `WAITING`. En este punto no hay `GameState` completo porque el modelo interno requiere dos jugadores distintos.
 
+También publica por WebSocket un evento público `GAME_CREATED` en `/topic/games/{gameId}/events`.
+
 ### Unirse a sala
 
 ```http
@@ -626,6 +629,13 @@ Content-Type: application/json
 ```
 
 Al unirse el segundo jugador se crea el `GameState` interno en estado `CREATED`, se persiste snapshot inicial y se registra log `GAME_JOINED`.
+
+También publica por WebSocket:
+
+- evento público `PLAYER_JOINED` en `/topic/games/{gameId}/events`;
+- vista segura de player one en `/queue/games/{gameId}/players/{playerOneId}/view`;
+- vista segura de player two en `/queue/games/{gameId}/players/{playerTwoId}/view`;
+- log público/sanitizado por jugador en `/queue/games/{gameId}/players/{playerId}/log`.
 
 Errores controlados:
 
@@ -675,9 +685,50 @@ Este es el contrato recomendado para frontend y futura reconexión WebSocket. De
 
 Si `viewerPlayerId` no pertenece a la partida, responde `403`.
 
+### Reconexión básica
+
+```http
+POST /api/games/{gameId}/reconnect?playerId=player-one
+```
+
+Devuelve la misma vista segura que `/view` para el jugador y publica por WebSocket:
+
+- evento público `PLAYER_RECONNECTED`;
+- vista segura actualizada en la cola privada del jugador;
+- log público/sanitizado actualizado en la cola privada del jugador.
+
 El log crudo (`commandJson`, `resultJson`, `eventsJson`) sigue existiendo internamente para auditoría/debug backend, pero no se expone como endpoint público.
 
 Nota: `viewerPlayerId` selecciona la perspectiva de la vista. No reemplaza autenticación real; cuando se agregue seguridad, debe derivarse de sesión/token y no confiarse al cliente.
+
+## WebSocket/STOMP
+
+Endpoint STOMP:
+
+```text
+/ws
+```
+
+Broker simple habilitado:
+
+- `/topic` para eventos públicos por partida.
+- `/queue` para mensajes por jugador/perspectiva.
+
+Application destination prefix:
+
+- `/app`
+
+Canales usados:
+
+- `/topic/games/{gameId}/events`: eventos públicos de sesión/reconexión (`GAME_CREATED`, `PLAYER_JOINED`, `LOG_UPDATED`, `PLAYER_RECONNECTED`).
+- `/queue/games/{gameId}/players/{playerId}/view`: vista segura para ese jugador.
+- `/queue/games/{gameId}/players/{playerId}/log`: log público/sanitizado para ese jugador.
+
+Regla obligatoria: WebSocket nunca publica `GameState`, snapshot JSON, `commandJson`, `resultJson`, `eventsJson` ni vista de un jugador en la cola del rival.
+
+Los mensajes realtime incluyen `eventId` para deduplicación básica en cliente. En una fase posterior conviene agregar `stateVersion`/`snapshotSequence` cuando las acciones jugables completas estén integradas al flujo realtime.
+
+Importante: hasta implementar autenticación real, las colas por `playerId` son un contrato de desarrollo/MVP y no una garantía criptográfica de privacidad. Con JWT/sesión, deben migrarse o protegerse para que la identidad de conexión determine qué cola privada puede consumir cada cliente.
 
 ## Base de datos local/dev
 
@@ -711,8 +762,8 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Mapeo completo de todos los efectos XY1.
 - Parseo automático de texto natural de cartas.
 - Acciones REST completas de juego: setup, inicio/fin de turno, bajar Pokémon, unir Energía, evolucionar, retirar, jugar Trainers, atacar y resolver selecciones pendientes.
-- WebSocket/realtime.
 - Frontend.
+- Autenticación real/JWT; por ahora `playerId`/`viewerPlayerId` selecciona perspectiva y debe endurecerse con sesión/token.
 - Regla ACE SPEC obligatoria para `xy1`.
 
 Los campos complejos de cartas (`attacks`, `abilities`, `rules`, `weaknesses`, etc.) se guardan como JSON texto para conservar fidelidad de catálogo sin sobre-modelar ni parsear reglas.
@@ -720,6 +771,7 @@ Los campos complejos de cartas (`attacks`, `abilities`, `rules`, `weaknesses`, e
 ## Dependencias actuales
 
 - `spring-boot-starter-web`: deja la app lista para exponer APIs REST futuras.
+- `spring-boot-starter-websocket`: STOMP/WebSocket para eventos realtime y reconexión básica.
 - `spring-boot-starter-data-jpa`: persistencia del catálogo local.
 - `h2`: base local/dev y tests.
 - `spring-boot-starter-test`: permite validar el contexto de Spring desde el inicio.

@@ -74,6 +74,28 @@ class GameControllerTest {
     }
 
     @Test
+    void reconnectsAndReturnsSafeView() throws Exception {
+        when(applicationService.reconnect("game-1", "player-one")).thenReturn(new GameViewResponse(
+                "game-1",
+                "ACTIVE",
+                "player-one",
+                new PlayerPerspectiveView("player-one", true, new HandView(1, List.of()), new DeckView(10, false, List.of()), new PrizeCardsView(6, false, List.of()), new DiscardPileView(0, List.of()), new PlayerBoardView(null, List.of()), 1),
+                new OpponentPerspectiveView("player-two", new HandView(2, List.of()), new DeckView(20, false, List.of()), new PrizeCardsView(6, false, List.of()), new DiscardPileView(0, List.of()), new OpponentBoardView(null, List.of()), 1),
+                new TurnView("player-one", "player-one", 1, "MAIN", true, false, false, false, false),
+                null,
+                new PendingSelectionView(false, false, null, null, null, null, null, 0, 0, false, false, List.of()),
+                null,
+                null,
+                null
+        ));
+
+        mockMvc.perform(post("/api/games/game-1/reconnect").param("playerId", "player-one"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.viewerPlayerId").value("player-one"))
+                .andExpect(jsonPath("$.opponent.hand.cards").isEmpty());
+    }
+
+    @Test
     void listsWaitingGamesAndHistory() throws Exception {
         when(queryService.waitingGames()).thenReturn(List.of(summary("game-1", "player-one", null, GameSessionStatus.WAITING)));
         when(queryService.publicHistory("game-1", "player-one")).thenReturn(List.of(new GameLogPublicView(1, 0, "player-two", "GAME_JOINED", Instant.parse("2026-06-05T00:00:00Z"), "player-two resolved GAME_JOINED", List.of("GAME_JOINED"))));

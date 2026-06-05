@@ -38,6 +38,11 @@ public class GameController {
         return toResponse(applicationService.joinGame(gameId, request == null ? null : request.playerTwoId()));
     }
 
+    @PostMapping("/{gameId}/reconnect")
+    public GameViewResponse reconnect(@PathVariable String gameId, @RequestParam String playerId) {
+        return applicationService.reconnect(gameId, playerId);
+    }
+
     @GetMapping("/{gameId}")
     public GameResponse get(@PathVariable String gameId) {
         return toResponse(queryService.get(gameId));
