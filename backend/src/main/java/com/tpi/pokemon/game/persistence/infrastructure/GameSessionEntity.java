@@ -21,10 +21,10 @@ public class GameSessionEntity {
     @Column(name = "game_id", nullable = false, unique = true, length = 80, updatable = false)
     private String gameId;
 
-    @Column(name = "player_one_id", nullable = false, length = 80)
+    @Column(name = "player_one_id", length = 80)
     private String playerOneId;
 
-    @Column(name = "player_two_id", nullable = false, length = 80)
+    @Column(name = "player_two_id", length = 80)
     private String playerTwoId;
 
     @Column(nullable = false, length = 40)
@@ -60,6 +60,15 @@ public class GameSessionEntity {
 
     public static GameSessionEntity create(String gameId) {
         return new GameSessionEntity(gameId);
+    }
+
+    public static GameSessionEntity waiting(String gameId, String playerOneId) {
+        GameSessionEntity session = new GameSessionEntity(gameId);
+        session.playerOneId = playerOneId;
+        session.status = "WAITING";
+        session.turnNumber = 0;
+        session.phase = "NOT_STARTED";
+        return session;
     }
 
     @PrePersist

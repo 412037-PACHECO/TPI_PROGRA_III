@@ -4,13 +4,14 @@
 
 Persistir suficiente estado para reconstruir una partida completa ante falla, reinicio o reconexión.
 
-Esta estrategia cubre **RF-03 - Gestión del juego y estados** y **RF-05 - Persistencia del estado** desde el diseño técnico. No define endpoints REST, WebSocket ni frontend; esos contratos quedan para una fase posterior.
+Esta estrategia cubre **RF-03 - Gestión del juego y estados** y **RF-05 - Persistencia del estado** desde el diseño técnico. La API REST básica de partidas ya existe para sesión/auditoría, pero WebSocket, frontend y vistas seguras finales quedan para fases posteriores.
 
 ## Estado de implementación
 
-- **Implementado hoy**: catálogo local XY1, Deck Builder persistido con JPA/H2 y persistencia interna de partidas mediante `GameSessionEntity`, `GameSnapshotEntity`, `GameActionLogEntity` y `GamePersistenceService`.
+- **Implementado hoy**: catálogo local XY1, Deck Builder persistido con JPA/H2, persistencia interna de partidas mediante `GameSessionEntity`, `GameSnapshotEntity`, `GameActionLogEntity`/`GamePersistenceService`, y API REST básica para crear sala, unirse, consultar metadata, listar salas en espera y consultar log persistido.
 - **Cobertura de Fase 12**: snapshot JSON completo + metadata consultable + log inmutable append-only, con reconstrucción desde último snapshot.
-- **Fuera de alcance de este documento/fase**: contratos públicos de API de partidas, WebSocket/reconexión, vistas seguras por jugador y UI.
+- **Cobertura de Fase 13 inicial**: endpoints REST de sesión/auditoría sobre la persistencia, sin acciones completas de juego ni vistas seguras finales.
+- **Fuera de alcance de este documento/fase**: WebSocket/reconexión, frontend, vistas seguras por jugador y comandos públicos completos de setup/turno/ataque.
 
 ## Decisión principal
 
@@ -139,7 +140,8 @@ En una primera implementación puede guardarse snapshot después de cada acción
 
 Persistir snapshot + log después de:
 
-- Crear/unirse a partida.
+- Unirse a partida y crear el `GameState` inicial de dos jugadores.
+- Crear sala en espera solo persiste metadata `WAITING`, porque todavía no hay `GameState` válido de dos jugadores.
 - Resolver mulligan/setup.
 - Robar carta.
 - Jugar carta.
@@ -170,11 +172,24 @@ Cada snapshot debe tener versión incremental para:
 - Persistir JSON completo reduce fricción del engine, pero dificulta reportes SQL profundos sobre zonas internas.
 - La auditoría XY1 sigue siendo incremental: persistir una partida no implica que todos los efectos del set estén soportados.
 
+## API REST básica implementada
+
+Endpoints disponibles:
+
+- `POST /api/games`: crea metadata de sala en espera (`WAITING`) para `playerOneId`.
+- `POST /api/games/{gameId}/join`: agrega `playerTwoId`, crea `GameState.CREATED`, persiste snapshot inicial y registra log `GAME_JOINED`.
+- `GET /api/games/{gameId}`: consulta metadata normalizada.
+- `GET /api/games/waiting`: lista salas en espera.
+- `GET /api/games/{gameId}/log`: consulta historial persistido append-only.
+
+Decisión importante: no se exponen endpoints de acciones de engine hasta cerrar DTOs de mazos/cartas, autorización mínima y vistas seguras por jugador. Exponer `GameState` o logs crudos como contrato final filtraría zonas ocultas.
+
+La operación de join toma lock pesimista sobre `GameSessionEntity` para evitar que dos requests simultáneos unan jugadores distintos a la misma sala `WAITING`.
+
 ## Próximo paso recomendado
 
-Diseñar la **API de partidas** como capa de aplicación sobre esta persistencia:
+Evolucionar la **API de partidas** como capa de aplicación sobre esta persistencia:
 
-- crear partida desde mazos válidos,
 - consultar metadata/estado seguro por jugador,
 - enviar comandos de juego,
 - obtener historial/auditoría filtrada,

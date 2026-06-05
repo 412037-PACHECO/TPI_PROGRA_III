@@ -6,6 +6,9 @@ import com.tpi.pokemon.decks.application.CatalogCardNotFoundException;
 import com.tpi.pokemon.decks.application.DeckCardNotFoundException;
 import com.tpi.pokemon.decks.application.DeckInvalidOperationException;
 import com.tpi.pokemon.decks.application.DeckNotFoundException;
+import com.tpi.pokemon.game.application.GameAlreadyFullException;
+import com.tpi.pokemon.game.application.GameNotFoundException;
+import com.tpi.pokemon.game.application.InvalidGameCommandException;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +36,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PokemonTcgApiException.class)
     ResponseEntity<ApiErrorResponse> handleExternalApi(PokemonTcgApiException exception) {
         return error(HttpStatus.BAD_GATEWAY, exception.getMessage());
+    }
+
+    @ExceptionHandler(GameNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> handleGameNotFound(GameNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler({InvalidGameCommandException.class, GameAlreadyFullException.class})
+    ResponseEntity<ApiErrorResponse> handleInvalidGameCommand(RuntimeException exception) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     private ResponseEntity<ApiErrorResponse> error(HttpStatus status, String message) {

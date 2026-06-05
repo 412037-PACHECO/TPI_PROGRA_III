@@ -302,7 +302,18 @@ Decisiones fase 12:
 - El log no reemplaza al snapshot: explica y audita la transición, mientras el snapshot acelera recuperación/reconexión.
 - No se agregan todavía endpoints REST de juego, WebSocket, frontend ni vistas seguras por jugador; quedan como próximo paso de API de partidas.
 
-## Fase 13 - WebSockets
+## Fase 13 - API REST básica de partidas
+
+- Estado: implementada como contrato mínimo de sesión/auditoría; pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: exponer una capa REST de aplicación sobre la persistencia sin meter reglas en controllers ni publicar vistas inseguras.
+- Entregables: `GameApplicationService`, `GameQueryService`, `GameController`, DTOs REST, excepciones application y mapeo de errores en `GlobalExceptionHandler`.
+- Endpoints implementados: `POST /api/games`, `POST /api/games/{gameId}/join`, `GET /api/games/{gameId}`, `GET /api/games/waiting`, `GET /api/games/{gameId}/log`.
+- Decisión: crear sala `WAITING` persiste solo metadata; al unirse segundo jugador se toma lock pesimista sobre la sesión, se crea `GameState.CREATED`, snapshot inicial y log `GAME_JOINED`.
+- Fuera de alcance: setup desde mazos, acciones de turno, ataque, resolución de selecciones pendientes, WebSocket, frontend y vistas seguras finales por jugador.
+- Riesgos: el log crudo puede contener información privada; no debe usarse como contrato final de frontend.
+- Criterio: endpoints delegan a application services, validan entrada básica, persisten snapshot/log al crear GameState inicial y tienen tests de application/API.
+
+## Fase 14 - WebSockets
 
 - Objetivo: sincronización realtime.
 - Entregables: canales, eventos, reconexión, vistas seguras.
@@ -310,7 +321,7 @@ Decisiones fase 12:
 - Riesgos: filtración o duplicados.
 - Criterio: contrato WS testeado.
 
-## Fase 14 - Tests fuertes
+## Fase 15 - Tests fuertes
 
 - Objetivo: cobertura y casos críticos.
 - Entregables: unit/integration/WS/E2E mínimos.
@@ -318,7 +329,7 @@ Decisiones fase 12:
 - Riesgos: tests frágiles.
 - Criterio: JaCoCo >=80% y críticos >90%.
 
-## Fase 15 - Preparación para frontend
+## Fase 16 - Preparación para frontend
 
 - Objetivo: contratos estables para Angular.
 - Entregables: OpenAPI, DTOs, eventos, vistas seguras.

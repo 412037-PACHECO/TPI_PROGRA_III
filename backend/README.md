@@ -2,7 +2,7 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 11 - Auditoría y mapeo progresivo XY1
+## Alcance actual: Fase 13 - API REST básica de partidas
 
 El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y motor extensible de efectos. La Fase 11 agrega auditoría progresiva de cartas reales XY1 y un primer catálogo explícito de mappings hacia `EffectDefinition`, sin intentar cubrir todo XY1 de golpe y sin parser automático de texto natural.
 
@@ -49,6 +49,8 @@ Incluye:
 - Clasificación documental 11G.5 de las 146 cartas: las 99 pendientes quedan clasificadas por gap real, sin implementar features nuevas ni afirmar soporte jugable completo.
 - Follow-up 11G.6 de bajo riesgo: los 6 casos `DAMAGE_ONLY_SUPPORTED` (`Ekans`, `Spoink`, `Sandile`, `Honedge`, `Swirlix`, `Lillipup`) quedan con mapping vacío explícito y test de catálogo para alcance de daño puro; `FULLY_TESTED` sube a 39 sin afirmar XY1 completo.
 - Herramienta interna para generar reporte de auditoría XY1 desde catálogo local cacheado, sin exponer endpoint público.
+- Persistencia interna RF-03/RF-05 con metadata de sesión, snapshots JSON versionados y log append-only.
+- API REST básica de partidas para crear sala en espera, unirse, consultar metadata, listar salas en espera y consultar historial persistido.
 
 ## Modelo Game State
 
@@ -594,6 +596,65 @@ Reglas XY1 implementadas solo en el endpoint explícito de validación:
 
 Los mazos incompletos pueden guardarse y editarse. Las reglas de mazo completo no bloquean el CRUD.
 
+## API REST básica de partidas
+
+Esta fase expone un contrato mínimo de sesión y auditoría. **No** expone todavía acciones completas de setup/turno/ataque ni vistas seguras finales por jugador.
+
+### Crear sala en espera
+
+```http
+POST /api/games
+Content-Type: application/json
+
+{
+  "playerOneId": "player-one"
+}
+```
+
+Respuesta `201 Created` con metadata de sesión `WAITING`. En este punto no hay `GameState` completo porque el modelo interno requiere dos jugadores distintos.
+
+### Unirse a sala
+
+```http
+POST /api/games/{gameId}/join
+Content-Type: application/json
+
+{
+  "playerTwoId": "player-two"
+}
+```
+
+Al unirse el segundo jugador se crea el `GameState` interno en estado `CREATED`, se persiste snapshot inicial y se registra log `GAME_JOINED`.
+
+Errores controlados:
+
+- `404`: partida inexistente.
+- `400`: jugador vacío, mismo jugador que creó la sala o partida ya completa.
+
+### Consultar metadata de partida
+
+```http
+GET /api/games/{gameId}
+```
+
+Devuelve metadata consultable: jugadores, estado, turno/fase, ganador y timestamps.
+
+### Listar salas en espera
+
+```http
+GET /api/games/waiting
+```
+
+Devuelve partidas con estado externo `WAITING`.
+
+### Consultar log persistido
+
+```http
+GET /api/games/{gameId}/log
+```
+
+Devuelve historial append-only persistido. El log puede contener datos internos y no debe tratarse como vista pública final para frontend hasta implementar vistas seguras por jugador.
+
 ## Base de datos local/dev
 
 Se usa H2 bajo el perfil `local` como base de desarrollo inicial para mantener la fase académica liviana y migrable a PostgreSQL/MySQL más adelante.
@@ -625,8 +686,8 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Efectos complejos de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.
 - Mapeo completo de todos los efectos XY1.
 - Parseo automático de texto natural de cartas.
-- Endpoints REST de juego.
-- Endpoints REST públicos de partida; la persistencia interna de sesión/snapshot/log ya existe para RF-03/RF-05.
+- Acciones REST completas de juego: setup, inicio/fin de turno, bajar Pokémon, unir Energía, evolucionar, retirar, jugar Trainers, atacar y resolver selecciones pendientes.
+- Vistas públicas seguras por jugador; el `GameState` interno y logs crudos no son contrato final de frontend.
 - WebSocket/realtime.
 - Frontend.
 - Regla ACE SPEC obligatoria para `xy1`.

@@ -49,6 +49,8 @@
 - No contiene lógica de reglas.
 - Devuelve errores accionables.
 - Tiene test de integración si toca persistencia o contrato relevante.
+- Si expone datos de partida, distingue metadata/log interno de vistas seguras finales por jugador.
+- No publica `GameState` completo como contrato frontend porque contiene zonas ocultas.
 
 ## Prueba
 
