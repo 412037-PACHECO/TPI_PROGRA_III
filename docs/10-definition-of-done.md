@@ -72,6 +72,7 @@
 - Reutiliza las mismas vistas seguras de REST; no duplica lógica de privacidad.
 - No publica `GameState`, snapshots JSON ni logs crudos.
 - Publica eventos de sesión/reconexión después de create/join/reconnect.
+- Publica eventos de gameplay después de acciones válidas, usando publicación post-commit cuando hay transacción activa.
 - La reconexión devuelve vista segura actualizada.
 - Tiene tests con `SimpMessagingTemplate` mockeado que verifican destinos y payloads seguros.
 
@@ -82,7 +83,9 @@
 - Valida jugador y delega reglas al engine.
 - Persiste log + snapshot solo si la acción fue válida.
 - Devuelve `GameViewResponse`, nunca `GameState`.
+- Si publica realtime, emite evento público sin zonas ocultas, vistas seguras por jugador y log público/sanitizado.
 - Una acción inválida devuelve error claro y no crea snapshot falso.
+- Una acción inválida no publica evento realtime de éxito.
 - No expone endpoints falsos para reglas sin contrato seguro, como pending selections o Trainers complejos.
 - Documenta gaps explícitos.
 

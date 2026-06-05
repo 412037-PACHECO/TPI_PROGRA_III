@@ -54,6 +54,33 @@ public class GameRealtimePublisher {
         publishPublicEvent(GameRealtimeEvent.of(gameId, GameRealtimeEventType.LOG_UPDATED, playerId, "Public log updated", Map.of("actionType", "PLAYER_RECONNECTED")));
     }
 
+    public void publishGameplayAction(
+            String gameId,
+            GameRealtimeEventType eventType,
+            String actorPlayerId,
+            String actionType,
+            GameViewResponse playerOneView,
+            GameViewResponse playerTwoView,
+            List<GameLogPublicView> log,
+            boolean gameFinished
+    ) {
+        publishPublicEvent(GameRealtimeEvent.of(
+                gameId,
+                eventType,
+                actorPlayerId,
+                actionType + " applied",
+                Map.of("actionType", actionType, "actorPlayerId", actorPlayerId)
+        ));
+        publishSafeView(playerOneView);
+        publishSafeView(playerTwoView);
+        publishSafeLog(gameId, playerOneView.viewerPlayerId(), log);
+        publishSafeLog(gameId, playerTwoView.viewerPlayerId(), log);
+        publishPublicEvent(GameRealtimeEvent.of(gameId, GameRealtimeEventType.LOG_UPDATED, actorPlayerId, "Public log updated", Map.of("actionType", actionType)));
+        if (gameFinished) {
+            publishPublicEvent(GameRealtimeEvent.of(gameId, GameRealtimeEventType.GAME_FINISHED, actorPlayerId, "Game finished", Map.of("actionType", actionType)));
+        }
+    }
+
     public void publishSafeView(GameViewResponse view) {
         messagingTemplate.convertAndSend(playerViewDestination(view.gameId(), view.viewerPlayerId()), GameViewUpdatedEvent.from(view));
     }

@@ -75,6 +75,24 @@ class GameRealtimePublisherTest {
         assertThat(event.getValue().log().get(0).summary()).doesNotContain("commandJson", "resultJson", "eventsJson", "secretCardId");
     }
 
+    @Test
+    void publishesGameplayActionEventSafeViewsLogsAndFinishedEvent() {
+        GameViewResponse playerOneView = view("player-one", 2, 3);
+        GameViewResponse playerTwoView = view("player-two", 3, 2);
+        List<GameLogPublicView> log = List.of(publicLog());
+
+        publisher.publishGameplayAction("game-1", GameRealtimeEventType.ATTACK_DECLARED, "player-one", "DECLARE_ATTACK", playerOneView, playerTwoView, log, true);
+
+        ArgumentCaptor<GameRealtimeEvent> publicEvent = ArgumentCaptor.forClass(GameRealtimeEvent.class);
+        verify(messagingTemplate, org.mockito.Mockito.times(3)).convertAndSend(eq("/topic/games/game-1/events"), publicEvent.capture());
+        assertThat(publicEvent.getAllValues()).extracting(GameRealtimeEvent::type)
+                .containsExactly(GameRealtimeEventType.ATTACK_DECLARED, GameRealtimeEventType.LOG_UPDATED, GameRealtimeEventType.GAME_FINISHED);
+        verify(messagingTemplate).convertAndSend(eq("/queue/games/game-1/players/player-one/view"), org.mockito.Mockito.any(GameViewUpdatedEvent.class));
+        verify(messagingTemplate).convertAndSend(eq("/queue/games/game-1/players/player-two/view"), org.mockito.Mockito.any(GameViewUpdatedEvent.class));
+        verify(messagingTemplate).convertAndSend(eq("/queue/games/game-1/players/player-one/log"), org.mockito.Mockito.any(GameLogUpdatedEvent.class));
+        verify(messagingTemplate).convertAndSend(eq("/queue/games/game-1/players/player-two/log"), org.mockito.Mockito.any(GameLogUpdatedEvent.class));
+    }
+
     private GameSessionSummary session() {
         Instant now = Instant.parse("2026-06-05T00:00:00Z");
         return new GameSessionSummary("game-1", "player-one", "player-two", "CREATED", null, 0, "NOT_STARTED", null, now, now);

@@ -358,9 +358,14 @@ Decisiones fase 12:
 
 ## Fase 17 - Gameplay realtime WebSocket
 
-- Objetivo: publicar por WebSocket los resultados de acciones jugables usando vistas seguras y eventos específicos de turnos/KO/premios/condiciones/fin de partida.
+- Estado: implementada para acciones jugables estructurales, pendiente de ejecución local final de Maven por restricción de entorno.
+- Objetivo: publicar por WebSocket los resultados de acciones jugables usando vistas seguras, log sanitizado y eventos públicos específicos.
+- Entregables: eventos `GAME_STARTED`, `SETUP_UPDATED`, `BASIC_PLAYED`, `ENERGY_ATTACHED`, `POKEMON_EVOLVED`, `RETREAT_PERFORMED`, `ATTACK_DECLARED`, `TURN_ENDED`, `ACTIVE_REPLACED` y `GAME_FINISHED` cuando el estado queda finalizado; integración desde `GameplayApplicationService` después de persistir acción válida; tests unitarios de publisher/application.
 - Dependencias: Fase 16.
-- Riesgos: orden/idempotencia y privacidad por jugador.
+- Decisión: se publica `afterCommit` cuando hay transacción activa, reutilizando `GameViewResponse` y `GameLogPublicView`; WebSocket no recibe `GameState`, snapshots ni logs crudos.
+- Fuera de alcance: frontend, JWT/auth, `/user/queue`, ordenamiento/idempotencia fuerte con `stateVersion`, `play-trainer`, `resolve-selection` y nuevas reglas de cartas.
+- Riesgos: `playerId` sigue siendo selector de perspectiva hasta agregar autenticación; clientes concurrentes pueden necesitar versión de estado para reconciliación avanzada.
+- Criterio: acción válida publica evento/vistas/log; acción inválida no publica éxito ni persiste snapshot falso; player one/player two reciben vistas distintas y seguras.
 
 ## Fase 18 - Tests fuertes
 

@@ -2,7 +2,7 @@
 
 Backend base del TPI Pokémon TCG.
 
-## Alcance actual: Fase 15 - WebSocket y reconexión básica
+## Alcance actual: Fase 17 - Gameplay realtime seguro
 
 El backend ya cuenta con capacidad de importar/cachear localmente cartas `xy1` desde `pokemontcg.io` v2, Deck Builder, modelo interno de partida, setup/mulligan inicial, motor de turnos/acciones MAIN, ataques base, knockout, premios, condiciones básicas de victoria/derrota, condiciones especiales y motor extensible de efectos. La Fase 11 agrega auditoría progresiva de cartas reales XY1 y un primer catálogo explícito de mappings hacia `EffectDefinition`, sin intentar cubrir todo XY1 de golpe y sin parser automático de texto natural.
 
@@ -52,7 +52,7 @@ Incluye:
 - Persistencia interna RF-03/RF-05 con metadata de sesión, snapshots JSON versionados y log append-only.
 - API REST básica de partidas para crear sala en espera, unirse, consultar metadata, listar salas en espera y consultar historial persistido.
 - Proyección segura por jugador para devolver estado de partida desde la perspectiva del solicitante sin filtrar mano, orden de mazo, premios ocultos ni selecciones privadas del rival.
-- WebSocket/STOMP backend para eventos realtime de sesión, envío de vistas seguras por jugador y reconexión básica.
+- WebSocket/STOMP backend para eventos realtime de sesión, envío de vistas seguras por jugador, reconexión básica y publicación de acciones jugables estructurales.
 
 ## Modelo Game State
 
@@ -600,7 +600,7 @@ Los mazos incompletos pueden guardarse y editarse. Las reglas de mazo completo n
 
 ## API REST de partidas y vistas seguras
 
-Esta fase expone sesión/auditoría, vistas seguras por jugador, eventos WebSocket de sesión/reconexión y una API REST jugable para los comandos estructurales ya soportados por el engine. **No** expone todavía frontend, gameplay realtime completo ni endpoints falsos para efectos sin contrato seguro.
+Esta fase expone sesión/auditoría, vistas seguras por jugador, eventos WebSocket de sesión/reconexión y una API REST jugable para los comandos estructurales ya soportados por el engine. Después de cada acción válida, publica realtime con evento público, vistas seguras por jugador y log sanitizado. **No** expone todavía frontend ni endpoints falsos para efectos sin contrato seguro.
 
 ### Crear sala en espera
 
@@ -703,7 +703,7 @@ Nota: `viewerPlayerId` selecciona la perspectiva de la vista. No reemplaza auten
 
 ## API REST jugable
 
-Todas las acciones jugables cargan el último snapshot, ejecutan el engine puro Java, persisten log + snapshot si la acción fue válida y devuelven `GameViewResponse` seguro para el jugador que actuó. Si la acción falla, responde error controlado y no persiste snapshot falso.
+Todas las acciones jugables cargan el último snapshot, ejecutan el engine puro Java, persisten log + snapshot si la acción fue válida, devuelven `GameViewResponse` seguro para el jugador que actuó y registran publicación realtime `afterCommit`. Si la acción falla, responde error controlado, no persiste snapshot falso y no publica evento de éxito.
 
 ### Setup desde mazos
 
@@ -775,13 +775,13 @@ Application destination prefix:
 
 Canales usados:
 
-- `/topic/games/{gameId}/events`: eventos públicos de sesión/reconexión (`GAME_CREATED`, `PLAYER_JOINED`, `LOG_UPDATED`, `PLAYER_RECONNECTED`).
+- `/topic/games/{gameId}/events`: eventos públicos de sesión/reconexión/gameplay (`GAME_CREATED`, `GAME_STARTED`, `PLAYER_JOINED`, `SETUP_UPDATED`, `LOG_UPDATED`, `PLAYER_RECONNECTED`, `TURN_STARTED`, `BASIC_PLAYED`, `ENERGY_ATTACHED`, `POKEMON_EVOLVED`, `RETREAT_PERFORMED`, `ATTACK_DECLARED`, `TURN_ENDED`, `ACTIVE_REPLACED`, `GAME_FINISHED`).
 - `/queue/games/{gameId}/players/{playerId}/view`: vista segura para ese jugador.
 - `/queue/games/{gameId}/players/{playerId}/log`: log público/sanitizado para ese jugador.
 
 Regla obligatoria: WebSocket nunca publica `GameState`, snapshot JSON, `commandJson`, `resultJson`, `eventsJson` ni vista de un jugador en la cola del rival.
 
-Los mensajes realtime incluyen `eventId` para deduplicación básica en cliente. En una fase posterior conviene agregar `stateVersion`/`snapshotSequence` cuando las acciones jugables completas estén integradas al flujo realtime.
+Los mensajes realtime incluyen `eventId` para deduplicación básica en cliente. En una fase posterior conviene agregar `stateVersion`/`snapshotSequence` para ordenamiento/idempotencia robusta en clientes concurrentes.
 
 Importante: hasta implementar autenticación real, las colas por `playerId` son un contrato de desarrollo/MVP y no una garantía criptográfica de privacidad. Con JWT/sesión, deben migrarse o protegerse para que la identidad de conexión determine qué cola privada puede consumir cada cliente.
 
@@ -816,7 +816,7 @@ La API key es opcional y se lee desde variable de entorno. No hardcodear secreto
 - Efectos complejos de ataques, habilidades, Trainers, Estadios, Herramientas o Energías Especiales.
 - Mapeo completo de todos los efectos XY1.
 - Parseo automático de texto natural de cartas.
-- Gameplay realtime completo por WebSocket; las acciones jugables actuales son REST y la publicación realtime de gameplay queda para la fase siguiente.
+- Gameplay realtime avanzado con ordenamiento/idempotencia fuerte, reconexión autenticada y hardening de colas por usuario.
 - Endpoints públicos de `play-trainer` y `resolve-selection` hasta cerrar contrato seguro de efectos/pending selections.
 - Frontend.
 - Autenticación real/JWT; por ahora `playerId`/`viewerPlayerId` selecciona perspectiva y debe endurecerse con sesión/token.
